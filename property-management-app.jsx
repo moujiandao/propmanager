@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from "react";
+import { createClient } from '@/lib/supabase/client';
+
+const supabase = createClient();
 
 // ─── TRANSLATIONS ─────────────────────────────────────────────────────────────
 const T = {
@@ -108,55 +111,7 @@ const T = {
   }
 };
 
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-const INITIAL_DATA = {
-  properties: [
-    { id: "p1", address: "2847 Maple Avenue", city: "Berkeley", state: "CA", zip: "94710", units: 2, type: "Duplex", status: "occupied" },
-    { id: "p2", address: "510 Oak Street", city: "Oakland", state: "CA", zip: "94607", units: 1, type: "Single Family", status: "occupied" },
-    { id: "p3", address: "1220 Cedar Lane", city: "San Leandro", state: "CA", zip: "94577", units: 1, type: "Condo", status: "vacant" },
-  ],
-  tenants: [
-    { id: "t1", name: "Sarah Chen", email: "sarah.chen@email.com", phone: "(510) 555-0142", propertyId: "p1", unit: "Unit A", status: "active", bankConnected: true, recurringPayment: true },
-    { id: "t2", name: "Marcus Williams", email: "m.williams@email.com", phone: "(510) 555-0287", propertyId: "p1", unit: "Unit B", status: "active", bankConnected: true, recurringPayment: false },
-    { id: "t3", name: "Elena Vasquez", email: "elena.v@email.com", phone: "(510) 555-0391", propertyId: "p2", unit: "Main", status: "active", bankConnected: false, recurringPayment: false },
-  ],
-  contracts: [
-    { id: "c1", tenantId: "t1", propertyId: "p1", unit: "Unit A", startDate: "2024-01-01", endDate: "2024-12-31", rentAmount: 2400, dueDay: 1, status: "active" },
-    { id: "c2", tenantId: "t2", propertyId: "p1", unit: "Unit B", startDate: "2024-03-01", endDate: "2025-02-28", rentAmount: 2200, dueDay: 1, status: "active" },
-    { id: "c3", tenantId: "t3", propertyId: "p2", unit: "Main", startDate: "2023-07-01", endDate: "2025-06-30", rentAmount: 3100, dueDay: 5, status: "active" },
-  ],
-  payments: [
-    { id: "pay1", tenantId: "t1", contractId: "c1", amount: 2400, dueDate: "2026-03-01", paidDate: "2026-02-28", status: "completed", type: "recurring", achStatus: "completed" },
-    { id: "pay2", tenantId: "t1", contractId: "c1", amount: 2400, dueDate: "2026-02-01", paidDate: "2026-01-31", status: "completed", type: "recurring", achStatus: "completed" },
-    { id: "pay3", tenantId: "t2", contractId: "c2", amount: 2200, dueDate: "2026-03-01", paidDate: null, status: "pending", type: "one-time", achStatus: "pending" },
-    { id: "pay4", tenantId: "t2", contractId: "c2", amount: 2200, dueDate: "2026-02-01", paidDate: "2026-02-05", status: "completed", type: "one-time", achStatus: "completed" },
-    { id: "pay5", tenantId: "t3", contractId: "c3", amount: 3100, dueDate: "2026-03-05", paidDate: null, status: "overdue", type: "one-time", achStatus: null },
-    { id: "pay6", tenantId: "t1", contractId: "c1", amount: 2400, dueDate: "2026-01-01", paidDate: "2025-12-31", status: "completed", type: "recurring", achStatus: "completed" },
-  ],
-  maintenance: [
-    { id: "m1", tenantId: "t1", propertyId: "p1", unit: "Unit A", description: "Leaking faucet in kitchen sink — water dripping constantly", priority: "medium", status: "in-progress", date: "2026-02-20" },
-    { id: "m2", tenantId: "t2", propertyId: "p1", unit: "Unit B", description: "Heater not working properly, not reaching set temperature", priority: "high", status: "open", date: "2026-02-28" },
-    { id: "m3", tenantId: "t3", propertyId: "p2", unit: "Main", description: "Broken window latch in bedroom — security concern", priority: "high", status: "open", date: "2026-03-01" },
-    { id: "m4", tenantId: "t1", propertyId: "p1", unit: "Unit A", description: "Paint peeling in bathroom near shower", priority: "low", status: "resolved", date: "2026-01-15" },
-  ],
-  emailSettings: {
-    fiveDayReminder: true, dayOfReminder: true, oneDayOverdue: false, threeDayOverdue: true, sevenDayOverdue: true,
-    templates: {
-      fiveDayReminder: "Dear {tenant_name},\n\nThis is a friendly reminder that your rent payment of ${amount} is due in 5 days on {due_date}.\n\nPlease log in to your tenant portal to make a payment or verify your recurring payment is set up.\n\nThank you,\n{landlord_name}",
-      dayOfReminder: "Dear {tenant_name},\n\nYour rent payment of ${amount} is due today, {due_date}.\n\nPlease log in to your portal to complete your payment.\n\nThank you,\n{landlord_name}",
-      oneDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} was due yesterday and has not been received. Please make your payment as soon as possible to avoid late fees.\n\nThank you,\n{landlord_name}",
-      threeDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} is now 3 days overdue. Please contact us immediately or make a payment through your portal.\n\nThank you,\n{landlord_name}",
-      sevenDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} is now 7 days overdue. This is your final reminder before additional action is taken.\n\nPlease contact us immediately.\n\n{landlord_name}",
-    }
-  }
-};
 
-const AUTH_USERS = [
-  { id: "landlord1", role: "landlord", email: "brian@property.com", password: "admin123", name: "Brian Zhang" },
-  { id: "t1", role: "tenant", email: "sarah.chen@email.com", password: "tenant123", name: "Sarah Chen" },
-  { id: "t2", role: "tenant", email: "m.williams@email.com", password: "tenant123", name: "Marcus Williams" },
-  { id: "t3", role: "tenant", email: "elena.v@email.com", password: "tenant123", name: "Elena Vasquez" },
-];
 
 // ─── ICONS ────────────────────────────────────────────────────────────────────
 const Icon = ({ name, size = 18 }) => {
@@ -279,15 +234,36 @@ const LangToggle = ({ lang, setLang }) => (
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 const LoginPage = ({ onLogin }) => {
-  const [email, setEmail] = useState("brian@property.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("landlord");
-  const demos = { landlord: { email: "brian@property.com", password: "admin123" }, tenant: { email: "sarah.chen@email.com", password: "tenant123" } };
-  useEffect(() => { setEmail(demos[tab].email); setPassword(demos[tab].password); setError(""); }, [tab]);
-  const handleLogin = () => {
-    const user = AUTH_USERS.find(u => u.email === email && u.password === password);
-    user ? onLogin(user) : setError("Invalid email or password.");
+  useEffect(() => { setEmail(""); setPassword(""); setError(""); }, [tab]);
+  const handleLogin = async () => {
+    setLoading(true);
+    setError("");
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    if (authError) { setError("Invalid email or password."); setLoading(false); return; }
+
+    // Check landlord profile first
+    const { data: landlord } = await supabase
+      .from("landlord_profiles").select("*").eq("user_id", authData.user.id).single();
+    if (landlord) {
+      onLogin({ id: landlord.id, authId: authData.user.id, role: "landlord", email, name: landlord.name || email.split("@")[0] });
+      return;
+    }
+
+    // Otherwise check tenant profile
+    const { data: tenant } = await supabase
+      .from("tenant_profiles").select("*").eq("user_id", authData.user.id).single();
+    if (tenant) {
+      onLogin({ id: tenant.id, authId: authData.user.id, role: "tenant", email, name: tenant.name || email.split("@")[0] });
+      return;
+    }
+
+    setError("No profile found for this account.");
+    setLoading(false);
   };
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Crimson Pro',Georgia,serif" }}>
@@ -312,8 +288,7 @@ const LoginPage = ({ onLogin }) => {
             </div>
           ))}
           {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
-          <button onClick={handleLogin} style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Playfair Display',Georgia,serif" }}>Sign In</button>
-          <p style={{ color: "#475569", fontSize: 12, textAlign: "center", margin: "16px 0 0" }}>Demo: email/password pre-filled above ↑</p>
+          <button onClick={handleLogin} disabled={loading} style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Playfair Display',Georgia,serif" }}>{loading ? "Signing in…" : "Sign In"}</button>
         </div>
       </div>
     </div>
@@ -489,11 +464,18 @@ const LandlordDashboard = ({ data, t }) => {
 };
 
 // ─── PROPERTIES PAGE ──────────────────────────────────────────────────────────
-const PropertiesPage = ({ data, setData, t }) => {
+const PropertiesPage = ({ data, setData, t, refresh }) => {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ address: "", city: "", state: "CA", zip: "", units: "1", type: "Single Family", status: "vacant" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
-  const add = () => { if (!form.address) return; setData(d => ({...d, properties: [...d.properties, {id:`p${Date.now()}`, ...form, units:+form.units}]})); setShow(false); };
+  const add = async () => {
+    if (!form.address) return;
+    const { error } = await supabase.from("properties").insert({
+      address: form.address, city: form.city, state: form.state, zip: form.zip,
+      units: +form.units, type: form.type, status: form.status,
+    });
+    if (!error) { await refresh(); setShow(false); }
+  };
 
   return (
     <div>
@@ -547,11 +529,25 @@ const PropertiesPage = ({ data, setData, t }) => {
 };
 
 // ─── TENANTS PAGE ─────────────────────────────────────────────────────────────
-const TenantsPage = ({ data, setData, t }) => {
+const TenantsPage = ({ data, setData, t, refresh }) => {
   const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
-  const add = () => { if (!form.name||!form.email) return; setData(d => ({...d, tenants: [...d.tenants, {id:`t${Date.now()}`, ...form, status:"active", bankConnected:false, recurringPayment:false}]})); setShow(false); };
+  const add = async () => {
+    if (!form.name || !form.email) return;
+    setSaving(true);
+    const res = await fetch("/api/auth/create-tenant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: form.name, email: form.email, phone: form.phone,
+        password: form.password, property_id: form.propertyId, unit: form.unit,
+      }),
+    });
+    if (res.ok) { await refresh(); setShow(false); }
+    setSaving(false);
+  };
 
   return (
     <div>
@@ -604,7 +600,7 @@ const TenantsPage = ({ data, setData, t }) => {
           <div style={{ background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 9, padding: 12, marginBottom: 16, fontSize: 13, color: "#92400e" }}><strong>{t.note}:</strong> {t.tenantNote}</div>
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
-            <Btn onClick={add}>{t.createTenantAccount}</Btn>
+            <Btn onClick={add}>{saving ? "Creating…" : t.createTenantAccount}</Btn>
           </div>
         </Modal>
       )}
@@ -613,11 +609,19 @@ const TenantsPage = ({ data, setData, t }) => {
 };
 
 // ─── CONTRACTS PAGE ───────────────────────────────────────────────────────────
-const ContractsPage = ({ data, setData, t }) => {
+const ContractsPage = ({ data, setData, t, refresh }) => {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ tenantId: "", propertyId: "", unit: "", startDate: "", endDate: "", rentAmount: "", dueDay: "1" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
-  const add = () => { if (!form.tenantId||!form.rentAmount) return; setData(d => ({...d, contracts:[...d.contracts,{id:`c${Date.now()}`,...form,rentAmount:+form.rentAmount,dueDay:+form.dueDay,status:"active"}]})); setShow(false); };
+  const add = async () => {
+    if (!form.tenantId || !form.rentAmount) return;
+    const { error } = await supabase.from("contracts").insert({
+      tenant_id: form.tenantId, property_id: form.propertyId, unit: form.unit,
+      start_date: form.startDate, end_date: form.endDate,
+      rent_amount: +form.rentAmount, due_day: +form.dueDay, status: "active",
+    });
+    if (!error) { await refresh(); setShow(false); }
+  };
 
   return (
     <div>
@@ -725,10 +729,14 @@ const PaymentsPage = ({ data, t }) => {
 };
 
 // ─── MAINTENANCE PAGE ─────────────────────────────────────────────────────────
-const MaintenancePage = ({ data, setData, t }) => {
+const MaintenancePage = ({ data, setData, t, refresh }) => {
   const pColors = { high: "#ef4444", medium: "#f59e0b", low: "#3b82f6" };
   const pLabels = { high: t.priorityHigh, medium: t.priorityMedium, low: t.priorityLow };
-  const updateStatus = (id, status) => setData(d => ({...d, maintenance: d.maintenance.map(m => m.id===id?{...m,status}:m)}));
+  const updateStatus = async (id, status) => {
+    // Optimistic update for instant UI feedback
+    setData(d => ({...d, maintenance: d.maintenance.map(m => m.id===id?{...m,status}:m)}));
+    await supabase.from("maintenance_requests").update({ status }).eq("id", id);
+  };
 
   return (
     <div>
@@ -770,10 +778,18 @@ const MaintenancePage = ({ data, setData, t }) => {
 };
 
 // ─── EMAIL PAGE ───────────────────────────────────────────────────────────────
-const EmailPage = ({ data, setData, t }) => {
+const EmailPage = ({ data, setData, t, refresh }) => {
   const s = data.emailSettings;
-  const updS = (k,v) => setData(d => ({...d, emailSettings:{...d.emailSettings,[k]:v}}));
-  const updT = (k,v) => setData(d => ({...d, emailSettings:{...d.emailSettings,templates:{...d.emailSettings.templates,[k]:v}}}));
+  const KEY_MAP = { fiveDayReminder: "five_day_reminder", dayOfReminder: "day_of_reminder", oneDayOverdue: "one_day_overdue", threeDayOverdue: "three_day_overdue", sevenDayOverdue: "seven_day_overdue" };
+  const updS = async (k, v) => {
+    setData(d => ({...d, emailSettings:{...d.emailSettings,[k]:v}}));
+    await supabase.from("email_settings").upsert({ [KEY_MAP[k]]: v }, { onConflict: "landlord_id" });
+  };
+  const updT = (k, v) => setData(d => ({...d, emailSettings:{...d.emailSettings,templates:{...d.emailSettings.templates,[k]:v}}}));
+  const saveTemplate = async () => {
+    await supabase.from("email_settings").upsert({ templates: s.templates }, { onConflict: "landlord_id" });
+    setEditing(null);
+  };
   const [editing, setEditing] = useState(null);
   const reminders = [
     { key:"fiveDayReminder",   tKey:"fiveDayReminder",   label:t.reminder5Day,  desc:t.reminder5DayDesc },
@@ -813,7 +829,7 @@ const EmailPage = ({ data, setData, t }) => {
             <textarea value={s.templates[reminders.find(r => r.key===editing)?.tKey]} onChange={e => updT(reminders.find(r => r.key===editing)?.tKey, e.target.value)}
               style={{ width: "100%", minHeight: 160, padding: "12px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 13, color: "#374151", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none", lineHeight: 1.6 }} />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-              <Btn size="sm" onClick={() => setEditing(null)}>{t.saveTemplate}</Btn>
+              <Btn size="sm" onClick={saveTemplate}>{t.saveTemplate}</Btn>
             </div>
           </div>
         )}
@@ -878,17 +894,33 @@ const TenantDashboard = ({ data, user }) => {
   );
 };
 
-const PaymentPortal = ({ data, setData, user }) => {
+const PaymentPortal = ({ data, setData, user, refresh }) => {
   const [step, setStep] = useState("overview");
   const [bankForm, setBankForm] = useState({ routingNumber: "", accountNumber: "", accountName: "", accountType: "checking" });
   const [success, setSuccess] = useState(false);
   const tenant = data.tenants.find(t => t.id === user.id);
   const contract = data.contracts.find(c => c.tenantId === user.id);
-  const toggleRecurring = () => setData(d => ({...d, tenants: d.tenants.map(t => t.id===user.id?{...t,recurringPayment:!t.recurringPayment}:t)}));
-  const connectBank = () => { if(!bankForm.routingNumber||!bankForm.accountNumber) return; setData(d => ({...d, tenants: d.tenants.map(t => t.id===user.id?{...t,bankConnected:true}:t)})); setStep("overview"); };
-  const makePayment = () => {
-    setData(d => ({...d, payments:[...d.payments,{id:`pay${Date.now()}`,tenantId:user.id,contractId:contract?.id,amount:contract?.rentAmount||0,dueDate:new Date().toISOString().split("T")[0],paidDate:new Date().toISOString().split("T")[0],status:"completed",type:"one-time",achStatus:"pending"}]}));
-    setSuccess(true); setTimeout(() => setSuccess(false), 3000);
+  const toggleRecurring = async () => {
+    await supabase.from("tenant_profiles").update({ recurring_payment: !tenant.recurringPayment }).eq("id", user.id);
+    await refresh();
+  };
+  const connectBank = async () => {
+    if(!bankForm.routingNumber||!bankForm.accountNumber) return;
+    await supabase.from("tenant_profiles").update({ bank_connected: true }).eq("id", user.id);
+    await refresh();
+    setStep("overview");
+  };
+  const makePayment = async () => {
+    const res = await fetch("/api/payments/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenant_id: user.id, contract_id: contract?.id, amount: contract?.rentAmount }),
+    });
+    if (res.ok) {
+      await refresh();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    }
   };
   if (!tenant||!contract) return <div style={{ padding:32,color:"#64748b" }}>No lease found.</div>;
 
@@ -973,15 +1005,23 @@ const PaymentPortal = ({ data, setData, user }) => {
   );
 };
 
-const TenantMaintenancePage = ({ data, setData, user }) => {
+const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
   const [form, setForm] = useState({ description: "", priority: "medium" });
   const [success, setSuccess] = useState(false);
   const tenant = data.tenants.find(t => t.id === user.id);
   const myReqs = data.maintenance.filter(m => m.tenantId === user.id);
-  const submit = () => {
+  const submit = async () => {
     if (!form.description) return;
-    setData(d => ({...d, maintenance:[...d.maintenance,{id:`m${Date.now()}`,tenantId:user.id,propertyId:tenant?.propertyId,unit:tenant?.unit,description:form.description,priority:form.priority,status:"open",date:new Date().toISOString().split("T")[0]}]}));
-    setForm({description:"",priority:"medium"}); setSuccess(true); setTimeout(() => setSuccess(false), 3000);
+    const { error } = await supabase.from("maintenance_requests").insert({
+      tenant_id: user.id, property_id: tenant?.propertyId, unit: tenant?.unit,
+      description: form.description, priority: form.priority, status: "open",
+    });
+    if (!error) {
+      await refresh();
+      setForm({description:"",priority:"medium"});
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    }
   };
   return (
     <div>
@@ -1099,20 +1139,102 @@ const PaymentHistoryPage = ({ data, user }) => {
 };
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
+const EMPTY_EMAIL_SETTINGS = {
+  fiveDayReminder: false, dayOfReminder: false, oneDayOverdue: false, threeDayOverdue: false, sevenDayOverdue: false,
+  templates: {
+    fiveDayReminder: "Dear {tenant_name},\n\nThis is a friendly reminder that your rent payment of ${amount} is due in 5 days on {due_date}.\n\nThank you,\n{landlord_name}",
+    dayOfReminder: "Dear {tenant_name},\n\nYour rent payment of ${amount} is due today, {due_date}.\n\nThank you,\n{landlord_name}",
+    oneDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} was due yesterday. Please make your payment as soon as possible.\n\nThank you,\n{landlord_name}",
+    threeDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} is now 3 days overdue. Please contact us immediately.\n\nThank you,\n{landlord_name}",
+    sevenDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} is now 7 days overdue. This is your final reminder before additional action is taken.\n\n{landlord_name}",
+  }
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState(INITIAL_DATA);
+  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS });
+  const [loadingData, setLoadingData] = useState(false);
   const [lang, setLang] = useState("en");
   const t = T[lang];
 
   useEffect(() => { document.body.style.margin = "0"; document.body.style.background = "#f8fafc"; }, []);
+  useEffect(() => { if (user) fetchAllData(); }, [user]);
+
+  // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
+  const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status });
+  const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status || "active", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false });
+  const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
+  const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
+  const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
+  const mapEmailSettings = (e) => !e ? EMPTY_EMAIL_SETTINGS : ({
+    fiveDayReminder: e.five_day_reminder || false, dayOfReminder: e.day_of_reminder || false,
+    oneDayOverdue: e.one_day_overdue || false, threeDayOverdue: e.three_day_overdue || false,
+    sevenDayOverdue: e.seven_day_overdue || false, templates: e.templates || EMPTY_EMAIL_SETTINGS.templates,
+  });
+
+  // ─── DATA FETCHING ─────────────────────────────────────────────────────────
+  const fetchAllData = async () => {
+    setLoadingData(true);
+    try {
+      if (user.role === "landlord") {
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes] = await Promise.all([
+          supabase.from("properties").select("*").order("created_at", { ascending: true }),
+          supabase.from("tenant_profiles").select("*"),
+          supabase.from("contracts").select("*"),
+          supabase.from("payments").select("*").order("due_date", { ascending: false }),
+          supabase.from("maintenance_requests").select("*").order("created_at", { ascending: false }),
+          supabase.from("email_settings").select("*").single(),
+        ]);
+        setData({
+          properties:    (propRes.data  || []).map(mapProperty),
+          tenants:       (tenRes.data   || []).map(mapTenant),
+          contracts:     (conRes.data   || []).map(mapContract),
+          payments:      (payRes.data   || []).map(mapPayment),
+          maintenance:   (maintRes.data || []).map(mapMaintenance),
+          emailSettings: mapEmailSettings(emailRes.data),
+        });
+      } else {
+        // Tenant: fetch own profile + related data
+        const { data: tenRow } = await supabase.from("tenant_profiles").select("*").eq("id", user.id).single();
+        const tenant = tenRow ? mapTenant(tenRow) : null;
+        const [propRes, conRes, payRes, maintRes] = await Promise.all([
+          tenant?.propertyId ? supabase.from("properties").select("*").eq("id", tenant.propertyId) : Promise.resolve({ data: [] }),
+          supabase.from("contracts").select("*").eq("tenant_id", user.id),
+          supabase.from("payments").select("*").eq("tenant_id", user.id).order("due_date", { ascending: false }),
+          supabase.from("maintenance_requests").select("*").eq("tenant_id", user.id).order("created_at", { ascending: false }),
+        ]);
+        setData({
+          properties:    (propRes.data  || []).map(mapProperty),
+          tenants:       tenant ? [tenant] : [],
+          contracts:     (conRes.data   || []).map(mapContract),
+          payments:      (payRes.data   || []).map(mapPayment),
+          maintenance:   (maintRes.data || []).map(mapMaintenance),
+          emailSettings: EMPTY_EMAIL_SETTINGS,
+        });
+      }
+    } catch (err) {
+      console.error("fetchAllData error:", err);
+    }
+    setLoadingData(false);
+  };
 
   if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} />;
 
+  if (loadingData && !data.properties.length && !data.tenants.length) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontFamily: "'Crimson Pro',Georgia,serif", color: "#64748b", fontSize: 16 }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Crimson+Pro:wght@300;400;500;600;700&display=swap');`}</style>
+        Loading your portfolio…
+      </div>
+    );
+  }
+
+  const refresh = fetchAllData;
+
   const renderPage = () => {
     if (user.role === "landlord") {
-      const props = { data, setData, t };
+      const props = { data, setData, t, refresh };
       switch (page) {
         case "dashboard":   return <LandlordDashboard {...props} />;
         case "properties":  return <PropertiesPage {...props} />;
@@ -1124,10 +1246,11 @@ export default function App() {
         default:            return <LandlordDashboard {...props} />;
       }
     } else {
+      const props = { data, setData, user, refresh };
       switch (page) {
         case "dashboard":       return <TenantDashboard data={data} user={user} />;
-        case "payment-portal":  return <PaymentPortal data={data} setData={setData} user={user} />;
-        case "maintenance-new": return <TenantMaintenancePage data={data} setData={setData} user={user} />;
+        case "payment-portal":  return <PaymentPortal {...props} />;
+        case "maintenance-new": return <TenantMaintenancePage {...props} />;
         case "lease":           return <TenantLeasePage data={data} user={user} />;
         case "payment-history": return <PaymentHistoryPage data={data} user={user} />;
         default:                return <TenantDashboard data={data} user={user} />;
@@ -1135,10 +1258,17 @@ export default function App() {
     }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setData({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS });
+    setPage("dashboard");
+  };
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc", fontFamily: "'Crimson Pro',Georgia,serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Crimson+Pro:wght@300;400;500;600;700&display=swap'); * { box-sizing: border-box; } body { margin: 0; }`}</style>
-      <Sidebar user={user} currentPage={page} onNavigate={setPage} onLogout={() => { setUser(null); setPage("dashboard"); }} lang={lang} setLang={setLang} t={t} />
+      <Sidebar user={user} currentPage={page} onNavigate={setPage} onLogout={handleLogout} lang={lang} setLang={setLang} t={t} />
       <main style={{ marginLeft: 240, flex: 1, padding: "36px 40px", minHeight: "100vh" }}>
         {renderPage()}
       </main>
