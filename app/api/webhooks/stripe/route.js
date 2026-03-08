@@ -1,9 +1,10 @@
 import Stripe from 'stripe'
-import { supabaseAdmin } from '../../../../lib/supabase/server'
+import { createClient } from '../../../../lib/supabase/server'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export async function POST(request) {
+  const supabaseAdmin = await createClient()
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
 

@@ -1,9 +1,10 @@
-import { supabaseAdmin } from '../../../../lib/supabase/server'
+import { createClient } from '../../../../lib/supabase/server'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request) {
+  const supabaseAdmin = await createClient()
   const { name, email, phone, propertyId, unit, landlordId } = await request.json()
 
   // Create the auth user in Supabase
