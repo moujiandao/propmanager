@@ -234,37 +234,57 @@ const LangToggle = ({ lang, setLang }) => (
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 const LoginPage = ({ onLogin }) => {
+  const [tab, setTab] = useState("landlord");
+  const [mode, setMode] = useState("login"); // 'login' | 'signup'
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState("landlord");
-  useEffect(() => { setEmail(""); setPassword(""); setError(""); }, [tab]);
+
+  const reset = () => { setEmail(""); setPassword(""); setName(""); setConfirmPassword(""); setError(""); setSuccess(""); };
+  useEffect(() => { reset(); setMode("login"); }, [tab]);
+
   const handleLogin = async () => {
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) { setError("Invalid email or password."); setLoading(false); return; }
 
-    // Check landlord profile first
-    const { data: landlord } = await supabase
-      .from("landlord_profiles").select("*").eq("user_id", authData.user.id).single();
-    if (landlord) {
-      onLogin({ id: landlord.id, authId: authData.user.id, role: "landlord", email, name: landlord.name || email.split("@")[0] });
-      return;
-    }
+    const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("user_id", authData.user.id).single();
+    if (landlord) { onLogin({ id: landlord.id, authId: authData.user.id, role: "landlord", email, name: landlord.name || email.split("@")[0] }); return; }
 
-    // Otherwise check tenant profile
-    const { data: tenant } = await supabase
-      .from("tenant_profiles").select("*").eq("user_id", authData.user.id).single();
-    if (tenant) {
-      onLogin({ id: tenant.id, authId: authData.user.id, role: "tenant", email, name: tenant.name || email.split("@")[0] });
-      return;
-    }
+    const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("user_id", authData.user.id).single();
+    if (tenant) { onLogin({ id: tenant.id, authId: authData.user.id, role: "tenant", email, name: tenant.name || email.split("@")[0] }); return; }
 
     setError("No profile found for this account.");
     setLoading(false);
   };
+
+  const handleSignup = async () => {
+    setError(""); setSuccess("");
+    if (!name.trim()) { setError("Full name is required."); return; }
+    if (!email.trim()) { setError("Email is required."); return; }
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (password !== confirmPassword) { setError("Passwords do not match."); return; }
+    setLoading(true);
+    const res = await fetch("/api/auth/register-landlord", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+    });
+    const json = await res.json();
+    setLoading(false);
+    if (!res.ok) { setError(json.error || "Something went wrong. Please try again."); return; }
+    setSuccess("Account created! You can now sign in.");
+    setMode("login");
+    setPassword(""); setName(""); setConfirmPassword("");
+  };
+
+  const inputStyle = { width: "100%", padding: "11px 14px", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, color: "#f1f5f9", fontSize: 14, boxSizing: "border-box", outline: "none", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 6, letterSpacing: ".5px", textTransform: "uppercase" };
+
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Crimson Pro',Georgia,serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Crimson+Pro:wght@300;400;600&display=swap');`}</style>
@@ -278,17 +298,66 @@ const LoginPage = ({ onLogin }) => {
           <p style={{ color: "#94a3b8", margin: 0, fontSize: 15, fontWeight: 300 }}>Property management, simplified.</p>
         </div>
         <div style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 32 }}>
+          {/* Role tabs */}
           <div style={{ display: "flex", gap: 8, marginBottom: 24, background: "rgba(0,0,0,.2)", borderRadius: 10, padding: 4 }}>
-            {["landlord","tenant"].map(t => <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "8px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", transition: "all .2s", background: tab===t?"rgba(217,119,6,.9)":"transparent", color: tab===t?"#fff":"#94a3b8" }}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}
+            {["landlord", "tenant"].map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                style={{ flex: 1, padding: "8px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", transition: "all .2s", background: tab === t ? "rgba(217,119,6,.9)" : "transparent", color: tab === t ? "#fff" : "#94a3b8" }}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
           </div>
-          {[["Email", email, setEmail, "email"], ["Password", password, setPassword, "password"]].map(([lbl, val, setter, type]) => (
-            <div key={lbl} style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 6, letterSpacing: ".5px", textTransform: "uppercase" }}>{lbl}</label>
-              <input value={val} onChange={e => setter(e.target.value)} type={type} style={{ width: "100%", padding: "11px 14px", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, color: "#f1f5f9", fontSize: 14, boxSizing: "border-box", outline: "none", fontFamily: "inherit" }} />
-            </div>
-          ))}
-          {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
-          <button onClick={handleLogin} disabled={loading} style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Playfair Display',Georgia,serif" }}>{loading ? "Signing in…" : "Sign In"}</button>
+
+          {mode === "login" ? (
+            <>
+              {success && <p style={{ color: "#4ade80", fontSize: 13, margin: "0 0 16px", background: "rgba(74,222,128,.1)", padding: "10px 14px", borderRadius: 8 }}>{success}</p>}
+              {[["Email", email, setEmail, "email"], ["Password", password, setPassword, "password"]].map(([lbl, val, setter, type]) => (
+                <div key={lbl} style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>{lbl}</label>
+                  <input value={val} onChange={e => setter(e.target.value)} type={type}
+                    onKeyDown={e => e.key === "Enter" && handleLogin()}
+                    style={inputStyle} />
+                </div>
+              ))}
+              {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
+              <button onClick={handleLogin} disabled={loading}
+                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Playfair Display',Georgia,serif" }}>
+                {loading ? "Signing in…" : "Sign In"}
+              </button>
+              {tab === "landlord" && (
+                <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 13, color: "#64748b" }}>
+                  Don&apos;t have an account?{" "}
+                  <button onClick={() => { reset(); setMode("signup"); }} style={{ background: "none", border: "none", color: "#d97706", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Create one</button>
+                </p>
+              )}
+              {tab === "tenant" && (
+                <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 12, color: "#475569" }}>
+                  Tenant accounts are created by your landlord.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p style={{ color: "#94a3b8", fontSize: 13, margin: "0 0 20px", textAlign: "center" }}>Create your landlord account</p>
+              {[["Full Name", name, setName, "text"], ["Email", email, setEmail, "email"], ["Password", password, setPassword, "password"], ["Confirm Password", confirmPassword, setConfirmPassword, "password"]].map(([lbl, val, setter, type]) => (
+                <div key={lbl} style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>{lbl}</label>
+                  <input value={val} onChange={e => setter(e.target.value)} type={type}
+                    onKeyDown={e => e.key === "Enter" && handleSignup()}
+                    style={inputStyle} />
+                </div>
+              ))}
+              {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
+              <button onClick={handleSignup} disabled={loading}
+                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Playfair Display',Georgia,serif" }}>
+                {loading ? "Creating account…" : "Create Account"}
+              </button>
+              <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 13, color: "#64748b" }}>
+                Already have an account?{" "}
+                <button onClick={() => { reset(); setMode("login"); }} style={{ background: "none", border: "none", color: "#d97706", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Sign in</button>
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
