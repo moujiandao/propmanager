@@ -30,7 +30,7 @@ export async function POST(request) {
   // Create landlord profile row
   const { error: profileError } = await supabase
     .from('landlord_profiles')
-    .insert({ user_id: authData.user.id, name, email })
+    .insert({ id: authData.user.id, name, email })
 
   if (profileError) {
     // Roll back the auth user so the DB and auth stay in sync

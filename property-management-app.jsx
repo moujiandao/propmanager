@@ -252,7 +252,7 @@ const LoginPage = ({ onLogin }) => {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) { setError("Invalid email or password."); setLoading(false); return; }
 
-    const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("user_id", authData.user.id).single();
+    const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", authData.user.id).single();
     if (landlord) { onLogin({ id: landlord.id, authId: authData.user.id, role: "landlord", email, name: landlord.name || email.split("@")[0] }); return; }
 
     const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("user_id", authData.user.id).single();
