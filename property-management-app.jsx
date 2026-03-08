@@ -603,6 +603,31 @@ const TenantsPage = ({ data, setData, t, refresh, user }) => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
+
+  const [editTenant, setEditTenant] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const setEF = (k,v) => setEditForm(f => ({...f,[k]:v}));
+
+  const openEdit = (ten) => {
+    setEditTenant(ten);
+    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", status: ten.status, monthlyRent: ten.monthlyRent || "" });
+  };
+
+  const saveEdit = async () => {
+    setEditSaving(true);
+    const { error } = await supabase.from("tenant_profiles").update({
+      name: editForm.name,
+      phone: editForm.phone,
+      property_id: editForm.propertyId || null,
+      unit: editForm.unit,
+      status: editForm.status,
+      monthly_rent: editForm.monthlyRent ? +editForm.monthlyRent : null,
+    }).eq("id", editTenant.id);
+    if (!error) { await refresh(); setEditTenant(null); }
+    setEditSaving(false);
+  };
+
   const add = async () => {
     if (!form.name || !form.email) return;
     setSaving(true);
@@ -626,7 +651,7 @@ const TenantsPage = ({ data, setData, t, refresh, user }) => {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ background: "#f8fafc" }}>
             <tr style={{ color: "#64748b", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              {[t.colTenant, t.colContact, t.colProperty, t.colBank, t.colRecurring, t.colStatus].map(h => <th key={h} style={{ padding: "14px 20px", textAlign: "left" }}>{h}</th>)}
+              {[t.colTenant, t.colContact, t.colProperty, "Monthly Rent", t.colBank, t.colRecurring, t.colStatus, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left" }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -648,15 +673,27 @@ const TenantsPage = ({ data, setData, t, refresh, user }) => {
                     <div style={{ fontSize: 13, color: "#374151" }}>{prop?.address || "—"}</div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit}</div>
                   </td>
+                  <td style={{ padding: "14px 20px" }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: ten.monthlyRent ? "#0f172a" : "#94a3b8" }}>
+                      {ten.monthlyRent ? fmt(ten.monthlyRent) : "—"}
+                    </span>
+                  </td>
                   <td style={{ padding: "14px 20px" }}>{ten.bankConnected ? <span style={{ color: "#22c55e", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="check" size={14} />{t.bankConnected}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.bankNotConnected}</span>}</td>
                   <td style={{ padding: "14px 20px" }}>{ten.recurringPayment ? <span style={{ color: "#3b82f6", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="refresh" size={14} />{t.recurringEnabled}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.recurringOff}</span>}</td>
                   <td style={{ padding: "14px 20px" }}><Badge status={ten.status} t={t} /></td>
+                  <td style={{ padding: "14px 20px" }}>
+                    <button onClick={() => openEdit(ten)} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                      <Icon name="edit" size={13} /> Edit
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {/* Add Tenant Modal */}
       {show && (
         <Modal title={t.addTenantTitle} onClose={() => setShow(false)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -671,6 +708,27 @@ const TenantsPage = ({ data, setData, t, refresh, user }) => {
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
             <Btn onClick={add}>{saving ? "Creating…" : t.createTenantAccount}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Tenant Modal */}
+      {editTenant && (
+        <Modal title={`Edit — ${editTenant.name}`} onClose={() => setEditTenant(null)} wide>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Inp label="Full Name" value={editForm.name} onChange={v => setEF("name",v)} />
+            <Inp label="Phone" value={editForm.phone} onChange={v => setEF("phone",v)} />
+            <Sel label="Property" value={editForm.propertyId} onChange={v => setEF("propertyId",v)} options={[{value:"",label:"— No property —"},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
+            <Inp label="Unit" value={editForm.unit} onChange={v => setEF("unit",v)} placeholder="Unit A" />
+            <Inp label="Monthly Payment ($)" value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
+            <Sel label="Status" value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"active",label:"Active"},{value:"inactive",label:"Inactive"}]} />
+          </div>
+          <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 9, padding: 12, marginBottom: 16, fontSize: 13, color: "#0369a1" }}>
+            Email address cannot be changed here. To update a tenant&apos;s email, do so from Supabase Auth.
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setEditTenant(null)}>{t.cancel}</Btn>
+            <Btn onClick={saveEdit}>{editSaving ? "Saving…" : "Save Changes"}</Btn>
           </div>
         </Modal>
       )}
@@ -1233,7 +1291,7 @@ export default function App() {
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status });
-  const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status || "active", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false });
+  const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status || "active", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0 });
   const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
