@@ -293,8 +293,8 @@ const LoginPage = ({ onLogin }) => {
       </div>
       <div style={{ width: "100%", maxWidth: 420, padding: 24 }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,#d97706,#92400e)", borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Icon name="building" size={28} /></div>
-          <h1 style={{ color: "#f8fafc", fontSize: 30, fontWeight: 700, margin: "0 0 6px", fontFamily: "'Playfair Display',Georgia,serif" }}>PropManager</h1>
+          <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,#d97706,#92400e)", borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Icon name="home" size={28} /></div>
+          <h1 style={{ color: "#f8fafc", fontSize: 22, fontWeight: 700, margin: "0 0 6px", fontFamily: "'Playfair Display',Georgia,serif" }}>2703 Ridge Rd Berkeley CA</h1>
           <p style={{ color: "#94a3b8", margin: 0, fontSize: 15, fontWeight: 300 }}>Property management, simplified.</p>
         </div>
         <div style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 32 }}>
