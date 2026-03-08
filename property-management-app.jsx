@@ -533,14 +533,14 @@ const LandlordDashboard = ({ data, t }) => {
 };
 
 // ─── PROPERTIES PAGE ──────────────────────────────────────────────────────────
-const PropertiesPage = ({ data, setData, t, refresh }) => {
+const PropertiesPage = ({ data, setData, t, refresh, user }) => {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ address: "", city: "", state: "CA", zip: "", units: "1", type: "Single Family", status: "vacant" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
   const add = async () => {
     if (!form.address) return;
     const { error } = await supabase.from("properties").insert({
-      address: form.address, city: form.city, state: form.state, zip: form.zip,
+      landlord_id: user.id, address: form.address, city: form.city, state: form.state, zip: form.zip,
       units: +form.units, type: form.type, status: form.status,
     });
     if (!error) { await refresh(); setShow(false); }
@@ -598,7 +598,7 @@ const PropertiesPage = ({ data, setData, t, refresh }) => {
 };
 
 // ─── TENANTS PAGE ─────────────────────────────────────────────────────────────
-const TenantsPage = ({ data, setData, t, refresh }) => {
+const TenantsPage = ({ data, setData, t, refresh, user }) => {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "" });
@@ -612,6 +612,7 @@ const TenantsPage = ({ data, setData, t, refresh }) => {
       body: JSON.stringify({
         name: form.name, email: form.email, phone: form.phone,
         password: form.password, property_id: form.propertyId, unit: form.unit,
+        landlord_id: user.id,
       }),
     });
     if (res.ok) { await refresh(); setShow(false); }
@@ -678,14 +679,14 @@ const TenantsPage = ({ data, setData, t, refresh }) => {
 };
 
 // ─── CONTRACTS PAGE ───────────────────────────────────────────────────────────
-const ContractsPage = ({ data, setData, t, refresh }) => {
+const ContractsPage = ({ data, setData, t, refresh, user }) => {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ tenantId: "", propertyId: "", unit: "", startDate: "", endDate: "", rentAmount: "", dueDay: "1" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
   const add = async () => {
     if (!form.tenantId || !form.rentAmount) return;
     const { error } = await supabase.from("contracts").insert({
-      tenant_id: form.tenantId, property_id: form.propertyId, unit: form.unit,
+      landlord_id: user.id, tenant_id: form.tenantId, property_id: form.propertyId, unit: form.unit,
       start_date: form.startDate, end_date: form.endDate,
       rent_amount: +form.rentAmount, due_day: +form.dueDay, status: "active",
     });
@@ -1303,7 +1304,7 @@ export default function App() {
 
   const renderPage = () => {
     if (user.role === "landlord") {
-      const props = { data, setData, t, refresh };
+      const props = { data, setData, t, refresh, user };
       switch (page) {
         case "dashboard":   return <LandlordDashboard {...props} />;
         case "properties":  return <PropertiesPage {...props} />;
