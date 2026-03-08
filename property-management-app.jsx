@@ -255,7 +255,7 @@ const LoginPage = ({ onLogin }) => {
     const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", authData.user.id).single();
     if (landlord) { onLogin({ id: landlord.id, authId: authData.user.id, role: "landlord", email, name: landlord.name || email.split("@")[0] }); return; }
 
-    const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("user_id", authData.user.id).single();
+    const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", authData.user.id).single();
     if (tenant) { onLogin({ id: tenant.id, authId: authData.user.id, role: "tenant", email, name: tenant.name || email.split("@")[0] }); return; }
 
     setError("No profile found for this account.");
