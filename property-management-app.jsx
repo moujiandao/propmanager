@@ -380,6 +380,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
     { id: "payment-portal", label: "Payment Portal", icon: "dollar" },
     { id: "maintenance-new", label: "Maintenance", icon: "wrench" },
     { id: "payment-history", label: "Payment History", icon: "clock" },
+    { id: "profile", label: "My Profile", icon: "key" },
   ];
   const nav = user.role === "landlord" ? landlordNav : tenantNav;
 
@@ -1284,6 +1285,118 @@ const PaymentHistoryPage = ({ data, user }) => {
   );
 };
 
+// ─── TENANT PROFILE PAGE ──────────────────────────────────────────────────────
+const TenantProfilePage = ({ user, setUser }) => {
+  const cardStyle = { background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f1f5f9", marginBottom: 20 };
+  const headStyle = { margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif", paddingBottom: 14, borderBottom: "1px solid #f1f5f9" };
+  const msgStyle = (err) => ({ fontSize: 13, marginTop: 8, color: err ? "#ef4444" : "#22c55e" });
+
+  // ── Name ──
+  const [name, setName] = useState(user.name);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameMsg, setNameMsg] = useState({ text: "", error: false });
+  const saveName = async () => {
+    if (!name.trim()) return;
+    setNameSaving(true); setNameMsg({ text: "", error: false });
+    const { error } = await supabase.from("tenant_profiles").update({ name: name.trim() }).eq("id", user.id);
+    if (error) { setNameMsg({ text: error.message, error: true }); }
+    else { setUser(u => ({ ...u, name: name.trim() })); setNameMsg({ text: "Name updated.", error: false }); }
+    setNameSaving(false);
+  };
+
+  // ── Email ──
+  const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMsg, setEmailMsg] = useState({ text: "", error: false });
+  const saveEmail = async () => {
+    setEmailMsg({ text: "", error: false });
+    if (!newEmail.trim() || !emailPassword) { setEmailMsg({ text: "Both fields are required.", error: true }); return; }
+    setEmailSaving(true);
+    // Verify current password first
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email: user.email, password: emailPassword });
+    if (authErr) { setEmailMsg({ text: "Incorrect password.", error: true }); setEmailSaving(false); return; }
+    // Request email change — Supabase sends a confirmation link to the new address
+    const { error: updateErr } = await supabase.auth.updateUser({ email: newEmail.trim() });
+    if (updateErr) { setEmailMsg({ text: updateErr.message, error: true }); setEmailSaving(false); return; }
+    setEmailMsg({ text: "A confirmation link has been sent to your new email. Click it to complete the change.", error: false });
+    setNewEmail(""); setEmailPassword("");
+    setEmailSaving(false);
+  };
+
+  // ── Password ──
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState({ text: "", error: false });
+  const savePassword = async () => {
+    setPwMsg({ text: "", error: false });
+    if (!currentPw || !newPw || !confirmPw) { setPwMsg({ text: "All fields are required.", error: true }); return; }
+    if (newPw.length < 8) { setPwMsg({ text: "New password must be at least 8 characters.", error: true }); return; }
+    if (newPw !== confirmPw) { setPwMsg({ text: "Passwords do not match.", error: true }); return; }
+    setPwSaving(true);
+    // Verify current password
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPw });
+    if (authErr) { setPwMsg({ text: "Current password is incorrect.", error: true }); setPwSaving(false); return; }
+    // Update password
+    const { error: updateErr } = await supabase.auth.updateUser({ password: newPw });
+    if (updateErr) { setPwMsg({ text: updateErr.message, error: true }); setPwSaving(false); return; }
+    setPwMsg({ text: "Password updated successfully.", error: false });
+    setCurrentPw(""); setNewPw(""); setConfirmPw("");
+    setPwSaving(false);
+  };
+
+  const inputStyle = { width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 14, color: "#0f172a", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 };
+
+  return (
+    <div style={{ maxWidth: 580 }}>
+      <PageHeader title="My Profile" subtitle="Manage your account details" />
+
+      {/* Name */}
+      <div style={cardStyle}>
+        <h3 style={headStyle}>Display Name</h3>
+        <label style={labelStyle}>Full Name</label>
+        <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
+        {nameMsg.text && <p style={msgStyle(nameMsg.error)}>{nameMsg.text}</p>}
+        <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+          <Btn onClick={saveName}>{nameSaving ? "Saving…" : "Save Name"}</Btn>
+        </div>
+      </div>
+
+      {/* Email */}
+      <div style={cardStyle}>
+        <h3 style={headStyle}>Change Email</h3>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>Current email: <strong style={{ color: "#0f172a" }}>{user.email}</strong></p>
+        <label style={labelStyle}>New Email Address</label>
+        <input value={newEmail} onChange={e => setNewEmail(e.target.value)} type="email" style={{ ...inputStyle, marginBottom: 12 }} />
+        <label style={labelStyle}>Current Password (to confirm)</label>
+        <input value={emailPassword} onChange={e => setEmailPassword(e.target.value)} type="password" style={inputStyle} />
+        {emailMsg.text && <p style={msgStyle(emailMsg.error)}>{emailMsg.text}</p>}
+        <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+          <Btn onClick={saveEmail}>{emailSaving ? "Sending…" : "Update Email"}</Btn>
+        </div>
+      </div>
+
+      {/* Password */}
+      <div style={cardStyle}>
+        <h3 style={headStyle}>Change Password</h3>
+        <label style={labelStyle}>Current Password</label>
+        <input value={currentPw} onChange={e => setCurrentPw(e.target.value)} type="password" style={{ ...inputStyle, marginBottom: 12 }} />
+        <label style={labelStyle}>New Password</label>
+        <input value={newPw} onChange={e => setNewPw(e.target.value)} type="password" placeholder="Min. 8 characters" style={{ ...inputStyle, marginBottom: 12 }} />
+        <label style={labelStyle}>Confirm New Password</label>
+        <input value={confirmPw} onChange={e => setConfirmPw(e.target.value)} type="password" style={inputStyle} />
+        {pwMsg.text && <p style={msgStyle(pwMsg.error)}>{pwMsg.text}</p>}
+        <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+          <Btn onClick={savePassword}>{pwSaving ? "Saving…" : "Update Password"}</Btn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 const EMPTY_EMAIL_SETTINGS = {
   fiveDayReminder: false, dayOfReminder: false, oneDayOverdue: false, threeDayOverdue: false, sevenDayOverdue: false,
@@ -1399,6 +1512,7 @@ export default function App() {
         case "maintenance-new": return <TenantMaintenancePage {...props} />;
         case "lease":           return <TenantLeasePage data={data} user={user} />;
         case "payment-history": return <PaymentHistoryPage data={data} user={user} />;
+        case "profile":         return <TenantProfilePage user={user} setUser={setUser} />;
         default:                return <TenantDashboard data={data} user={user} />;
       }
     }
