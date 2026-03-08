@@ -611,8 +611,8 @@ const TenantsPage = ({ data, setData, t, refresh, user }) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name, email: form.email, phone: form.phone,
-        password: form.password, property_id: form.propertyId, unit: form.unit,
-        landlord_id: user.id,
+        password: form.password, propertyId: form.propertyId, unit: form.unit,
+        landlordId: user.id,
       }),
     });
     if (res.ok) { await refresh(); setShow(false); }
