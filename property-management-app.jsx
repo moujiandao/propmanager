@@ -609,22 +609,35 @@ const TenantsPage = ({ data, setData, t, refresh, user }) => {
   const [editSaving, setEditSaving] = useState(false);
   const setEF = (k,v) => setEditForm(f => ({...f,[k]:v}));
 
+  const [editError, setEditError] = useState("");
+
   const openEdit = (ten) => {
     setEditTenant(ten);
-    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", status: ten.status, monthlyRent: ten.monthlyRent || "" });
+    setEditError("");
+    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", status: ten.status, monthlyRent: ten.monthlyRent || "", password: "" });
   };
 
   const saveEdit = async () => {
+    setEditError("");
     setEditSaving(true);
-    const { error } = await supabase.from("tenant_profiles").update({
-      name: editForm.name,
-      phone: editForm.phone,
-      property_id: editForm.propertyId || null,
-      unit: editForm.unit,
-      status: editForm.status,
-      monthly_rent: editForm.monthlyRent ? +editForm.monthlyRent : null,
-    }).eq("id", editTenant.id);
-    if (!error) { await refresh(); setEditTenant(null); }
+    const res = await fetch("/api/auth/update-tenant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenantId: editTenant.id,
+        name: editForm.name,
+        phone: editForm.phone,
+        propertyId: editForm.propertyId || null,
+        unit: editForm.unit,
+        status: editForm.status,
+        monthlyRent: editForm.monthlyRent || null,
+        password: editForm.password || null,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) { setEditError(json.error || "Something went wrong."); setEditSaving(false); return; }
+    await refresh();
+    setEditTenant(null);
     setEditSaving(false);
   };
 
@@ -723,6 +736,11 @@ const TenantsPage = ({ data, setData, t, refresh, user }) => {
             <Inp label="Monthly Payment ($)" value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
             <Sel label="Status" value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"active",label:"Active"},{value:"inactive",label:"Inactive"}]} />
           </div>
+          <div style={{ marginTop: 4, marginBottom: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Password Reset</div>
+            <Inp label="New Password (leave blank to keep current)" value={editForm.password} onChange={v => setEF("password",v)} type="password" placeholder="Min. 8 characters" />
+          </div>
+          {editError && <p style={{ color: "#ef4444", fontSize: 13, margin: "0 0 12px" }}>{editError}</p>}
           <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 9, padding: 12, marginBottom: 16, fontSize: 13, color: "#0369a1" }}>
             Email address cannot be changed here. To update a tenant&apos;s email, do so from Supabase Auth.
           </div>
