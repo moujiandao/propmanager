@@ -374,6 +374,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
     { id: "payments", label: t.navPayments, icon: "dollar" },
     { id: "maintenance", label: t.navMaintenance, icon: "wrench" },
     { id: "email", label: t.navEmail, icon: "mail" },
+    { id: "documents", label: "Documents", icon: "key" },
   ];
   const tenantNav = [
     { id: "dashboard", label: "Dashboard", icon: "home" },
@@ -1285,6 +1286,91 @@ const PaymentHistoryPage = ({ data, user }) => {
   );
 };
 
+// ─── DOCUMENTS PAGE (landlord only) ───────────────────────────────────────────
+const toEmbedUrl = (link) => {
+  if (!link) return null;
+  const folderMatch = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (folderMatch) return `https://drive.google.com/embeddedfolderview?id=${folderMatch[1]}#list`;
+  const fileMatch = link.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileMatch) return `https://drive.google.com/file/d/${fileMatch[1]}/preview`;
+  return null;
+};
+
+const DocumentsPage = ({ data, refresh }) => {
+  const [selectedId, setSelectedId] = useState(data.properties[0]?.id || "");
+  const [link, setLink] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const selected = data.properties.find(p => p.id === selectedId);
+
+  useEffect(() => {
+    setLink(selected?.driveLink || "");
+    setMsg("");
+  }, [selectedId]);
+
+  const save = async () => {
+    setSaving(true); setMsg("");
+    const { error } = await supabase.from("properties").update({ drive_link: link.trim() || null }).eq("id", selectedId);
+    if (error) { setMsg("Failed to save."); }
+    else { await refresh(); setMsg("Saved."); }
+    setSaving(false);
+  };
+
+  const embedUrl = toEmbedUrl(link);
+
+  if (!data.properties.length) return (
+    <div>
+      <PageHeader title="Documents" subtitle="Link Google Drive folders to your properties" />
+      <div style={{ background: "#fff", borderRadius: 14, padding: 40, border: "1px solid #f1f5f9", textAlign: "center", color: "#94a3b8" }}>Add a property first to attach documents.</div>
+    </div>
+  );
+
+  return (
+    <div>
+      <PageHeader title="Documents" subtitle="Link Google Drive folders to your properties" />
+      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 20, alignItems: "start" }}>
+        {/* Property list */}
+        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden" }}>
+          {data.properties.map(p => (
+            <button key={p.id} onClick={() => setSelectedId(p.id)}
+              style={{ width: "100%", padding: "14px 16px", border: "none", borderBottom: "1px solid #f8fafc", background: p.id === selectedId ? "rgba(217,119,6,.08)" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: p.id === selectedId ? "#d97706" : "#0f172a" }}>{p.address}</div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{p.city} · {p.driveLink ? "✓ Linked" : "No folder"}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Right panel */}
+        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", padding: 24 }}>
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{selected?.address}</h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>Paste a Google Drive folder or file share link below.</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <input value={link} onChange={e => { setLink(e.target.value); setMsg(""); }}
+                placeholder="https://drive.google.com/drive/folders/..."
+                style={{ flex: 1, padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 13, color: "#0f172a", fontFamily: "inherit", outline: "none" }} />
+              <button onClick={save} disabled={saving}
+                style={{ padding: "10px 20px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 9, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+            {msg && <p style={{ margin: "8px 0 0", fontSize: 13, color: msg === "Saved." ? "#22c55e" : "#ef4444" }}>{msg}</p>}
+          </div>
+
+          {embedUrl ? (
+            <iframe src={embedUrl} title="Google Drive" style={{ width: "100%", height: 520, border: "1.5px solid #e2e8f0", borderRadius: 10 }} allow="autoplay" />
+          ) : (
+            <div style={{ height: 200, border: "1.5px dashed #e2e8f0", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 14 }}>
+              Paste a Drive link above to preview the folder here.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── TENANT PROFILE PAGE ──────────────────────────────────────────────────────
 const TenantProfilePage = ({ user, setUser }) => {
   const cardStyle = { background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f1f5f9", marginBottom: 20 };
@@ -1421,7 +1507,7 @@ export default function App() {
   useEffect(() => { if (user) fetchAllData(); }, [user]);
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
-  const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status });
+  const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "" });
   const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status || "active", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0 });
   const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
@@ -1502,6 +1588,7 @@ export default function App() {
         case "payments":    return <PaymentsPage data={data} t={t} />;
         case "maintenance": return <MaintenancePage {...props} />;
         case "email":       return <EmailPage {...props} />;
+        case "documents":   return <DocumentsPage data={data} refresh={refresh} />;
         default:            return <LandlordDashboard {...props} />;
       }
     } else {
