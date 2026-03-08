@@ -379,9 +379,9 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
   const tenantNav = [
     { id: "dashboard", label: "Dashboard", icon: "home" },
     { id: "payment-portal", label: "Payment Portal", icon: "dollar" },
-    { id: "maintenance-new", label: "Maintenance", icon: "wrench" },
     { id: "payment-history", label: "Payment History", icon: "clock" },
     { id: "profile", label: "My Profile", icon: "key" },
+    { id: "maintenance-new", label: "Maintenance", icon: "wrench" },
   ];
   const nav = user.role === "landlord" ? landlordNav : tenantNav;
 
@@ -1000,7 +1000,6 @@ const TenantDashboard = ({ data, user }) => {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 24 }}>
         <StatCard label="Monthly Rent" value={contract ? fmt(contract.rentAmount) : "—"} sub={contract ? `Due the ${contract.dueDay}${contract.dueDay===1?"st":"th"} of each month` : ""} icon="dollar" />
         <StatCard label="Next Payment" value={contract ? `Mar ${contract.dueDay}` : "—"} sub={payments[0] ? <Badge status={payments[0].status} t={T.en} /> : ""} icon="calendar" color="#3b82f6" />
-        <StatCard label="Open Requests" value={openMaint.length} sub="maintenance requests" icon="wrench" color="#f59e0b" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
