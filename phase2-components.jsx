@@ -238,3 +238,170 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
     </div>
   )
 }
+
+export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
+  const [uploading, setUploading] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [parsing, setParsing] = useState(null) // documentId being parsed
+  const [parsedResult, setParsedResult] = useState(null) // { docId, extracted }
+  const [filterProperty, setFilterProperty] = useState('')
+  const [filterTenant, setFilterTenant] = useState('')
+  const [filterType, setFilterType] = useState('')
+
+  // Upload form state
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadTenantId, setUploadTenantId] = useState('')
+  const [uploadPropertyId, setUploadPropertyId] = useState('')
+  const [uploadDocType, setUploadDocType] = useState('other')
+
+  const handleUpload = async () => {
+    if (!uploadFile) return
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('file', uploadFile)
+    formData.append('landlordId', user.id)
+    if (uploadTenantId) formData.append('tenantId', uploadTenantId)
+    if (uploadPropertyId) formData.append('propertyId', uploadPropertyId)
+    formData.append('documentType', uploadDocType)
+
+    const res = await fetch('/api/documents/upload', { method: 'POST', body: formData })
+    setUploading(false)
+    if (res.ok) {
+      setShowUploadModal(false)
+      setUploadFile(null)
+      setUploadTenantId('')
+      setUploadPropertyId('')
+      setUploadDocType('other')
+      refresh()
+    }
+  }
+
+  const handleDelete = async (docId) => {
+    await fetch('/api/documents/delete', { method: 'POST', body: JSON.stringify({ documentId: docId }), headers: { 'Content-Type': 'application/json' } })
+    refresh()
+  }
+
+  const handleParse = async (docId) => {
+    setParsing(docId)
+    const res = await fetch('/api/documents/parse', { method: 'POST', body: JSON.stringify({ documentId: docId }), headers: { 'Content-Type': 'application/json' } })
+    const json = await res.json()
+    setParsing(null)
+    if (json.extracted) setParsedResult({ docId, extracted: json.extracted })
+  }
+
+  const handleView = async (doc) => {
+    const supabaseClient = createClient()
+    const { data: signedData } = await supabaseClient.storage.from('documents').createSignedUrl(doc.filePath, 60)
+    if (signedData?.signedUrl) window.open(signedData.signedUrl, '_blank')
+  }
+
+  // Filter documents
+  let docs = data.documents || []
+  if (filterProperty) docs = docs.filter(d => d.propertyId === filterProperty)
+  if (filterTenant) docs = docs.filter(d => d.tenantId === filterTenant)
+  if (filterType) docs = docs.filter(d => d.documentType === filterType)
+
+  const docTypeBadgeColor = { application: '#0ea5e9', lease: '#d97706', other: '#64748b' }
+
+  return (
+    <div style={{ padding: '24px 32px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h1 style={{ color: '#f1f5f9', fontSize: 24, fontWeight: 700, margin: 0 }}>Documents</h1>
+        <Btn onClick={() => setShowUploadModal(true)}>+ Upload Document</Btn>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+        <select value={filterProperty} onChange={e => setFilterProperty(e.target.value)} style={{ background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
+          <option value="">All Properties</option>
+          {(data.properties || []).map(p => <option key={p.id} value={p.id}>{p.address}</option>)}
+        </select>
+        <select value={filterTenant} onChange={e => setFilterTenant(e.target.value)} style={{ background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
+          <option value="">All Tenants</option>
+          {(data.tenants || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
+          <option value="">All Types</option>
+          <option value="application">Application</option>
+          <option value="lease">Lease</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      {/* Document list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {docs.length === 0 && <p style={{ color: '#94a3b8' }}>No documents yet.</p>}
+        {docs.map(doc => {
+          const tenant = (data.tenants || []).find(t => t.id === doc.tenantId)
+          const property = (data.properties || []).find(p => p.id === doc.propertyId)
+          return (
+            <div key={doc.id} style={{ background: '#1e293b', borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <span style={{ color: '#f1f5f9', fontWeight: 600, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fileName}</span>
+                  <span style={{ background: docTypeBadgeColor[doc.documentType] || '#64748b', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, textTransform: 'uppercase', flexShrink: 0 }}>{doc.documentType}</span>
+                </div>
+                <div style={{ color: '#94a3b8', fontSize: 13 }}>
+                  {tenant && <span>{tenant.name}</span>}
+                  {tenant && property && <span> · </span>}
+                  {property && <span>{property.address}</span>}
+                  <span style={{ marginLeft: 12 }}>{new Date(doc.uploadedAt).toLocaleDateString()}</span>
+                </div>
+                {parsedResult?.docId === doc.id && (
+                  <div style={{ marginTop: 10, background: '#0f172a', borderRadius: 8, padding: 12, fontSize: 12, color: '#94a3b8' }}>
+                    <div style={{ color: '#d97706', fontWeight: 700, marginBottom: 6 }}>AI Extracted Data</div>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(parsedResult.extracted, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <button onClick={() => handleView(doc)} style={{ background: '#334155', color: '#f1f5f9', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>View</button>
+                <button onClick={() => handleParse(doc.id)} disabled={parsing === doc.id} style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: parsing === doc.id ? 'not-allowed' : 'pointer', opacity: parsing === doc.id ? 0.7 : 1 }}>
+                  {parsing === doc.id ? 'Parsing...' : 'Parse with AI'}
+                </button>
+                <button onClick={() => handleDelete(doc.id)} style={{ background: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>Delete</button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Upload modal */}
+      {showUploadModal && (
+        <Modal onClose={() => setShowUploadModal(false)}>
+          <h3 style={{ color: '#f1f5f9', marginTop: 0 }}>Upload Document</h3>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>File (PDF or DOCX)</label>
+            <input type="file" accept=".pdf,.docx,.doc" onChange={e => setUploadFile(e.target.files[0])} style={{ color: '#f1f5f9', width: '100%' }} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Tenant (optional)</label>
+            <select value={uploadTenantId} onChange={e => setUploadTenantId(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9', fontSize: 15 }}>
+              <option value="">None</option>
+              {(data.tenants || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Property (optional)</label>
+            <select value={uploadPropertyId} onChange={e => setUploadPropertyId(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9', fontSize: 15 }}>
+              <option value="">None</option>
+              {(data.properties || []).map(p => <option key={p.id} value={p.id}>{p.address}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Document Type</label>
+            <select value={uploadDocType} onChange={e => setUploadDocType(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9', fontSize: 15 }}>
+              <option value="application">Application</option>
+              <option value="lease">Lease</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <button onClick={handleUpload} disabled={uploading || !uploadFile} style={{ width: '100%', padding: 12, background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: uploading || !uploadFile ? 'not-allowed' : 'pointer', opacity: uploading || !uploadFile ? 0.7 : 1 }}>
+            {uploading ? 'Uploading...' : 'Upload'}
+          </button>
+        </Modal>
+      )}
+    </div>
+  )
+}

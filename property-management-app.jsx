@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from '@/lib/supabase/client';
-import { PropertyDetailPage } from './phase2-components';
+import { PropertyDetailPage, DocumentsPageV2 } from './phase2-components';
 
 const supabase = createClient();
 
@@ -1502,7 +1502,7 @@ const EMPTY_EMAIL_SETTINGS = {
 export default function App() {
   const [user, setUser] = useState(null);
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [] });
+  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [] });
   const [loadingData, setLoadingData] = useState(false);
   const [lang, setLang] = useState("en");
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
@@ -1519,6 +1519,7 @@ export default function App() {
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
   const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
+  const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at })
   const mapEmailSettings = (e) => !e ? EMPTY_EMAIL_SETTINGS : ({
     fiveDayReminder: e.five_day_reminder || false, dayOfReminder: e.day_of_reminder || false,
     oneDayOverdue: e.one_day_overdue || false, threeDayOverdue: e.three_day_overdue || false,
@@ -1530,7 +1531,7 @@ export default function App() {
     setLoadingData(true);
     try {
       if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes] = await Promise.all([
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
           supabase.from("contracts").select("*"),
@@ -1538,6 +1539,7 @@ export default function App() {
           supabase.from("maintenance_requests").select("*").order("created_at", { ascending: false }),
           supabase.from("email_settings").select("*").single(),
           supabase.from("units").select("*").order("unit_number", { ascending: true }),
+          supabase.from("documents").select("*").order("uploaded_at", { ascending: false }),
         ]);
         setData({
           properties:    (propRes.data  || []).map(mapProperty),
@@ -1547,6 +1549,7 @@ export default function App() {
           maintenance:   (maintRes.data || []).map(mapMaintenance),
           emailSettings: mapEmailSettings(emailRes.data),
           units:         (unitRes.data  || []).map(mapUnit),
+          documents:     (docRes.data   || []).map(mapDocument),
         });
       } else {
         // Tenant: fetch own profile + related data
@@ -1566,6 +1569,7 @@ export default function App() {
           maintenance:   (maintRes.data || []).map(mapMaintenance),
           emailSettings: EMPTY_EMAIL_SETTINGS,
           units:         [],
+          documents:     [],
         });
       }
     } catch (err) {
@@ -1598,7 +1602,7 @@ export default function App() {
         case "payments":         return <PaymentsPage data={data} t={t} />;
         case "maintenance":      return <MaintenancePage {...props} />;
         case "email":            return <EmailPage {...props} />;
-        case "documents":        return <DocumentsPage data={data} refresh={refresh} />;
+        case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={fetchAllData} user={user} />;
         case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
         default:                 return <LandlordDashboard {...props} />;
       }
@@ -1619,7 +1623,7 @@ export default function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setData({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [] });
+    setData({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [] });
     setPage("dashboard");
   };
 
