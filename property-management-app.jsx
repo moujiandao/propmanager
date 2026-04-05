@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from '@/lib/supabase/client';
-import { PropertyDetailPage, DocumentsPageV2 } from './phase2-components';
+import { PropertyDetailPage, DocumentsPageV2, TenantContactPage } from './phase2-components';
 
 const supabase = createClient();
 
@@ -605,7 +605,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
 };
 
 // ─── TENANTS PAGE ─────────────────────────────────────────────────────────────
-const TenantsPage = ({ data, setData, t, refresh, user }) => {
+const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTenantId }) => {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "" });
@@ -682,7 +682,7 @@ const TenantsPage = ({ data, setData, t, refresh, user }) => {
                   <td style={{ padding: "14px 20px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ten.name.charAt(0)}</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{ten.name}</div>
+                      <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: setPage ? "#d97706" : "#0f172a", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{ten.name}</button>
                     </div>
                   </td>
                   <td style={{ padding: "14px 20px" }}>
@@ -1514,7 +1514,7 @@ export default function App() {
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "" });
-  const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status || "active", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0 });
+  const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status || "active", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
   const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
@@ -1597,7 +1597,8 @@ export default function App() {
       switch (page) {
         case "dashboard":        return <LandlordDashboard {...props} />;
         case "properties":       return <PropertiesPage {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} />;
-        case "tenants":          return <TenantsPage {...props} />;
+        case "tenants":          return <TenantsPage {...props} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
+        case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={fetchAllData} user={user} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
         case "contracts":        return <ContractsPage {...props} />;
         case "payments":         return <PaymentsPage data={data} t={t} />;
         case "maintenance":      return <MaintenancePage {...props} />;

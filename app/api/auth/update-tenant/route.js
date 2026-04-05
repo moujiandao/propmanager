@@ -1,7 +1,7 @@
 import { createClient } from '../../../../lib/supabase/server'
 
 export async function POST(request) {
-  const { tenantId, name, phone, propertyId, unit, status, monthlyRent, password } = await request.json()
+  const { tenantId, name, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId } = await request.json()
 
   if (!tenantId) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
@@ -19,6 +19,15 @@ export async function POST(request) {
       unit,
       status,
       monthly_rent: monthlyRent ? +monthlyRent : null,
+      move_in_date: moveInDate || null,
+      move_out_date: moveOutDate || null,
+      has_cosigner: hasCosigner || false,
+      student_status: studentStatus || null,
+      student_year: studentYear || null,
+      zelle_name: zelleName || null,
+      home_address: homeAddress || null,
+      age: age || null,
+      unit_id: unitId || null,
     })
     .eq('id', tenantId)
 

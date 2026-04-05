@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader } from './property-management-app'
 
@@ -402,6 +402,412 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
           </button>
         </Modal>
       )}
+    </div>
+  )
+}
+
+// ─── TENANT CONTACT PAGE ──────────────────────────────────────────────────────
+const fmt2 = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n)
+
+const InfoRow = ({ label, value, children }) => (
+  <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 14 }}>
+    <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px" }}>{label}</span>
+    {children || <span style={{ fontSize: 14, color: value ? "#f1f5f9" : "#475569" }}>{value || "—"}</span>}
+  </div>
+)
+
+const TenantCard = ({ title, children }) => (
+  <div style={{ background: "#1e293b", borderRadius: 14, padding: 24, border: "1px solid rgba(255,255,255,.07)" }}>
+    <h3 style={{ margin: "0 0 18px", fontSize: 14, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px" }}>{title}</h3>
+    {children}
+  </div>
+)
+
+const EMPTY_TENANT_FORM = {
+  name: "", phone: "", propertyId: "", unit: "", status: "active", monthlyRent: "",
+  moveInDate: "", moveOutDate: "", hasCosigner: false, studentStatus: "", studentYear: "",
+  zelleName: "", homeAddress: "", age: "", unitId: "",
+}
+
+export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBack, onNavigateToProperty }) => {
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState(EMPTY_TENANT_FORM)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState("")
+  const [selectedDocId, setSelectedDocId] = useState("")
+  const [showImportPreview, setShowImportPreview] = useState(false)
+
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const tenant = (data.tenants || []).find(t => t.id === tenantId)
+
+  useEffect(() => {
+    if (tenant) {
+      setForm({
+        name: tenant.name || "",
+        phone: tenant.phone || "",
+        propertyId: tenant.propertyId || "",
+        unit: tenant.unit || "",
+        status: tenant.status || "active",
+        monthlyRent: tenant.monthlyRent ? String(tenant.monthlyRent) : "",
+        moveInDate: tenant.moveInDate || "",
+        moveOutDate: tenant.moveOutDate || "",
+        hasCosigner: tenant.hasCosigner || false,
+        studentStatus: tenant.studentStatus || "",
+        studentYear: tenant.studentYear || "",
+        zelleName: tenant.zelleName || "",
+        homeAddress: tenant.homeAddress || "",
+        age: tenant.age ? String(tenant.age) : "",
+        unitId: tenant.unitId || "",
+      })
+    }
+    setEditing(false)
+    setSaveError("")
+  }, [tenantId])
+
+  if (!tenant) {
+    return (
+      <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Crimson Pro', Georgia, serif" }}>
+        <button onClick={onBack} style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, padding: "8px 14px", color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 24 }}>
+          ← Back
+        </button>
+        <p style={{ color: "#94a3b8", fontSize: 15 }}>Tenant not found.</p>
+      </div>
+    )
+  }
+
+  // Resolve linked data
+  const property = (data.properties || []).find(p => p.id === tenant.propertyId)
+  const linkedUnit = (data.units || []).find(u => u.id === tenant.unitId)
+  const housemates = (data.tenants || []).filter(t => t.unitId && t.unitId === tenant.unitId && t.id !== tenantId)
+  const tenantDocs = (data.documents || []).filter(d => d.tenantId === tenantId)
+  const parsableDocs = tenantDocs.filter(d => d.aiExtracted !== null && d.aiExtracted !== undefined)
+
+  const selectedParsedDoc = parsableDocs.find(d => d.id === selectedDocId)
+
+  const handleSave = async () => {
+    setSaving(true)
+    setSaveError("")
+    const res = await fetch("/api/auth/update-tenant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenantId,
+        name: form.name,
+        phone: form.phone,
+        propertyId: form.propertyId || null,
+        unit: form.unit,
+        status: form.status,
+        monthlyRent: form.monthlyRent || null,
+        moveInDate: form.moveInDate || null,
+        moveOutDate: form.moveOutDate || null,
+        hasCosigner: form.hasCosigner,
+        studentStatus: form.studentStatus || null,
+        studentYear: form.studentYear || null,
+        zelleName: form.zelleName || null,
+        homeAddress: form.homeAddress || null,
+        age: form.age ? Number(form.age) : null,
+        unitId: form.unitId || null,
+      }),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { setSaveError(json.error || "Something went wrong."); return; }
+    await refresh()
+    setEditing(false)
+  }
+
+  const handleApplyExtracted = async (extracted) => {
+    setSaving(true)
+    setSaveError("")
+    // Map AI-extracted fields to API shape - keys may vary by document parser output
+    const payload = {
+      tenantId,
+      name: extracted.name || tenant.name,
+      phone: extracted.phone || tenant.phone || null,
+      propertyId: tenant.propertyId || null,
+      unit: extracted.unit || tenant.unit || null,
+      status: tenant.status,
+      monthlyRent: extracted.monthly_rent || extracted.monthlyRent || tenant.monthlyRent || null,
+      moveInDate: extracted.move_in_date || extracted.moveInDate || tenant.moveInDate || null,
+      moveOutDate: extracted.move_out_date || extracted.moveOutDate || tenant.moveOutDate || null,
+      hasCosigner: extracted.has_cosigner ?? extracted.hasCosigner ?? tenant.hasCosigner,
+      studentStatus: extracted.student_status || extracted.studentStatus || tenant.studentStatus || null,
+      studentYear: extracted.student_year || extracted.studentYear || tenant.studentYear || null,
+      zelleName: extracted.zelle_name || extracted.zelleName || tenant.zelleName || null,
+      homeAddress: extracted.home_address || extracted.homeAddress || tenant.homeAddress || null,
+      age: extracted.age ? Number(extracted.age) : (tenant.age || null),
+      unitId: tenant.unitId || null,
+    }
+    const res = await fetch("/api/auth/update-tenant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { setSaveError(json.error || "Import failed."); return; }
+    await refresh()
+    setShowImportPreview(false)
+    setSelectedDocId("")
+  }
+
+  const handleViewDoc = async (doc) => {
+    const client = createClient()
+    const { data: signedData } = await client.storage.from('documents').createSignedUrl(doc.filePath, 60)
+    if (signedData?.signedUrl) window.open(signedData.signedUrl, '_blank')
+  }
+
+  const docTypeBadgeColor = { application: '#0ea5e9', lease: '#d97706', other: '#64748b' }
+  const displayRent = linkedUnit?.monthlyRent || tenant.monthlyRent
+
+  return (
+    <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Crimson Pro', Georgia, serif" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
+        <button
+          onClick={onBack}
+          style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, padding: "8px 14px", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.12)"}
+          onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.07)"}
+        >
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Back
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
+            {tenant.name.charAt(0)}
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Playfair Display', Georgia, serif", letterSpacing: "-0.5px" }}>
+              {tenant.name}
+            </h1>
+            <p style={{ margin: "3px 0 0", color: "#64748b", fontSize: 13 }}>
+              {tenant.email}
+              {tenant.status && <span style={{ marginLeft: 10 }}><Badge status={tenant.status} /></span>}
+            </p>
+          </div>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+          {editing ? (
+            <>
+              <button onClick={() => { setEditing(false); setSaveError(""); }} style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, padding: "9px 18px", color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+                Cancel
+              </button>
+              <button onClick={handleSave} disabled={saving} style={{ background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setEditing(true)}
+              style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, padding: "9px 18px", color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.12)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.07)"}
+            >
+              <Icon name="edit" size={13} /> Edit Profile
+            </button>
+          )}
+        </div>
+      </div>
+
+      {saveError && (
+        <div style={{ background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.3)", borderRadius: 10, padding: "12px 16px", color: "#fca5a5", fontSize: 13, marginBottom: 20 }}>
+          {saveError}
+        </div>
+      )}
+
+      {/* 2-column grid of info cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 18 }}>
+
+        {/* Contact */}
+        <TenantCard title="Contact">
+          {editing ? (
+            <>
+              <Inp label="Phone" value={form.phone} onChange={v => setF("phone", v)} />
+              <Inp label="Zelle Name" value={form.zelleName} onChange={v => setF("zelleName", v)} placeholder="Name or phone number" />
+              <Inp label="Home Address" value={form.homeAddress} onChange={v => setF("homeAddress", v)} placeholder="Permanent home address" />
+            </>
+          ) : (
+            <>
+              <InfoRow label="Email" value={tenant.email} />
+              <InfoRow label="Phone" value={tenant.phone} />
+              <InfoRow label="Zelle Name" value={tenant.zelleName} />
+              <InfoRow label="Home Address" value={tenant.homeAddress} />
+            </>
+          )}
+        </TenantCard>
+
+        {/* Residence */}
+        <TenantCard title="Residence">
+          {editing ? (
+            <>
+              <Sel label="Property" value={form.propertyId} onChange={v => setF("propertyId", v)}
+                options={[{ value: "", label: "— No property —" }, ...(data.properties || []).map(p => ({ value: p.id, label: p.address }))]}
+              />
+              <Inp label="Unit (text)" value={form.unit} onChange={v => setF("unit", v)} placeholder="e.g. 2B" />
+              <Sel label="Linked Unit" value={form.unitId} onChange={v => setF("unitId", v)}
+                options={[{ value: "", label: "— None —" }, ...(data.units || []).map(u => ({ value: u.id, label: `Unit ${u.unitNumber}` }))]}
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Inp label="Move-in Date" value={form.moveInDate} onChange={v => setF("moveInDate", v)} type="date" />
+                <Inp label="Move-out Date" value={form.moveOutDate} onChange={v => setF("moveOutDate", v)} type="date" />
+              </div>
+              <Inp label="Monthly Rent ($)" value={form.monthlyRent} onChange={v => setF("monthlyRent", v)} type="number" placeholder="e.g. 1500" />
+            </>
+          ) : (
+            <>
+              <InfoRow label="Property">
+                {property ? (
+                  <button onClick={() => onNavigateToProperty && onNavigateToProperty(property.id)}
+                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#d97706", fontSize: 14, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}
+                    onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                  >
+                    {property.address}
+                  </button>
+                ) : <span style={{ color: "#475569", fontSize: 14 }}>—</span>}
+              </InfoRow>
+              <InfoRow label="Unit">
+                {linkedUnit ? (
+                  <span style={{ fontSize: 14, color: "#f1f5f9" }}>Unit {linkedUnit.unitNumber} ({linkedUnit.bedrooms}bd / {linkedUnit.bathrooms}ba)</span>
+                ) : <span style={{ color: "#475569", fontSize: 14 }}>{tenant.unit || "—"}</span>}
+              </InfoRow>
+              <InfoRow label="Move-in Date" value={tenant.moveInDate} />
+              <InfoRow label="Move-out Date" value={tenant.moveOutDate} />
+              <InfoRow label="Monthly Rent">
+                <span style={{ fontSize: 15, fontWeight: 700, color: displayRent ? "#d97706" : "#475569" }}>
+                  {displayRent ? fmt2(displayRent) + "/mo" : "—"}
+                </span>
+              </InfoRow>
+            </>
+          )}
+        </TenantCard>
+
+        {/* Personal Info */}
+        <TenantCard title="Personal Info">
+          {editing ? (
+            <>
+              <Inp label="Age" value={form.age} onChange={v => setF("age", v)} type="number" placeholder="e.g. 22" />
+              <Sel label="Student Status" value={form.studentStatus} onChange={v => setF("studentStatus", v)}
+                options={[{ value: "", label: "—" }, { value: "student", label: "Student" }, { value: "non-student", label: "Non-student" }]}
+              />
+              <Inp label="Student Year" value={form.studentYear} onChange={v => setF("studentYear", v)} placeholder="e.g. Junior, 2nd year" />
+              <Sel label="Has Cosigner" value={String(form.hasCosigner)} onChange={v => setF("hasCosigner", v === "true")}
+                options={[{ value: "false", label: "No" }, { value: "true", label: "Yes" }]}
+              />
+            </>
+          ) : (
+            <>
+              <InfoRow label="Age" value={tenant.age ? String(tenant.age) : null} />
+              <InfoRow label="Student Status" value={tenant.studentStatus} />
+              <InfoRow label="Student Year" value={tenant.studentYear} />
+              <InfoRow label="Has Cosigner">
+                <Badge status={tenant.hasCosigner ? "active" : "inactive"} />
+              </InfoRow>
+            </>
+          )}
+        </TenantCard>
+
+        {/* Housemates */}
+        <TenantCard title="Housemates">
+          {housemates.length === 0 ? (
+            <p style={{ color: "#475569", fontSize: 14, margin: 0 }}>No housemates</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {housemates.map(hm => (
+                <div key={hm.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#0ea5e9,#0369a1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                    {hm.name.charAt(0)}
+                  </div>
+                  <span style={{ fontSize: 14, color: "#f1f5f9", fontWeight: 600 }}>{hm.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </TenantCard>
+
+        {/* Documents */}
+        <TenantCard title="Documents">
+          {tenantDocs.length === 0 ? (
+            <p style={{ color: "#475569", fontSize: 14, margin: 0 }}>No documents uploaded for this tenant.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {tenantDocs.map(doc => (
+                <div key={doc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: doc.documentType === "lease" ? "rgba(217,119,6,.08)" : "rgba(255,255,255,.03)", borderRadius: 9, padding: "10px 14px", border: doc.documentType === "lease" ? "1px solid rgba(217,119,6,.2)" : "1px solid rgba(255,255,255,.06)" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.fileName}</span>
+                      <span style={{ background: docTypeBadgeColor[doc.documentType] || "#64748b", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20, textTransform: "uppercase", flexShrink: 0 }}>{doc.documentType}</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: "#64748b" }}>{new Date(doc.uploadedAt).toLocaleDateString()}</span>
+                  </div>
+                  <button onClick={() => handleViewDoc(doc)} style={{ background: "#334155", color: "#f1f5f9", border: "none", borderRadius: 7, padding: "6px 12px", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>
+                    View
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </TenantCard>
+
+        {/* Import from Document - only shown when parsable docs exist */}
+        {parsableDocs.length > 0 && (
+          <TenantCard title="Import from Document">
+            <p style={{ color: "#94a3b8", fontSize: 13, marginTop: 0, marginBottom: 16 }}>
+              Auto-fill tenant profile fields from AI-parsed documents.
+            </p>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>Select Document</label>
+              <select
+                value={selectedDocId}
+                onChange={e => { setSelectedDocId(e.target.value); setShowImportPreview(false); }}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #334155", background: "#0f172a", color: "#f1f5f9", fontSize: 14, fontFamily: "inherit" }}
+              >
+                <option value="">— Choose a parsed document —</option>
+                {parsableDocs.map(d => (
+                  <option key={d.id} value={d.id}>{d.fileName}</option>
+                ))}
+              </select>
+            </div>
+            {selectedDocId && !showImportPreview && (
+              <button
+                onClick={() => setShowImportPreview(true)}
+                style={{ background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Preview &amp; Apply
+              </button>
+            )}
+            {showImportPreview && selectedParsedDoc && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ background: "#0f172a", borderRadius: 10, padding: 14, marginBottom: 14, border: "1px solid #334155" }}>
+                  <div style={{ color: "#d97706", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Extracted Fields</div>
+                  <pre style={{ margin: 0, fontSize: 12, color: "#94a3b8", whiteSpace: "pre-wrap", wordBreak: "break-all", maxHeight: 200, overflow: "auto" }}>
+                    {JSON.stringify(selectedParsedDoc.aiExtracted, null, 2)}
+                  </pre>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={() => handleApplyExtracted(selectedParsedDoc.aiExtracted)}
+                    disabled={saving}
+                    style={{ background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}
+                  >
+                    {saving ? "Applying…" : "Apply to Profile"}
+                  </button>
+                  <button
+                    onClick={() => setShowImportPreview(false)}
+                    style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, padding: "9px 18px", color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </TenantCard>
+        )}
+
+      </div>
     </div>
   )
 }
