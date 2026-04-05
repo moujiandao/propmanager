@@ -621,7 +621,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", status: ten.status, monthlyRent: ten.monthlyRent || "", password: "" });
+    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status, monthlyRent: ten.monthlyRent || "", password: "" });
   };
 
   const saveEdit = async () => {
@@ -636,6 +636,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         phone: editForm.phone,
         propertyId: editForm.propertyId || null,
         unit: editForm.unit,
+        unitId: editForm.unitId || null,
         status: editForm.status,
         monthlyRent: editForm.monthlyRent || null,
         password: editForm.password || null,
@@ -739,7 +740,43 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Inp label="Full Name" value={editForm.name} onChange={v => setEF("name",v)} />
             <Inp label="Phone" value={editForm.phone} onChange={v => setEF("phone",v)} />
             <Sel label="Property" value={editForm.propertyId} onChange={v => setEF("propertyId",v)} options={[{value:"",label:"— No property —"},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
-            <Inp label="Unit" value={editForm.unit} onChange={v => setEF("unit",v)} placeholder="Unit A" />
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>Unit</div>
+              {(() => {
+                const propUnits = (data.units || []).filter(u => u.propertyId === editForm.propertyId);
+                return (
+                  <select
+                    value={editForm.unitId || ""}
+                    onChange={e => {
+                      const uid = e.target.value;
+                      const matched = propUnits.find(u => u.id === uid);
+                      setEF("unitId", uid || "");
+                      setEF("unit", matched ? matched.unitNumber : "");
+                    }}
+                    style={{ width: "100%", background: "#0f172a", color: "#f1f5f9", border: "1px solid #334155", borderRadius: 8, padding: "10px 14px", fontSize: 14, fontFamily: "inherit" }}
+                    disabled={!editForm.propertyId}
+                  >
+                    {!editForm.propertyId ? (
+                      <option value="">— Select a property first —</option>
+                    ) : propUnits.length === 0 ? (
+                      <>
+                        <option value="">— No unit assigned —</option>
+                        <option value="" disabled>No units — add units first from the property page</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="">— No unit assigned —</option>
+                        {propUnits.map(u => (
+                          <option key={u.id} value={u.id}>
+                            Unit {u.unitNumber} — {u.bedrooms}bd/{u.bathrooms}ba ({u.status})
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                );
+              })()}
+            </div>
             <Inp label="Monthly Payment ($)" value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
             <Sel label="Status" value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"active",label:"Active"},{value:"inactive",label:"Inactive"}]} />
           </div>

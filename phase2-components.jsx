@@ -248,6 +248,14 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
   const [filterTenant, setFilterTenant] = useState('')
   const [filterType, setFilterType] = useState('')
 
+  // Lease record creation state
+  const [showLeaseModal, setShowLeaseModal] = useState(false)
+  const [leaseModalDocId, setLeaseModalDocId] = useState(null)
+  const [leasePropertyId, setLeasePropertyId] = useState('')
+  const [leaseUnitId, setLeaseUnitId] = useState('')
+  const [leaseProcessing, setLeaseProcessing] = useState(false)
+  const [leaseResult, setLeaseResult] = useState(null)
+
   // Upload form state
   const [uploadFile, setUploadFile] = useState(null)
   const [uploadTenantId, setUploadTenantId] = useState('')
@@ -293,6 +301,21 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
     const supabaseClient = createClient()
     const { data: signedData } = await supabaseClient.storage.from('documents').createSignedUrl(doc.filePath, 60)
     if (signedData?.signedUrl) window.open(signedData.signedUrl, '_blank')
+  }
+
+  const handleProcessLease = async () => {
+    setLeaseProcessing(true)
+    const res = await fetch('/api/documents/process-lease', {
+      method: 'POST',
+      body: JSON.stringify({ documentId: leaseModalDocId, propertyId: leasePropertyId, unitId: leaseUnitId }),
+      headers: { 'Content-Type': 'application/json' }
+    })
+    const json = await res.json()
+    setLeaseProcessing(false)
+    if (res.ok) {
+      setLeaseResult(json)
+      refresh()
+    }
   }
 
   // Filter documents
@@ -352,6 +375,13 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
                   <div style={{ marginTop: 10, background: '#0f172a', borderRadius: 8, padding: 12, fontSize: 12, color: '#94a3b8' }}>
                     <div style={{ color: '#d97706', fontWeight: 700, marginBottom: 6 }}>AI Extracted Data</div>
                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(parsedResult.extracted, null, 2)}</pre>
+                    {doc.documentType === 'lease' && (
+                      <button
+                        onClick={() => { setLeaseModalDocId(doc.id); setLeasePropertyId(doc.propertyId || ''); setLeaseUnitId(doc.unitId || ''); setLeaseResult(null); setShowLeaseModal(true) }}
+                        style={{ marginTop: 8, background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>
+                        Create Lease Records
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -400,6 +430,71 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
           <button onClick={handleUpload} disabled={uploading || !uploadFile} style={{ width: '100%', padding: 12, background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: uploading || !uploadFile ? 'not-allowed' : 'pointer', opacity: uploading || !uploadFile ? 0.7 : 1 }}>
             {uploading ? 'Uploading...' : 'Upload'}
           </button>
+        </Modal>
+      )}
+
+      {/* Lease Records Confirmation Modal */}
+      {showLeaseModal && (
+        <Modal onClose={() => { setShowLeaseModal(false); setLeaseResult(null) }}>
+          <h3 style={{ color: '#f1f5f9', marginTop: 0 }}>Create Lease Records</h3>
+
+          {parsedResult?.docId === leaseModalDocId && parsedResult.extracted && (
+            <div style={{ marginBottom: 18, background: '#0f172a', borderRadius: 8, padding: 14, fontSize: 13 }}>
+              <div style={{ marginBottom: 10 }}>
+                <span style={{ color: '#94a3b8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px' }}>People on Lease</span>
+                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                  {[parsedResult.extracted.tenant_name, ...(parsedResult.extracted.housemates || [])].filter(n => n && n.trim()).map((name, i) => (
+                    <li key={i} style={{ color: '#f1f5f9', marginBottom: 2 }}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+              <div style={{ marginBottom: 6, color: '#94a3b8' }}>
+                <span style={{ fontWeight: 700 }}>Lease Dates:</span>{' '}
+                <span style={{ color: '#f1f5f9' }}>{parsedResult.extracted.lease_start_date || '—'} to {parsedResult.extracted.lease_end_date || '—'}</span>
+              </div>
+              <div style={{ color: '#94a3b8' }}>
+                <span style={{ fontWeight: 700 }}>Rent:</span>{' '}
+                <span style={{ color: '#f1f5f9' }}>{parsedResult.extracted.rent_amount ? `$${parsedResult.extracted.rent_amount}` : '—'}</span>
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Property</label>
+            <select value={leasePropertyId} onChange={e => { setLeasePropertyId(e.target.value); setLeaseUnitId('') }} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9', fontSize: 15 }}>
+              <option value="">Select property</option>
+              {(data.properties || []).map(p => <option key={p.id} value={p.id}>{p.address}</option>)}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Unit</label>
+            <select value={leaseUnitId} onChange={e => setLeaseUnitId(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9', fontSize: 15 }}>
+              <option value="">Select unit</option>
+              {(data.units || []).filter(u => !leasePropertyId || u.propertyId === leasePropertyId).map(u => <option key={u.id} value={u.id}>{u.unitNumber}</option>)}
+            </select>
+          </div>
+
+          {leaseResult && (
+            <div style={{ marginBottom: 16, background: '#14532d', borderRadius: 8, padding: 12, fontSize: 13, color: '#bbf7d0' }}>
+              Created {leaseResult.created.length} tenant{leaseResult.created.length !== 1 ? 's' : ''}, updated {leaseResult.updated.length} tenant{leaseResult.updated.length !== 1 ? 's' : ''}, created {leaseResult.contractsCreated} contract{leaseResult.contractsCreated !== 1 ? 's' : ''}.
+              {leaseResult.skipped.length > 0 && <div style={{ marginTop: 4 }}>{leaseResult.skipped.length} contract{leaseResult.skipped.length !== 1 ? 's' : ''} skipped (already exist).</div>}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={handleProcessLease}
+              disabled={leaseProcessing || !!leaseResult}
+              style={{ flex: 1, padding: 12, background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: leaseProcessing || leaseResult ? 'not-allowed' : 'pointer', opacity: leaseProcessing || leaseResult ? 0.7 : 1 }}>
+              {leaseProcessing ? 'Processing...' : 'Confirm & Create'}
+            </button>
+            <button
+              onClick={() => { setShowLeaseModal(false); setLeaseResult(null) }}
+              style={{ padding: '12px 20px', background: '#334155', color: '#f1f5f9', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>
+              Cancel
+            </button>
+          </div>
         </Modal>
       )}
     </div>
@@ -646,10 +741,43 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
               <Sel label="Property" value={form.propertyId} onChange={v => setF("propertyId", v)}
                 options={[{ value: "", label: "— No property —" }, ...(data.properties || []).map(p => ({ value: p.id, label: p.address }))]}
               />
-              <Inp label="Unit (text)" value={form.unit} onChange={v => setF("unit", v)} placeholder="e.g. 2B" />
-              <Sel label="Linked Unit" value={form.unitId} onChange={v => setF("unitId", v)}
-                options={[{ value: "", label: "— None —" }, ...(data.units || []).map(u => ({ value: u.id, label: `Unit ${u.unitNumber}` }))]}
-              />
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>Unit</div>
+                {(() => {
+                  const propUnits = (data.units || []).filter(u => u.propertyId === form.propertyId);
+                  return (
+                    <select
+                      value={form.unitId || ""}
+                      onChange={e => {
+                        const uid = e.target.value;
+                        const matched = propUnits.find(u => u.id === uid);
+                        setF("unitId", uid || "");
+                        setF("unit", matched ? matched.unitNumber : "");
+                      }}
+                      style={{ width: "100%", background: "#0f172a", color: "#f1f5f9", border: "1px solid #334155", borderRadius: 8, padding: "10px 14px", fontSize: 14, fontFamily: "inherit" }}
+                      disabled={!form.propertyId}
+                    >
+                      {!form.propertyId ? (
+                        <option value="">— Select a property first —</option>
+                      ) : propUnits.length === 0 ? (
+                        <>
+                          <option value="">— No unit assigned —</option>
+                          <option value="" disabled>No units — add units first from the property page</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="">— No unit assigned —</option>
+                          {propUnits.map(u => (
+                            <option key={u.id} value={u.id}>
+                              Unit {u.unitNumber} — {u.bedrooms}bd/{u.bathrooms}ba ({u.status})
+                            </option>
+                          ))}
+                        </>
+                      )}
+                    </select>
+                  );
+                })()}
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <Inp label="Move-in Date" value={form.moveInDate} onChange={v => setF("moveInDate", v)} type="date" />
                 <Inp label="Move-out Date" value={form.moveOutDate} onChange={v => setF("moveOutDate", v)} type="date" />

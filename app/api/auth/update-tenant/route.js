@@ -9,6 +9,13 @@ export async function POST(request) {
 
   const supabase = await createClient()
 
+  // Capture the tenant's previous unit_id before updating, so we can recompute occupancy for the old unit too
+  const { data: prevTenant } = await supabase
+    .from('tenant_profiles')
+    .select('unit_id, property_id')
+    .eq('id', tenantId)
+    .single()
+
   // Update profile fields
   const { error: profileError } = await supabase
     .from('tenant_profiles')
@@ -43,6 +50,36 @@ export async function POST(request) {
     const { error: pwError } = await supabase.auth.admin.updateUserById(tenantId, { password })
     if (pwError) {
       return Response.json({ error: pwError.message }, { status: 400 })
+    }
+  }
+
+  // Recompute unit occupancy if unitId changed (or if a property is set)
+  // Determine which property to recompute for — use the updated propertyId, falling back to prev
+  const affectedPropertyId = propertyId || prevTenant?.property_id
+  const unitIdChanged = unitId !== undefined && unitId !== prevTenant?.unit_id
+
+  if (unitIdChanged && affectedPropertyId) {
+    // Fetch all units for this property
+    const { data: propertyUnits } = await supabase
+      .from('units')
+      .select('id')
+      .eq('property_id', affectedPropertyId)
+
+    if (propertyUnits && propertyUnits.length > 0) {
+      // Fetch all tenants that have a unit_id pointing to one of these units
+      const unitIds = propertyUnits.map(u => u.id)
+      const { data: occupiedTenants } = await supabase
+        .from('tenant_profiles')
+        .select('unit_id')
+        .in('unit_id', unitIds)
+
+      const occupiedUnitIds = new Set((occupiedTenants || []).map(t => t.unit_id))
+
+      // Update each unit's status based on whether any tenant is assigned to it
+      for (const unit of propertyUnits) {
+        const newStatus = occupiedUnitIds.has(unit.id) ? 'occupied' : 'vacant'
+        await supabase.from('units').update({ status: newStatus }).eq('id', unit.id)
+      }
     }
   }
 
