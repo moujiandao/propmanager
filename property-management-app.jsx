@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from '@/lib/supabase/client';
+import { PropertyDetailPage } from './phase2-components';
 
 const supabase = createClient();
 
@@ -114,7 +115,7 @@ const T = {
 
 
 // ─── ICONS ────────────────────────────────────────────────────────────────────
-const Icon = ({ name, size = 18 }) => {
+export const Icon = ({ name, size = 18 }) => {
   const icons = {
     home: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
     building: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,
@@ -156,7 +157,7 @@ const statusColors = {
   vacant:    { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
 };
 
-const Badge = ({ status, t }) => {
+export const Badge = ({ status, t }) => {
   const c = statusColors[status] || statusColors.pending;
   const raw = t ? (t[`st_${status}`] || status) : status;
   const label = raw.charAt(0).toUpperCase() + raw.slice(1);
@@ -173,7 +174,7 @@ const Toggle = ({ value, onChange }) => (
   </button>
 );
 
-const Modal = ({ title, onClose, children, wide }) => (
+export const Modal = ({ title, onClose, children, wide }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
     <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: wide ? 680 : 480, maxHeight: "90vh", overflow: "auto", boxShadow: "0 24px 60px rgba(0,0,0,.15)" }}>
       <div style={{ padding: "24px 28px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -185,7 +186,7 @@ const Modal = ({ title, onClose, children, wide }) => (
   </div>
 );
 
-const Inp = ({ label, value, onChange, type = "text", placeholder, readOnly }) => (
+export const Inp = ({ label, value, onChange, type = "text", placeholder, readOnly }) => (
   <div style={{ marginBottom: 16 }}>
     {label && <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{label}</label>}
     <input type={type} value={value} onChange={e => onChange && onChange(e.target.value)} placeholder={placeholder} readOnly={readOnly}
@@ -193,7 +194,7 @@ const Inp = ({ label, value, onChange, type = "text", placeholder, readOnly }) =
   </div>
 );
 
-const Sel = ({ label, value, onChange, options }) => (
+export const Sel = ({ label, value, onChange, options }) => (
   <div style={{ marginBottom: 16 }}>
     {label && <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{label}</label>}
     <select value={value} onChange={e => onChange(e.target.value)}
@@ -203,7 +204,7 @@ const Sel = ({ label, value, onChange, options }) => (
   </div>
 );
 
-const Btn = ({ children, onClick, variant = "primary", size = "md", icon }) => {
+export const Btn = ({ children, onClick, variant = "primary", size = "md", icon }) => {
   const s = { primary: { background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none" }, secondary: { background: "#f8fafc", color: "#374151", border: "1.5px solid #e2e8f0" }, ghost: { background: "transparent", color: "#64748b", border: "none" } };
   const sz = { sm: { padding: "6px 14px", fontSize: 13 }, md: { padding: "10px 20px", fontSize: 14 } };
   return (
@@ -428,7 +429,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
 };
 
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
-const PageHeader = ({ title, subtitle, action }) => (
+export const PageHeader = ({ title, subtitle, action }) => (
   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
     <div>
       <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif", letterSpacing: "-0.5px" }}>{title}</h1>
@@ -535,7 +536,7 @@ const LandlordDashboard = ({ data, t }) => {
 };
 
 // ─── PROPERTIES PAGE ──────────────────────────────────────────────────────────
-const PropertiesPage = ({ data, setData, t, refresh, user }) => {
+const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedPropertyId }) => {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ address: "", city: "", state: "CA", zip: "", units: "1", type: "Single Family", status: "vacant" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
@@ -553,10 +554,14 @@ const PropertiesPage = ({ data, setData, t, refresh, user }) => {
       <PageHeader title={t.propTitle} subtitle={t.propSubtitle(data.properties.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addProperty}</Btn>} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 18 }}>
         {data.properties.map(p => {
-          const pts = data.tenants.filter(ten => ten.propertyId === p.id);
           const rev = data.contracts.filter(c => c.propertyId === p.id).reduce((s,c) => s+c.rentAmount, 0);
+          const propertyUnits = (data.units || []).filter(u => u.propertyId === p.id);
+          const occupiedUnits = propertyUnits.filter(u => u.status === 'occupied').length;
+          const totalUnits = propertyUnits.length;
           return (
-            <div key={p.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+            <div key={p.id} onClick={() => { if (setSelectedPropertyId && setPage) { setSelectedPropertyId(p.id); setPage('property-detail'); } }} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", boxShadow: "0 1px 3px rgba(0,0,0,.04)", cursor: setSelectedPropertyId ? "pointer" : "default", transition: "box-shadow .15s" }}
+              onMouseEnter={e => { if (setSelectedPropertyId) e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.10)"; }}
+              onMouseLeave={e => { if (setSelectedPropertyId) e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.04)"; }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                 <div style={{ width: 44, height: 44, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "#d97706" }}><Icon name="home" size={22} /></div>
                 <Badge status={p.status} t={t} />
@@ -565,8 +570,8 @@ const PropertiesPage = ({ data, setData, t, refresh, user }) => {
               <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>{p.city}, {p.state} {p.zip} · {p.type}</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>{t.tenants}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{pts.length}<span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 400 }}>/{p.units}</span></div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>Occupied Units</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{occupiedUnits}<span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 400 }}>/{totalUnits}</span></div>
                 </div>
                 <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
                   <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>{t.revenue}</div>
@@ -1497,9 +1502,11 @@ const EMPTY_EMAIL_SETTINGS = {
 export default function App() {
   const [user, setUser] = useState(null);
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS });
+  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [] });
   const [loadingData, setLoadingData] = useState(false);
   const [lang, setLang] = useState("en");
+  const [selectedPropertyId, setSelectedPropertyId] = useState(null);
+  const [selectedTenantId, setSelectedTenantId] = useState(null);
   const t = T[lang];
 
   useEffect(() => { document.body.style.margin = "0"; document.body.style.background = "#f8fafc"; }, []);
@@ -1511,6 +1518,7 @@ export default function App() {
   const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
+  const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
   const mapEmailSettings = (e) => !e ? EMPTY_EMAIL_SETTINGS : ({
     fiveDayReminder: e.five_day_reminder || false, dayOfReminder: e.day_of_reminder || false,
     oneDayOverdue: e.one_day_overdue || false, threeDayOverdue: e.three_day_overdue || false,
@@ -1522,13 +1530,14 @@ export default function App() {
     setLoadingData(true);
     try {
       if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes] = await Promise.all([
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
           supabase.from("contracts").select("*"),
           supabase.from("payments").select("*").order("due_date", { ascending: false }),
           supabase.from("maintenance_requests").select("*").order("created_at", { ascending: false }),
           supabase.from("email_settings").select("*").single(),
+          supabase.from("units").select("*").order("unit_number", { ascending: true }),
         ]);
         setData({
           properties:    (propRes.data  || []).map(mapProperty),
@@ -1537,6 +1546,7 @@ export default function App() {
           payments:      (payRes.data   || []).map(mapPayment),
           maintenance:   (maintRes.data || []).map(mapMaintenance),
           emailSettings: mapEmailSettings(emailRes.data),
+          units:         (unitRes.data  || []).map(mapUnit),
         });
       } else {
         // Tenant: fetch own profile + related data
@@ -1555,6 +1565,7 @@ export default function App() {
           payments:      (payRes.data   || []).map(mapPayment),
           maintenance:   (maintRes.data || []).map(mapMaintenance),
           emailSettings: EMPTY_EMAIL_SETTINGS,
+          units:         [],
         });
       }
     } catch (err) {
@@ -1580,15 +1591,16 @@ export default function App() {
     if (user.role === "landlord") {
       const props = { data, setData, t, refresh, user };
       switch (page) {
-        case "dashboard":   return <LandlordDashboard {...props} />;
-        case "properties":  return <PropertiesPage {...props} />;
-        case "tenants":     return <TenantsPage {...props} />;
-        case "contracts":   return <ContractsPage {...props} />;
-        case "payments":    return <PaymentsPage data={data} t={t} />;
-        case "maintenance": return <MaintenancePage {...props} />;
-        case "email":       return <EmailPage {...props} />;
-        case "documents":   return <DocumentsPage data={data} refresh={refresh} />;
-        default:            return <LandlordDashboard {...props} />;
+        case "dashboard":        return <LandlordDashboard {...props} />;
+        case "properties":       return <PropertiesPage {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} />;
+        case "tenants":          return <TenantsPage {...props} />;
+        case "contracts":        return <ContractsPage {...props} />;
+        case "payments":         return <PaymentsPage data={data} t={t} />;
+        case "maintenance":      return <MaintenancePage {...props} />;
+        case "email":            return <EmailPage {...props} />;
+        case "documents":        return <DocumentsPage data={data} refresh={refresh} />;
+        case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
+        default:                 return <LandlordDashboard {...props} />;
       }
     } else {
       const props = { data, setData, user, refresh };
@@ -1607,7 +1619,7 @@ export default function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setData({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS });
+    setData({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [] });
     setPage("dashboard");
   };
 
