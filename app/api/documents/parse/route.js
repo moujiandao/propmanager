@@ -58,38 +58,43 @@ export async function POST(request) {
   const isPdf = doc.file_type === 'application/pdf' || doc.file_name.endsWith('.pdf')
   const isDocx = doc.file_type?.includes('wordprocessingml') || doc.file_name.match(/\.docx?$/)
 
-  if (isPdf) {
-    const buffer = await fileData.arrayBuffer()
-    const base64 = Buffer.from(buffer).toString('base64')
+  try {
+    if (isPdf) {
+      const buffer = await fileData.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
 
-    message = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: base64 }
-          },
-          { type: 'text', text: EXTRACT_PROMPT }
-        ]
-      }]
-    })
-  } else if (isDocx) {
-    const buffer = await fileData.arrayBuffer()
-    const { value: text } = await mammoth.extractRawText({ buffer: Buffer.from(buffer) })
+      message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20241001',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: { type: 'base64', media_type: 'application/pdf', data: base64 }
+            },
+            { type: 'text', text: EXTRACT_PROMPT }
+          ]
+        }]
+      })
+    } else if (isDocx) {
+      const buffer = await fileData.arrayBuffer()
+      const { value: text } = await mammoth.extractRawText({ buffer: Buffer.from(buffer) })
 
-    message = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: `${EXTRACT_PROMPT}\n\nDocument text:\n${text}`
-      }]
-    })
-  } else {
-    return NextResponse.json({ error: 'Unsupported file type. Upload PDF or DOCX.' }, { status: 400 })
+      message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20241001',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: `${EXTRACT_PROMPT}\n\nDocument text:\n${text}`
+        }]
+      })
+    } else {
+      return NextResponse.json({ error: 'Unsupported file type. Upload PDF or DOCX.' }, { status: 400 })
+    }
+  } catch (apiError) {
+    console.error('Claude API error:', apiError)
+    return NextResponse.json({ error: `AI parsing failed: ${apiError.message}` }, { status: 500 })
   }
 
   let extracted

@@ -244,12 +244,14 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [parsing, setParsing] = useState(null) // documentId being parsed
   const [parsedResult, setParsedResult] = useState(null) // { docId, extracted }
+  const [parseError, setParseError] = useState(null)
+  const [approvedFields, setApprovedFields] = useState({})
+  const [approvedTenants, setApprovedTenants] = useState({})
   const [filterProperty, setFilterProperty] = useState('')
   const [filterTenant, setFilterTenant] = useState('')
   const [filterType, setFilterType] = useState('')
 
   // Lease record creation state
-  const [showLeaseModal, setShowLeaseModal] = useState(false)
   const [leaseModalDocId, setLeaseModalDocId] = useState(null)
   const [leasePropertyId, setLeasePropertyId] = useState('')
   const [leaseUnitId, setLeaseUnitId] = useState('')
@@ -291,10 +293,33 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
 
   const handleParse = async (docId) => {
     setParsing(docId)
-    const res = await fetch('/api/documents/parse', { method: 'POST', body: JSON.stringify({ documentId: docId }), headers: { 'Content-Type': 'application/json' } })
-    const json = await res.json()
-    setParsing(null)
-    if (json.extracted) setParsedResult({ docId, extracted: json.extracted })
+    setParseError(null)
+    setParsedResult(null)
+    try {
+      const res = await fetch('/api/documents/parse', { method: 'POST', body: JSON.stringify({ documentId: docId }), headers: { 'Content-Type': 'application/json' } })
+      const json = await res.json()
+      setParsing(null)
+      if (!res.ok) {
+        setParseError({ docId, message: json.error || 'Parse failed' })
+        return
+      }
+      if (json.extracted) {
+        setParsedResult({ docId, extracted: json.extracted })
+        // Initialize all non-null fields as approved
+        const fields = {}
+        const fieldKeys = ['tenant_name','email','phone','home_address','move_in_date','move_out_date','lease_start_date','lease_end_date','has_cosigner','student_status','student_year','current_rent','zelle_name','age','rent_amount']
+        fieldKeys.forEach(k => { fields[k] = json.extracted[k] != null && json.extracted[k] !== '' })
+        setApprovedFields(fields)
+        // Initialize all tenants as approved
+        const people = [json.extracted.tenant_name, ...(json.extracted.housemates || [])].filter(n => n && n.trim())
+        const tenants = {}
+        people.forEach(name => { tenants[name] = true })
+        setApprovedTenants(tenants)
+      }
+    } catch (err) {
+      setParsing(null)
+      setParseError({ docId, message: err.message || 'Network error' })
+    }
   }
 
   const handleView = async (doc) => {
@@ -307,7 +332,13 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
     setLeaseProcessing(true)
     const res = await fetch('/api/documents/process-lease', {
       method: 'POST',
-      body: JSON.stringify({ documentId: leaseModalDocId, propertyId: leasePropertyId, unitId: leaseUnitId }),
+      body: JSON.stringify({
+        documentId: leaseModalDocId || parsedResult?.docId,
+        propertyId: leasePropertyId,
+        unitId: leaseUnitId,
+        approvedTenants: Object.entries(approvedTenants).filter(([_, v]) => v).map(([name]) => name),
+        approvedFields
+      }),
       headers: { 'Content-Type': 'application/json' }
     })
     const json = await res.json()
@@ -371,16 +402,110 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
                   {property && <span>{property.address}</span>}
                   <span style={{ marginLeft: 12 }}>{new Date(doc.uploadedAt).toLocaleDateString()}</span>
                 </div>
+                {/* Parse error display */}
+                {parseError?.docId === doc.id && (
+                  <div style={{ marginTop: 10, background: '#450a0a', borderRadius: 8, padding: 12, fontSize: 13, color: '#fca5a5' }}>
+                    Error: {parseError.message}
+                  </div>
+                )}
+                {/* Approval panel */}
                 {parsedResult?.docId === doc.id && (
-                  <div style={{ marginTop: 10, background: '#0f172a', borderRadius: 8, padding: 12, fontSize: 12, color: '#94a3b8' }}>
-                    <div style={{ color: '#d97706', fontWeight: 700, marginBottom: 6 }}>AI Extracted Data</div>
-                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(parsedResult.extracted, null, 2)}</pre>
-                    {doc.documentType === 'lease' && (
+                  <div style={{ marginTop: 10, background: '#0f172a', borderRadius: 8, padding: 16, fontSize: 13 }}>
+                    <div style={{ color: '#d97706', fontWeight: 700, marginBottom: 12, fontSize: 15 }}>Parsed Results - Review & Apply</div>
+
+                    {/* Section 1: People on the lease */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>People Found</div>
+                      {[parsedResult.extracted.tenant_name, ...(parsedResult.extracted.housemates || [])].filter(n => n && n.trim()).map((name, i) => {
+                        const existingTenant = (data.tenants || []).find(t => t.name?.toLowerCase() === name.toLowerCase())
+                        return (
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, cursor: 'pointer' }}>
+                            <input type="checkbox" checked={approvedTenants[name] || false} onChange={() => setApprovedTenants(prev => ({ ...prev, [name]: !prev[name] }))} style={{ accentColor: '#d97706' }} />
+                            <span style={{ color: '#f1f5f9' }}>{name}</span>
+                            <span style={{ color: existingTenant ? '#22c55e' : '#f59e0b', fontSize: 11, fontWeight: 600 }}>
+                              {existingTenant ? 'matches existing tenant' : 'will create new profile'}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+
+                    {/* Section 2: Extracted fields */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Lease Details</div>
+                      {[
+                        { key: 'lease_start_date', label: 'Start Date' },
+                        { key: 'lease_end_date', label: 'End Date' },
+                        { key: 'rent_amount', label: 'Monthly Rent', fmt: v => `$${v}` },
+                      ].map(({ key, label, fmt }) => (
+                        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, cursor: 'pointer', opacity: parsedResult.extracted[key] == null ? 0.4 : 1 }}>
+                          <input type="checkbox" checked={approvedFields[key] || false} onChange={() => setApprovedFields(prev => ({ ...prev, [key]: !prev[key] }))} disabled={parsedResult.extracted[key] == null} style={{ accentColor: '#d97706' }} />
+                          <span style={{ color: '#94a3b8', width: 120, flexShrink: 0 }}>{label}</span>
+                          <span style={{ color: '#f1f5f9' }}>{parsedResult.extracted[key] != null ? (fmt ? fmt(parsedResult.extracted[key]) : String(parsedResult.extracted[key])) : '—'}</span>
+                        </label>
+                      ))}
+
+                      <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8, marginTop: 14 }}>Tenant Info</div>
+                      {[
+                        { key: 'email', label: 'Email' },
+                        { key: 'phone', label: 'Phone' },
+                        { key: 'home_address', label: 'Home Address' },
+                        { key: 'age', label: 'Age' },
+                        { key: 'student_status', label: 'Student Status' },
+                        { key: 'student_year', label: 'Student Year' },
+                        { key: 'zelle_name', label: 'Zelle Name' },
+                        { key: 'has_cosigner', label: 'Has Cosigner', fmt: v => v ? 'Yes' : 'No' },
+                      ].map(({ key, label, fmt }) => (
+                        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, cursor: 'pointer', opacity: parsedResult.extracted[key] == null ? 0.4 : 1 }}>
+                          <input type="checkbox" checked={approvedFields[key] || false} onChange={() => setApprovedFields(prev => ({ ...prev, [key]: !prev[key] }))} disabled={parsedResult.extracted[key] == null} style={{ accentColor: '#d97706' }} />
+                          <span style={{ color: '#94a3b8', width: 120, flexShrink: 0 }}>{label}</span>
+                          <span style={{ color: '#f1f5f9' }}>{parsedResult.extracted[key] != null ? (fmt ? fmt(parsedResult.extracted[key]) : String(parsedResult.extracted[key])) : '—'}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* Section 3: Property/Unit assignment */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Assignment</div>
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
+                        <select value={leasePropertyId} onChange={e => { setLeasePropertyId(e.target.value); setLeaseUnitId('') }} style={{ flex: 1, background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}>
+                          <option value="">Select Property</option>
+                          {(data.properties || []).map(p => <option key={p.id} value={p.id}>{p.address}</option>)}
+                        </select>
+                        <select value={leaseUnitId} onChange={e => setLeaseUnitId(e.target.value)} style={{ flex: 1, background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}>
+                          <option value="">Select Unit</option>
+                          {(data.units || []).filter(u => u.propertyId === leasePropertyId).map(u => <option key={u.id} value={u.id}>Unit {u.unitNumber}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', gap: 10 }}>
                       <button
-                        onClick={() => { setLeaseModalDocId(doc.id); setLeasePropertyId(doc.propertyId || ''); setLeaseUnitId(doc.unitId || ''); setLeaseResult(null); setShowLeaseModal(true) }}
-                        style={{ marginTop: 8, background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>
-                        Create Lease Records
+                        onClick={() => {
+                          setLeaseModalDocId(doc.id)
+                          setLeaseResult(null)
+                          handleProcessLease()
+                        }}
+                        disabled={leaseProcessing || !leasePropertyId}
+                        style={{ background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: leaseProcessing || !leasePropertyId ? 'not-allowed' : 'pointer', opacity: leaseProcessing || !leasePropertyId ? 0.7 : 1 }}>
+                        {leaseProcessing ? 'Applying...' : 'Apply Selected'}
                       </button>
+                      <button
+                        onClick={() => { setParsedResult(null); setApprovedFields({}); setApprovedTenants({}) }}
+                        style={{ background: '#334155', color: '#f1f5f9', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
+                        Cancel
+                      </button>
+                    </div>
+
+                    {/* Success result */}
+                    {leaseResult && (
+                      <div style={{ marginTop: 12, background: '#052e16', borderRadius: 8, padding: 12, color: '#86efac', fontSize: 13 }}>
+                        {leaseResult.created?.length > 0 && <div>Created: {leaseResult.created.join(', ')}</div>}
+                        {leaseResult.updated?.length > 0 && <div>Updated: {leaseResult.updated.join(', ')}</div>}
+                        {leaseResult.skipped?.length > 0 && <div>Skipped: {leaseResult.skipped.join(', ')}</div>}
+                        {leaseResult.contractsCreated > 0 && <div>{leaseResult.contractsCreated} contract(s) created</div>}
+                      </div>
                     )}
                   </div>
                 )}
@@ -433,70 +558,6 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
         </Modal>
       )}
 
-      {/* Lease Records Confirmation Modal */}
-      {showLeaseModal && (
-        <Modal onClose={() => { setShowLeaseModal(false); setLeaseResult(null) }}>
-          <h3 style={{ color: '#f1f5f9', marginTop: 0 }}>Create Lease Records</h3>
-
-          {parsedResult?.docId === leaseModalDocId && parsedResult.extracted && (
-            <div style={{ marginBottom: 18, background: '#0f172a', borderRadius: 8, padding: 14, fontSize: 13 }}>
-              <div style={{ marginBottom: 10 }}>
-                <span style={{ color: '#94a3b8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px' }}>People on Lease</span>
-                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-                  {[parsedResult.extracted.tenant_name, ...(parsedResult.extracted.housemates || [])].filter(n => n && n.trim()).map((name, i) => (
-                    <li key={i} style={{ color: '#f1f5f9', marginBottom: 2 }}>{name}</li>
-                  ))}
-                </ul>
-              </div>
-              <div style={{ marginBottom: 6, color: '#94a3b8' }}>
-                <span style={{ fontWeight: 700 }}>Lease Dates:</span>{' '}
-                <span style={{ color: '#f1f5f9' }}>{parsedResult.extracted.lease_start_date || '—'} to {parsedResult.extracted.lease_end_date || '—'}</span>
-              </div>
-              <div style={{ color: '#94a3b8' }}>
-                <span style={{ fontWeight: 700 }}>Rent:</span>{' '}
-                <span style={{ color: '#f1f5f9' }}>{parsedResult.extracted.rent_amount ? `$${parsedResult.extracted.rent_amount}` : '—'}</span>
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Property</label>
-            <select value={leasePropertyId} onChange={e => { setLeasePropertyId(e.target.value); setLeaseUnitId('') }} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9', fontSize: 15 }}>
-              <option value="">Select property</option>
-              {(data.properties || []).map(p => <option key={p.id} value={p.id}>{p.address}</option>)}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Unit</label>
-            <select value={leaseUnitId} onChange={e => setLeaseUnitId(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9', fontSize: 15 }}>
-              <option value="">Select unit</option>
-              {(data.units || []).filter(u => !leasePropertyId || u.propertyId === leasePropertyId).map(u => <option key={u.id} value={u.id}>{u.unitNumber}</option>)}
-            </select>
-          </div>
-
-          {leaseResult && (
-            <div style={{ marginBottom: 16, background: '#14532d', borderRadius: 8, padding: 12, fontSize: 13, color: '#bbf7d0' }}>
-              Created {leaseResult.created.length} tenant{leaseResult.created.length !== 1 ? 's' : ''}, updated {leaseResult.updated.length} tenant{leaseResult.updated.length !== 1 ? 's' : ''}, created {leaseResult.contractsCreated} contract{leaseResult.contractsCreated !== 1 ? 's' : ''}.
-              {leaseResult.skipped.length > 0 && <div style={{ marginTop: 4 }}>{leaseResult.skipped.length} contract{leaseResult.skipped.length !== 1 ? 's' : ''} skipped (already exist).</div>}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={handleProcessLease}
-              disabled={leaseProcessing || !!leaseResult}
-              style={{ flex: 1, padding: 12, background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: leaseProcessing || leaseResult ? 'not-allowed' : 'pointer', opacity: leaseProcessing || leaseResult ? 0.7 : 1 }}>
-              {leaseProcessing ? 'Processing...' : 'Confirm & Create'}
-            </button>
-            <button
-              onClick={() => { setShowLeaseModal(false); setLeaseResult(null) }}
-              style={{ padding: '12px 20px', background: '#334155', color: '#f1f5f9', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>
-              Cancel
-            </button>
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }

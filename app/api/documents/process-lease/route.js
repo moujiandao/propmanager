@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 export async function POST(request) {
   const supabase = await createClient()
-  const { documentId, propertyId, unitId } = await request.json()
+  const { documentId, propertyId, unitId, approvedTenants, approvedFields } = await request.json()
 
   if (!documentId) {
     return NextResponse.json({ error: 'Missing documentId' }, { status: 400 })
@@ -25,8 +25,11 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Document has not been parsed or is missing tenant_name' }, { status: 400 })
   }
 
-  // 2. Build the full list of people on the lease
-  const allPeople = [ai.tenant_name, ...(ai.housemates || [])].filter(n => n && n.trim())
+  // 2. Build the full list of people on the lease, filtered by approvals
+  let allPeople = [ai.tenant_name, ...(ai.housemates || [])].filter(n => n && n.trim())
+  if (approvedTenants && approvedTenants.length > 0) {
+    allPeople = allPeople.filter(name => approvedTenants.includes(name))
+  }
 
   // 3. Look up the unit number text for the contract's `unit` field
   let unitNumber = null
@@ -75,18 +78,32 @@ export async function POST(request) {
       created.push(personName)
     }
 
-    // 5. Update tenant profile with property/unit/move-in date
-    await supabase
-      .from('tenant_profiles')
-      .update({
-        property_id: propertyId || null,
-        unit_id: unitId || null,
-        move_in_date: ai.lease_start_date || null,
-      })
-      .eq('id', tenantId)
+    // 5. Update tenant profile with approved fields only
+    const profileUpdate = {}
+    if (!approvedFields || approvedFields.move_in_date) profileUpdate.move_in_date = ai.lease_start_date || null
+    if (!approvedFields || approvedFields.move_out_date) profileUpdate.move_out_date = ai.move_out_date || null
+    if (!approvedFields || approvedFields.email) profileUpdate.email = ai.email || null
+    if (!approvedFields || approvedFields.phone) profileUpdate.phone = ai.phone || null
+    if (!approvedFields || approvedFields.home_address) profileUpdate.home_address = ai.home_address || null
+    if (!approvedFields || approvedFields.age) profileUpdate.age = ai.age || null
+    if (!approvedFields || approvedFields.student_status) profileUpdate.student_status = ai.student_status || null
+    if (!approvedFields || approvedFields.student_year) profileUpdate.student_year = ai.student_year || null
+    if (!approvedFields || approvedFields.zelle_name) profileUpdate.zelle_name = ai.zelle_name || null
+    if (!approvedFields || approvedFields.has_cosigner) profileUpdate.has_cosigner = ai.has_cosigner || false
+    // Always set property and unit if provided (these come from the UI dropdowns, not the AI)
+    if (propertyId) profileUpdate.property_id = propertyId
+    if (unitId) profileUpdate.unit_id = unitId
 
-    // 6. Upsert contract - skip if one already exists for this tenant with same start_date
-    if (ai.lease_start_date) {
+    if (Object.keys(profileUpdate).length > 0) {
+      await supabase
+        .from('tenant_profiles')
+        .update(profileUpdate)
+        .eq('id', tenantId)
+    }
+
+    // 6. Upsert contract - only if lease fields are approved, skip if duplicate
+    const createContract = !approvedFields || (approvedFields.lease_start_date || approvedFields.rent_amount)
+    if (createContract && ai.lease_start_date) {
       const { data: existingContract } = await supabase
         .from('contracts')
         .select('id')
@@ -97,17 +114,15 @@ export async function POST(request) {
       if (existingContract && existingContract.length > 0) {
         skipped.push(personName)
       } else {
+        const contractData = { landlord_id: landlordId, tenant_id: tenantId, property_id: propertyId }
+        if (!approvedFields || approvedFields.lease_start_date) contractData.start_date = ai.lease_start_date
+        if (!approvedFields || approvedFields.lease_end_date) contractData.end_date = ai.lease_end_date
+        if (!approvedFields || approvedFields.rent_amount) contractData.rent_amount = ai.rent_amount
+        if (unitNumber) contractData.unit = unitNumber
+
         const { error: contractError } = await supabase
           .from('contracts')
-          .insert({
-            landlord_id: landlordId,
-            tenant_id: tenantId,
-            property_id: propertyId || null,
-            unit: unitNumber,
-            start_date: ai.lease_start_date,
-            end_date: ai.lease_end_date || null,
-            rent_amount: ai.rent_amount || null,
-          })
+          .insert(contractData)
 
         if (contractError) {
           return NextResponse.json({ error: `Failed to create contract: ${contractError.message}` }, { status: 500 })
