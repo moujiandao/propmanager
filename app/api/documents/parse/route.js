@@ -7,9 +7,11 @@ const anthropic = new Anthropic() // reads ANTHROPIC_API_KEY from env
 
 const EXTRACT_PROMPT = `You are extracting tenant information from a rental application or lease agreement. Return ONLY valid JSON with no markdown, no explanation, just the JSON object. Use null for any field not found.
 
+IMPORTANT: If there are multiple tenants on the lease, put ONLY the first tenant's name in tenant_name and ALL other tenants in the housemates array as separate entries. Never combine multiple names into one string.
+
 Extract these fields:
 {
-  "tenant_name": "string or null",
+  "tenant_name": "string - first/primary tenant only, one person",
   "email": "string or null",
   "phone": "string or null",
   "home_address": "string or null",
@@ -24,7 +26,7 @@ Extract these fields:
   "lease_start_date": "YYYY-MM-DD or null",
   "lease_end_date": "YYYY-MM-DD or null",
   "rent_amount": "number or null",
-  "housemates": ["string names"] or []
+  "housemates": ["string names - all other tenants on the lease besides the primary tenant_name"] or []
 }`
 
 export async function POST(request) {
@@ -64,7 +66,7 @@ export async function POST(request) {
       const base64 = Buffer.from(buffer).toString('base64')
 
       message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20241001',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         messages: [{
           role: 'user',
@@ -82,7 +84,7 @@ export async function POST(request) {
       const { value: text } = await mammoth.extractRawText({ buffer: Buffer.from(buffer) })
 
       message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20241001',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         messages: [{
           role: 'user',
@@ -99,10 +101,21 @@ export async function POST(request) {
 
   let extracted
   try {
-    const raw = message.content[0].text.trim()
+    let raw = message.content[0].text.trim()
+    // Strip markdown code fences if present (e.g. ```json ... ```)
+    const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (fenceMatch) raw = fenceMatch[1].trim()
     extracted = JSON.parse(raw)
   } catch {
+    console.error('AI returned invalid JSON:', message.content[0].text)
     return NextResponse.json({ error: 'AI returned invalid JSON', raw: message.content[0].text }, { status: 500 })
+  }
+
+  // Safety net: if tenant_name contains multiple names (comma-separated), split them
+  if (extracted.tenant_name && extracted.tenant_name.includes(',')) {
+    const names = extracted.tenant_name.split(',').map(n => n.trim()).filter(Boolean)
+    extracted.tenant_name = names[0]
+    extracted.housemates = [...names.slice(1), ...(extracted.housemates || [])]
   }
 
   const { error: updateError } = await supabase

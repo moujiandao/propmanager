@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { createClient } from '@/lib/supabase/client';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage } from './phase2-components';
 
@@ -454,10 +454,36 @@ const StatCard = ({ label, value, sub, icon, color = "#d97706" }) => (
 
 // ─── LANDLORD DASHBOARD ───────────────────────────────────────────────────────
 const LandlordDashboard = ({ data, t }) => {
-  const { properties, tenants, payments, maintenance, contracts } = data;
+  const { properties, tenants, payments, maintenance, contracts, units = [] } = data;
   const occupied = properties.filter(p => p.status === "occupied").length;
   const pendingPayments = payments.filter(p => p.status === "pending" || p.status === "overdue");
   const openMaint = maintenance.filter(m => m.status !== "resolved");
+
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const currentMonthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const paidTenantIds = new Set(
+    payments
+      .filter(p => p.status === "completed" && p.dueDate && p.dueDate.startsWith(currentMonthKey))
+      .map(p => p.tenantId)
+  );
+  const unpaidTenants = tenants.filter(ten => ten.status === "active" && !paidTenantIds.has(ten.id));
+
+  const todayStr = now.toISOString().split("T")[0];
+  const sixMo = new Date(now.getFullYear(), now.getMonth() + 6, now.getDate());
+  const sixMoStr = sixMo.toISOString().split("T")[0];
+  const currentVacancies = units.filter(u => u.status === "vacant").map(u => {
+    const prop = properties.find(p => p.id === u.propertyId);
+    return { key: `v-${u.id}`, unitLabel: u.unitNumber || "—", propertyAddress: prop?.address || "", status: "vacant", dateLabel: "Vacant now", tenantName: null };
+  });
+  const upcomingVacancies = tenants
+    .filter(ten => ten.moveOutDate && ten.moveOutDate >= todayStr && ten.moveOutDate <= sixMoStr)
+    .map(ten => {
+      const unit = units.find(u => u.id === ten.unitId);
+      const prop = properties.find(p => p.id === ten.propertyId);
+      return { key: `m-${ten.id}`, unitLabel: unit?.unitNumber || ten.unit || "—", propertyAddress: prop?.address || "", status: "pending", dateLabel: `Vacating ${fmtDate(ten.moveOutDate)}`, tenantName: ten.name };
+    });
+  const vacancies = [...currentVacancies, ...upcomingVacancies];
 
   return (
     <div>
@@ -470,39 +496,44 @@ const LandlordDashboard = ({ data, t }) => {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{t.tenantPaymentStatus}</h3>
-          {tenants.map(ten => {
-            const latest = payments.filter(p => p.tenantId === ten.id).sort((a,b) => new Date(b.dueDate)-new Date(a.dueDate))[0];
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>Unpaid Rent — {currentMonthLabel}</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{unpaidTenants.length} tenant{unpaidTenants.length === 1 ? "" : "s"}</span>
+          </div>
+          {unpaidTenants.length === 0 ? (
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>All active tenants have paid this month.</div>
+          ) : unpaidTenants.map(ten => {
+            const prop = properties.find(p => p.id === ten.propertyId);
             return (
               <div key={ten.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{ten.name.charAt(0)}</div>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{ten.name}</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit} · {properties.find(p => p.id === ten.propertyId)?.address}</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit} · {prop?.address}</div>
                   </div>
                 </div>
-                {latest && <Badge status={latest.status} t={t} />}
+                <Badge status="overdue" t={t} />
               </div>
             );
           })}
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{t.recentMaintenance}</h3>
-          {maintenance.slice(0, 4).map(m => {
-            const ten = tenants.find(ten => ten.id === m.tenantId);
-            return (
-              <div key={m.id} style={{ padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 500, lineHeight: 1.4 }}>{m.description.slice(0,55)}...</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>{ten?.name} · {fmtDate(m.date)}</div>
-                  </div>
-                  <Badge status={m.status} t={t} />
-                </div>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>Vacancies — Now & Next 6 Months</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{vacancies.length} unit{vacancies.length === 1 ? "" : "s"}</span>
+          </div>
+          {vacancies.length === 0 ? (
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>No vacant units, and no tenants scheduled to move out in the next 6 months.</div>
+          ) : vacancies.map(v => (
+            <div key={v.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Unit {v.unitLabel} · {v.propertyAddress}</div>
+                <div style={{ fontSize: 12, color: "#94a3b8" }}>{v.tenantName ? `${v.tenantName} · ${v.dateLabel}` : v.dateLabel}</div>
               </div>
-            );
-          })}
+              <Badge status={v.status} t={t} />
+            </div>
+          ))}
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", gridColumn: "1/-1" }}>
           <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{t.recentPayments}</h3>
@@ -608,7 +639,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
 const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTenantId }) => {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
   const [editTenant, setEditTenant] = useState(null);
@@ -621,7 +652,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status, monthlyRent: ten.monthlyRent || "", password: "" });
+    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status, monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "" });
   };
 
   const saveEdit = async () => {
@@ -640,6 +671,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         status: editForm.status,
         monthlyRent: editForm.monthlyRent || null,
         password: editForm.password || null,
+        zelleName: editForm.zelleName || null,
       }),
     });
     const json = await res.json();
@@ -650,7 +682,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   };
 
   const add = async () => {
-    if (!form.name || !form.email) return;
+    if (!form.name) return;
     setSaving(true);
     const res = await fetch("/api/auth/create-tenant", {
       method: "POST",
@@ -658,7 +690,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       body: JSON.stringify({
         name: form.name, email: form.email, phone: form.phone,
         password: form.password, propertyId: form.propertyId, unit: form.unit,
-        landlordId: user.id,
+        zelleName: form.zelleName, landlordId: user.id,
       }),
     });
     if (res.ok) { await refresh(); setShow(false); }
@@ -719,13 +751,14 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <Modal title={t.addTenantTitle} onClose={() => setShow(false)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Inp label={t.fullName} value={form.name} onChange={v => setF("name",v)} placeholder="Jane Smith" />
-            <Inp label={t.email} value={form.email} onChange={v => setF("email",v)} type="email" />
+            <Inp label={`${t.email} (optional)`} value={form.email} onChange={v => setF("email",v)} type="email" />
             <Inp label={t.phone} value={form.phone} onChange={v => setF("phone",v)} />
             <Inp label={t.loginPassword} value={form.password} onChange={v => setF("password",v)} type="text" placeholder={t.tempPassword} />
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
+            <Inp label="Zelle Name" value={form.zelleName} onChange={v => setF("zelleName",v)} placeholder="Name or phone on Zelle" />
           </div>
-          <div style={{ background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 9, padding: 12, marginBottom: 16, fontSize: 13, color: "#92400e" }}><strong>{t.note}:</strong> {t.tenantNote}</div>
+          <div style={{ background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 9, padding: 12, marginBottom: 16, fontSize: 13, color: "#92400e" }}><strong>{t.note}:</strong> Email is optional. If provided, a welcome email will be sent and the tenant can log in to their portal.</div>
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
             <Btn onClick={add}>{saving ? "Creating…" : t.createTenantAccount}</Btn>
@@ -779,6 +812,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             </div>
             <Inp label="Monthly Payment ($)" value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
             <Sel label="Status" value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"active",label:"Active"},{value:"inactive",label:"Inactive"}]} />
+            <Inp label="Zelle Name" value={editForm.zelleName} onChange={v => setEF("zelleName",v)} placeholder="Name or phone on Zelle" />
           </div>
           <div style={{ marginTop: 4, marginBottom: 4 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Password Reset</div>
@@ -870,47 +904,229 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
 
 // ─── PAYMENTS PAGE ────────────────────────────────────────────────────────────
 const PaymentsPage = ({ data, t }) => {
-  const [filter, setFilter] = useState("all");
-  const filtered = filter === "all" ? data.payments : data.payments.filter(p => p.status === filter);
-  const filterLabels = { all: t.filterAll, completed: t.st_completed, pending: t.st_pending, overdue: t.st_overdue, failed: t.st_failed };
+  // Last 12 months, oldest first
+  const months = useMemo(() => {
+    const result = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      result.push({
+        label: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+        key: `${yyyy}-${mm}`,
+        dueDate: `${yyyy}-${mm}-01`,
+      });
+    }
+    return result;
+  }, []);
+
+  // "tenantId-YYYY-MM" → payment record id (from DB)
+  const [saved, setSaved] = useState(() => {
+    const map = {};
+    for (const p of data.payments) {
+      if (p.status === "completed" && p.dueDate) {
+        map[`${p.tenantId}-${p.dueDate.slice(0, 7)}`] = p.id;
+      }
+    }
+    return map;
+  });
+
+  // Local checkbox state - starts matching saved, diverges as user clicks
+  const [checked, setChecked] = useState(() => ({ ...saved }));
+  const [saving, setSaving] = useState(false);
+  const [payError, setPayError] = useState(null);
+
+  // Detect unsaved changes
+  const hasChanges = useMemo(() => {
+    const allKeys = new Set([...Object.keys(saved), ...Object.keys(checked)]);
+    for (const k of allKeys) {
+      if (!!saved[k] !== !!checked[k]) return true;
+    }
+    return false;
+  }, [saved, checked]);
+
+  // Group tenants by unit
+  const grouped = useMemo(() => {
+    const unitMap = {};
+    const noUnit = [];
+    for (const tenant of data.tenants) {
+      if (tenant.unitId) {
+        if (!unitMap[tenant.unitId]) {
+          unitMap[tenant.unitId] = { unit: data.units.find(u => u.id === tenant.unitId), tenants: [] };
+        }
+        unitMap[tenant.unitId].tenants.push(tenant);
+      } else {
+        noUnit.push(tenant);
+      }
+    }
+    const groups = Object.values(unitMap).sort((a, b) =>
+      (a.unit?.unitNumber || "").localeCompare(b.unit?.unitNumber || "", undefined, { numeric: true })
+    );
+    if (noUnit.length > 0) groups.push({ unit: null, tenants: noUnit });
+    return groups;
+  }, [data.tenants, data.units]);
+
+  const getContract = (tenant) => data.contracts.find(c => c.tenantId === tenant.id);
+
+  const toggle = (tenantId, monthKey) => {
+    const mapKey = `${tenantId}-${monthKey}`;
+    setChecked(prev => {
+      const next = { ...prev };
+      if (next[mapKey]) { delete next[mapKey]; } else { next[mapKey] = true; }
+      return next;
+    });
+  };
+
+  const saveChanges = async () => {
+    setSaving(true);
+    setPayError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    const allKeys = new Set([...Object.keys(saved), ...Object.keys(checked)]);
+    const toInsert = [];
+    const toDelete = [];
+
+    for (const mapKey of allKeys) {
+      const wasSaved = !!saved[mapKey];
+      const isChecked = !!checked[mapKey];
+      if (isChecked && !wasSaved) {
+        // New check - need to insert
+        const [tenantId, monthKey] = [mapKey.slice(0, 36), mapKey.slice(37)];
+        const tenant = data.tenants.find(t => t.id === tenantId);
+        const contract = tenant ? getContract(tenant) : null;
+        const row = {
+          landlord_id: user.id,
+          tenant_id: tenantId,
+          amount: contract?.rentAmount || 0,
+          due_date: `${monthKey}-01`,
+          paid_date: new Date().toISOString().split("T")[0],
+          status: "completed",
+          type: "recurring",
+        };
+        if (contract?.id) row.contract_id = contract.id;
+        toInsert.push({ mapKey, row });
+      } else if (!isChecked && wasSaved) {
+        // Unchecked - need to delete
+        toDelete.push({ mapKey, id: saved[mapKey] });
+      }
+    }
+
+    const newSaved = { ...saved };
+
+    // Batch delete
+    if (toDelete.length > 0) {
+      const ids = toDelete.map(d => d.id);
+      const { error } = await supabase.from("payments").delete().in("id", ids);
+      if (error) {
+        setPayError(`Failed to delete: ${error.message}`);
+        setSaving(false);
+        return;
+      }
+      for (const d of toDelete) delete newSaved[d.mapKey];
+    }
+
+    // Batch insert
+    if (toInsert.length > 0) {
+      const { data: inserted, error } = await supabase
+        .from("payments")
+        .insert(toInsert.map(i => i.row))
+        .select();
+      if (error) {
+        setPayError(`Failed to save: ${error.message}`);
+        setSaving(false);
+        return;
+      }
+      // Map returned rows back to mapKeys by matching tenant_id + due_date
+      for (const rec of inserted) {
+        const mk = `${rec.tenant_id}-${rec.due_date.slice(0, 7)}`;
+        newSaved[mk] = rec.id;
+      }
+    }
+
+    setSaved(newSaved);
+    setChecked({ ...newSaved });
+    setSaving(false);
+  };
+
+  const colCount = 3 + months.length;
 
   return (
     <div>
-      <PageHeader title={t.payTitle} subtitle={t.paySubtitle} />
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        {["all","completed","pending","overdue","failed"].map(f => (
-          <button key={f} onClick={() => setFilter(f)} style={{ padding: "7px 16px", borderRadius: 8, border: "1.5px solid", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s", borderColor: filter===f?"#d97706":"#e2e8f0", background: filter===f?"#d97706":"#fff", color: filter===f?"#fff":"#64748b" }}>
-            {filterLabels[f]}
+      <PageHeader title={t.payTitle} subtitle="Monthly rent tracker by unit" />
+      {payError && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontSize: 13, color: "#dc2626" }}>{payError}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <button onClick={saveChanges} disabled={saving || !hasChanges}
+          style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: hasChanges ? "#d97706" : "#e2e8f0", color: hasChanges ? "#fff" : "#94a3b8", fontSize: 14, fontWeight: 600, cursor: (saving || !hasChanges) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+        {hasChanges && (
+          <button onClick={() => setChecked({ ...saved })}
+            style={{ padding: "9px 16px", borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Discard
           </button>
-        ))}
+        )}
       </div>
-      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
           <thead style={{ background: "#f8fafc" }}>
             <tr style={{ color: "#64748b", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              {[t.colTenant,t.colAmount,t.colDueDate,t.colPaidDate,t.colType,t.colAchStatus,t.colStatus].map(h => <th key={h} style={{ padding: "14px 18px", textAlign: "left" }}>{h}</th>)}
+              <th style={{ padding: "14px 18px", textAlign: "left" }}>Tenant</th>
+              <th style={{ padding: "14px 18px", textAlign: "left" }}>Zelle Name</th>
+              <th style={{ padding: "14px 18px", textAlign: "left" }}>Rent</th>
+              {months.map(m => (
+                <th key={m.key} style={{ padding: "14px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{m.label}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.map(p => {
-              const ten = data.tenants.find(ten => ten.id === p.tenantId);
-              return (
-                <tr key={p.id} style={{ borderTop: "1px solid #f8fafc" }}>
-                  <td style={{ padding: "14px 18px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                      <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>{ten?.name.charAt(0)}</div>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{ten?.name}</span>
-                    </div>
+            {grouped.map(({ unit, tenants }) => (
+              <Fragment key={unit?.id || "unassigned"}>
+                <tr>
+                  <td colSpan={colCount} style={{ padding: "8px 18px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".6px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                    {unit ? `Unit ${unit.unitNumber}` : "Unassigned"}
                   </td>
-                  <td style={{ padding: "14px 18px", fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{fmt(p.amount)}</td>
-                  <td style={{ padding: "14px 18px", fontSize: 13, color: "#64748b" }}>{fmtDate(p.dueDate)}</td>
-                  <td style={{ padding: "14px 18px", fontSize: 13, color: "#64748b" }}>{fmtDate(p.paidDate)}</td>
-                  <td style={{ padding: "14px 18px", fontSize: 12, color: "#64748b" }}>{p.type==="recurring"?t.typeRecurring:t.typeOneTime}</td>
-                  <td style={{ padding: "14px 18px" }}>{p.achStatus ? <Badge status={p.achStatus} t={t} /> : <span style={{ color: "#d1d5db", fontSize: 13 }}>{t.naLabel}</span>}</td>
-                  <td style={{ padding: "14px 18px" }}><Badge status={p.status} t={t} /></td>
                 </tr>
-              );
-            })}
+                {tenants.map(tenant => {
+                  const rentAmount = getContract(tenant)?.rentAmount || null;
+                  return (
+                    <tr key={tenant.id} style={{ borderTop: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "13px 18px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>{tenant.name.charAt(0)}</div>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenant.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: "13px 18px", fontSize: 13, color: "#64748b" }}>
+                        {tenant.zelleName || <span style={{ color: "#d1d5db" }}>-</span>}
+                      </td>
+                      <td style={{ padding: "13px 18px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+                        {rentAmount ? fmt(rentAmount) : <span style={{ color: "#d1d5db" }}>-</span>}
+                      </td>
+                      {months.map(month => {
+                        const mapKey = `${tenant.id}-${month.key}`;
+                        const isChecked = !!checked[mapKey];
+                        const isDirty = !!checked[mapKey] !== !!saved[mapKey];
+                        return (
+                          <td key={month.key} style={{ padding: "13px 10px", textAlign: "center", background: isDirty ? "#fffbeb" : "transparent" }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggle(tenant.id, month.key)}
+                              style={{ width: 17, height: 17, cursor: "pointer", accentColor: "#d97706" }}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </Fragment>
+            ))}
+            {data.tenants.length === 0 && (
+              <tr>
+                <td colSpan={colCount} style={{ padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 15 }}>No tenants found</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -1549,6 +1765,19 @@ export default function App() {
   useEffect(() => { document.body.style.margin = "0"; document.body.style.background = "#f8fafc"; }, []);
   useEffect(() => { if (user) fetchAllData(); }, [user]);
 
+  // Restore session on page load / hot reload
+  useEffect(() => {
+    const restoreSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", session.user.id).single();
+      if (landlord) { setUser({ id: landlord.id, authId: session.user.id, role: "landlord", email: session.user.email, name: landlord.name || session.user.email?.split("@")[0] }); return; }
+      const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", session.user.id).single();
+      if (tenant) { setUser({ id: tenant.id, authId: session.user.id, role: "tenant", email: session.user.email, name: tenant.name || session.user.email?.split("@")[0] }); }
+    };
+    restoreSession();
+  }, []);
+
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "" });
   const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status || "active", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
@@ -1578,6 +1807,18 @@ export default function App() {
           supabase.from("units").select("*").order("unit_number", { ascending: true }),
           supabase.from("documents").select("*").order("uploaded_at", { ascending: false }),
         ]);
+        const today = new Date().toISOString().split("T")[0];
+        const units = (unitRes.data || []).map(mapUnit).map(unit => {
+          const tenantsInUnit = (tenRes.data || []).filter(t => t.unit_id === unit.id);
+          const hasActiveLease = tenantsInUnit.some(t =>
+            (conRes.data || []).some(c =>
+              c.tenant_id === t.id &&
+              (c.status === "active" || !c.status) &&
+              (!c.end_date || c.end_date >= today)
+            )
+          );
+          return { ...unit, status: hasActiveLease ? "occupied" : "vacant" };
+        });
         setData({
           properties:    (propRes.data  || []).map(mapProperty),
           tenants:       (tenRes.data   || []).map(mapTenant),
@@ -1585,7 +1826,7 @@ export default function App() {
           payments:      (payRes.data   || []).map(mapPayment),
           maintenance:   (maintRes.data || []).map(mapMaintenance),
           emailSettings: mapEmailSettings(emailRes.data),
-          units:         (unitRes.data  || []).map(mapUnit),
+          units,
           documents:     (docRes.data   || []).map(mapDocument),
         });
       } else {

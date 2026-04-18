@@ -121,7 +121,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 18 }}>
           {units.map(unit => {
-            const tenant = (data.tenants || []).find(t => t.unitId === unit.id)
+            const tenants = (data.tenants || []).filter(t => t.unitId === unit.id)
             const isOccupied = unit.status === 'occupied'
             return (
               <div key={unit.id} style={{ background: "#1e293b", borderRadius: 14, padding: 22, border: "1px solid rgba(255,255,255,.07)", position: "relative" }}>
@@ -156,18 +156,27 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
                   <Badge status={unit.status || "vacant"} />
                 </div>
 
-                {/* Tenant */}
-                {isOccupied && tenant ? (
+                {/* Tenants + per-tenant rent split */}
+                {isOccupied && tenants.length > 0 ? (
                   <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 12, fontSize: 13 }}>
-                    <span style={{ color: "#64748b" }}>Tenant: </span>
-                    <button
-                      onClick={() => onNavigateToTenant && onNavigateToTenant(tenant.id)}
-                      style={{ background: "none", border: "none", color: "#d97706", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13, fontFamily: "inherit" }}
-                      onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
-                      onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-                    >
-                      {tenant.name}
-                    </button>
+                    <div style={{ color: "#64748b", marginBottom: 6, textTransform: "uppercase", fontSize: 11, letterSpacing: ".5px", fontWeight: 600 }}>
+                      {tenants.length === 1 ? "Tenant" : `Tenants (${tenants.length})`}
+                    </div>
+                    {tenants.map(t => (
+                      <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                        <button
+                          onClick={() => onNavigateToTenant && onNavigateToTenant(t.id)}
+                          style={{ background: "none", border: "none", color: "#d97706", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13, fontFamily: "inherit", textAlign: "left" }}
+                          onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+                          onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                        >
+                          {t.name}
+                        </button>
+                        <span style={{ color: t.monthlyRent ? "#f1f5f9" : "#475569", fontWeight: 600 }}>
+                          {t.monthlyRent ? fmt(t.monthlyRent) : "—"}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 ) : isOccupied ? (
                   <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 12, fontSize: 13, color: "#475569" }}>

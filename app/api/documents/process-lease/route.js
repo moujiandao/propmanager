@@ -58,23 +58,36 @@ export async function POST(request) {
       tenantId = existing[0].id
       updated.push(personName)
     } else {
-      // 4c. Insert new tenant profile
-      const { data: newTenant, error: insertError } = await supabase
+      // Create auth user first (tenant_profiles.id must reference auth.users.id)
+      const placeholderEmail = `${personName.trim().toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@placeholder.local`
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: placeholderEmail,
+        email_confirm: true,
+        user_metadata: { role: 'tenant', name: personName.trim() },
+      })
+
+      if (authError) {
+        console.error('Failed to create auth user:', authError)
+        return NextResponse.json({ error: `Failed to create tenant auth: ${authError.message}` }, { status: 500 })
+      }
+
+      const { error: insertError } = await supabase
         .from('tenant_profiles')
         .insert({
+          id: authData.user.id,
           name: personName.trim(),
+          email: placeholderEmail,
           landlord_id: landlordId,
           property_id: propertyId || null,
           unit_id: unitId || null,
           status: 'active',
         })
-        .select('id')
-        .single()
 
       if (insertError) {
+        console.error('Failed to create tenant profile:', insertError)
         return NextResponse.json({ error: `Failed to create tenant: ${insertError.message}` }, { status: 500 })
       }
-      tenantId = newTenant.id
+      tenantId = authData.user.id
       created.push(personName)
     }
 
@@ -125,6 +138,7 @@ export async function POST(request) {
           .insert(contractData)
 
         if (contractError) {
+          console.error('Failed to create contract:', contractError)
           return NextResponse.json({ error: `Failed to create contract: ${contractError.message}` }, { status: 500 })
         }
         contractsCreated++

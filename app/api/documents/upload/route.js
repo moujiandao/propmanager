@@ -27,7 +27,8 @@ export async function POST(request) {
     .upload(filePath, fileBuffer, { contentType: file.type })
 
   if (storageError) {
-    return NextResponse.json({ error: storageError.message }, { status: 500 })
+    console.error('Storage upload error:', storageError)
+    return NextResponse.json({ error: storageError.message, detail: storageError }, { status: 500 })
   }
 
   const { data: doc, error: dbError } = await supabase
@@ -46,7 +47,8 @@ export async function POST(request) {
     .single()
 
   if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 })
+    console.error('DB insert error:', dbError)
+    return NextResponse.json({ error: dbError.message, detail: dbError }, { status: 500 })
   }
 
   return NextResponse.json({ document: doc })
