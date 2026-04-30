@@ -16,8 +16,18 @@ export async function POST(request) {
     .eq('id', tenantId)
     .single()
 
+  // Verify the tenant exists before updating
+  const { count, error: checkError } = await supabase
+    .from('tenant_profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('id', tenantId)
+
+  if (checkError || count === 0) {
+    return Response.json({ error: `No tenant found with id ${tenantId}` }, { status: 404 })
+  }
+
   // Update profile fields
-  const { data: updatedRows, error: profileError } = await supabase
+  const { error: profileError } = await supabase
     .from('tenant_profiles')
     .update({
       name,
@@ -38,16 +48,9 @@ export async function POST(request) {
       unit_id: unitId || null,
     })
     .eq('id', tenantId)
-    .select('id, move_out_date')
-
-  console.log('[update-tenant] tenantId:', tenantId, '| moveOutDate received:', moveOutDate, '| profileError:', profileError, '| updatedRows:', updatedRows)
 
   if (profileError) {
     return Response.json({ error: profileError.message }, { status: 400 })
-  }
-
-  if (!updatedRows || updatedRows.length === 0) {
-    return Response.json({ error: `No tenant found with id ${tenantId}` }, { status: 404 })
   }
 
   // Update password if provided
