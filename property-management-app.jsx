@@ -145,6 +145,7 @@ export const Icon = ({ name, size = 18 }) => {
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 const fmt = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+const tenantFullName = (ten) => [ten.name, ten.lastName].filter(Boolean).join(" ");
 
 const statusColors = {
   completed: { bg: "#dcfce7", text: "#166534", dot: "#22c55e" },
@@ -461,6 +462,7 @@ const StatCard = ({ label, value, sub, icon, color = "#4f46e5" }) => (
 const LandlordDashboard = ({ data, t }) => {
   const { properties, tenants, payments, maintenance, contracts, units = [] } = data;
   const occupied = properties.filter(p => p.status === "occupied").length;
+  const futureTenants = tenants.filter(t => t.status === "future tenant");
   const pendingPayments = payments.filter(p => p.status === "pending" || p.status === "overdue");
   const openMaint = maintenance.filter(m => m.status !== "resolved");
 
@@ -486,7 +488,7 @@ const LandlordDashboard = ({ data, t }) => {
     .map(ten => {
       const unit = units.find(u => u.id === ten.unitId);
       const prop = properties.find(p => p.id === ten.propertyId);
-      return { key: `m-${ten.id}`, unitLabel: unit?.unitNumber || ten.unit || "—", propertyAddress: prop?.address || "", status: "pending", dateLabel: `Vacating ${fmtDate(ten.moveOutDate)}`, tenantName: ten.name };
+      return { key: `m-${ten.id}`, unitLabel: unit?.unitNumber || ten.unit || "—", propertyAddress: prop?.address || "", status: "pending", dateLabel: `Vacating ${fmtDate(ten.moveOutDate)}`, tenantName: tenantFullName(ten) };
     });
   const vacancies = [...currentVacancies, ...upcomingVacancies];
 
@@ -514,7 +516,7 @@ const LandlordDashboard = ({ data, t }) => {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{ten.name}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenantFullName(ten)}</div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit} · {prop?.address}</div>
                   </div>
                 </div>
@@ -540,6 +542,32 @@ const LandlordDashboard = ({ data, t }) => {
             </div>
           ))}
         </div>
+        <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>New Tenants</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{futureTenants.length} upcoming</span>
+          </div>
+          {futureTenants.length === 0 ? (
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>No upcoming tenants scheduled.</div>
+          ) : futureTenants.map(ten => {
+            const prop = properties.find(p => p.id === ten.propertyId);
+            return (
+              <div key={ten.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#22c55e,#16a34a)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenantFullName(ten)}</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit || data.units?.find(u => u.id === ten.unitId)?.unitNumber || "—"} · {prop?.address || "—"}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>Move-in</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", gridColumn: "1/-1" }}>
           <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.recentPayments}</h3>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -553,7 +581,7 @@ const LandlordDashboard = ({ data, t }) => {
                 const ten = tenants.find(ten => ten.id === p.tenantId);
                 return (
                   <tr key={p.id} style={{ borderTop: "1px solid #f8fafc" }}>
-                    <td style={{ padding: "11px 12px 11px 0", fontSize: 14, fontWeight: 500 }}>{ten?.name}</td>
+                    <td style={{ padding: "11px 12px 11px 0", fontSize: 14, fontWeight: 500 }}>{ten ? tenantFullName(ten) : "—"}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14 }}>{fmt(p.amount)}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.dueDate)}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.paidDate)}</td>
@@ -644,7 +672,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
 const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTenantId }) => {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false });
+  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
   const [editTenant, setEditTenant] = useState(null);
@@ -668,7 +696,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "" });
+    setEditForm({ name: ten.name, lastName: ten.lastName || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "" });
   };
 
   const saveEdit = async () => {
@@ -680,6 +708,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       body: JSON.stringify({
         tenantId: editTenant.id,
         name: editForm.name,
+        lastName: editForm.lastName || null,
         phone: editForm.phone,
         propertyId: editForm.propertyId || null,
         unit: editForm.unit,
@@ -706,7 +735,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: form.name, phone: form.phone,
+        name: form.name, lastName: form.lastName || null, phone: form.phone,
         email: form.createLogin ? form.email : null,
         password: form.createLogin ? form.password : null,
         propertyId: form.propertyId, unit: form.unit,
@@ -714,7 +743,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         moveInDate: form.moveInDate, moveOutDate: form.moveOutDate || null,
       }),
     });
-    if (res.ok) { await refresh(); setShow(false); setForm({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false }); }
+    if (res.ok) { await refresh(); setShow(false); setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false }); }
     setSaving(false);
   };
 
@@ -741,8 +770,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       <tr key={ten.id} style={{ borderTop: "1px solid #f8fafc" }}>
         <td style={{ padding: "14px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ten.name.charAt(0)}</div>
-            <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{ten.name}</button>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
+            <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{tenantFullName(ten)}</button>
           </div>
         </td>
         <td style={{ padding: "14px 20px" }}>
@@ -830,7 +859,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       {show && (
         <Modal title={t.addTenantTitle} onClose={() => setShow(false)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Inp label={t.fullName} value={form.name} onChange={v => setF("name",v)} placeholder="Jane Smith" />
+            <Inp label="First Name" value={form.name} onChange={v => setF("name",v)} placeholder="Jane" />
+            <Inp label="Last Name" value={form.lastName||""} onChange={v => setF("lastName",v)} placeholder="Smith" />
             <Inp label={t.phone} value={form.phone} onChange={v => setF("phone",v)} />
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
@@ -861,9 +891,10 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
       {/* Edit Tenant Modal */}
       {editTenant && (
-        <Modal title={`Edit — ${editTenant.name}`} onClose={() => setEditTenant(null)} wide>
+        <Modal title={`Edit — ${tenantFullName(editTenant)}`} onClose={() => setEditTenant(null)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Inp label="Full Name" value={editForm.name} onChange={v => setEF("name",v)} />
+            <Inp label="First Name" value={editForm.name} onChange={v => setEF("name",v)} />
+            <Inp label="Last Name" value={editForm.lastName||""} onChange={v => setEF("lastName",v)} />
             <Inp label="Phone" value={editForm.phone} onChange={v => setEF("phone",v)} />
             <Sel label="Property" value={editForm.propertyId} onChange={v => setEF("propertyId",v)} options={[{value:"",label:"— No property —"},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <div>
@@ -928,7 +959,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       {deleteTarget && (
         <Modal title="Delete Tenant" onClose={() => setDeleteTarget(null)}>
           <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
-            Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
+            Are you sure you want to delete <strong>{tenantFullName(deleteTarget)}</strong>?
           </p>
           <p style={{ margin: "0 0 20px", fontSize: 13, color: "#94a3b8" }}>
             This will permanently remove their account and all associated data. This cannot be undone.
@@ -972,7 +1003,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
             <div key={c.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: 16, alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colTenant}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{ten?.name||"—"}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{ten ? tenantFullName(ten) : "—"}</div>
                 <div style={{ fontSize: 12, color: "#64748b" }}>{prop?.address} · {c.unit}</div>
               </div>
               <div>
@@ -997,7 +1028,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
       {show && (
         <Modal title={t.addLeaseTitle} onClose={() => setShow(false)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Sel label={t.colTenant} value={form.tenantId} onChange={v => setF("tenantId",v)} options={[{value:"",label:t.selectTenant},...data.tenants.map(ten => ({value:ten.id,label:ten.name}))]} />
+            <Sel label={t.colTenant} value={form.tenantId} onChange={v => setF("tenantId",v)} options={[{value:"",label:t.selectTenant},...data.tenants.map(ten => ({value:ten.id,label:tenantFullName(ten)}))]} />
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
             <Inp label={t.monthlyRent} value={form.rentAmount} onChange={v => setF("rentAmount",v)} type="number" />
@@ -1017,11 +1048,11 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
 
 // ─── PAYMENTS PAGE ────────────────────────────────────────────────────────────
 const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
-  // Last 12 months, oldest first
+  // 3-month window: previous, current, next month
   const months = useMemo(() => {
     const result = [];
     const now = new Date();
-    for (let i = 11; i >= 0; i--) {
+    for (let i = 1; i >= -1; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -1211,10 +1242,10 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                           {setPage && setSelectedTenantId ? (
                             <span onClick={() => { setSelectedTenantId(tenant.id); setPage("tenant-detail"); }}
                               style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}>
-                              {tenant.name}
+                              {tenantFullName(tenant)}
                             </span>
                           ) : (
-                            <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenant.name}</span>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenantFullName(tenant)}</span>
                           )}
                         </div>
                       </td>
@@ -1294,7 +1325,7 @@ const MaintenancePage = ({ data, setData, t, refresh }) => {
                   <div style={{ flex: 1 }}>
                     <p style={{ margin: "0 0 6px", fontSize: 15, color: "#0f172a", fontWeight: 500 }}>{m.description}</p>
                     <div style={{ display: "flex", gap: 12, fontSize: 13, color: "#64748b" }}>
-                      <span>{ten?.name}</span><span>{prop?.address} · {m.unit}</span><span>{fmtDate(m.date)}</span>
+                      <span>{ten ? tenantFullName(ten) : "—"}</span><span>{prop?.address} · {m.unit}</span><span>{fmtDate(m.date)}</span>
                       <span style={{ color: pColors[m.priority], fontWeight: 600 }}>{pLabels[m.priority]}</span>
                     </div>
                   </div>
@@ -1917,7 +1948,7 @@ export default function App() {
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "" });
-  const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
+  const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
   const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });

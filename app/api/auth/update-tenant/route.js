@@ -1,7 +1,7 @@
 import { createClient } from '../../../../lib/supabase/server'
 
 export async function POST(request) {
-  const { tenantId, name, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId } = await request.json()
+  const { tenantId, name, lastName, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId } = await request.json()
 
   if (!tenantId) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
@@ -21,6 +21,7 @@ export async function POST(request) {
     .from('tenant_profiles')
     .update({
       name,
+      last_name: lastName !== undefined ? (lastName || null) : undefined,
       phone,
       property_id: propertyId || null,
       unit,
