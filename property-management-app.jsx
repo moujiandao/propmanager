@@ -2374,9 +2374,16 @@ export default function App() {
         // Tenant: fetch own profile + related data
         const { data: tenRow } = await supabase.from("tenant_profiles").select("*").eq("id", user.id).single();
         const tenant = tenRow ? mapTenant(tenRow) : null;
+        const { data: ctRows } = await supabase
+          .from("contract_tenants")
+          .select("contract_id")
+          .eq("tenant_id", user.id);
+        const contractId = ctRows?.[0]?.contract_id;
         const [propRes, conRes, payRes, maintRes] = await Promise.all([
           tenant?.propertyId ? supabase.from("properties").select("*").eq("id", tenant.propertyId) : Promise.resolve({ data: [] }),
-          supabase.from("contracts").select("*").eq("tenant_id", user.id),
+          contractId
+            ? supabase.from("contracts").select("*, contract_tenants(tenant_id)").eq("id", contractId)
+            : Promise.resolve({ data: [] }),
           supabase.from("payments").select("*").eq("tenant_id", user.id).order("due_date", { ascending: false }),
           supabase.from("maintenance_requests").select("*").eq("tenant_id", user.id).order("created_at", { ascending: false }),
         ]);
