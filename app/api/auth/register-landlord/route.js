@@ -1,4 +1,4 @@
-import { createClient } from '../../../../lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request) {
   const { name, email, password } = await request.json()
@@ -10,7 +10,11 @@ export async function POST(request) {
     return Response.json({ error: 'Password must be at least 8 characters.' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 
   // Create the auth user
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
