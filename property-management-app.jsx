@@ -1165,16 +1165,26 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 // ─── CONTRACTS PAGE ───────────────────────────────────────────────────────────
 const ContractsPage = ({ data, setData, t, refresh, user }) => {
   const [show, setShow] = useState(false);
-  const [form, setForm] = useState({ tenantId: "", propertyId: "", unit: "", startDate: "", endDate: "", rentAmount: "", dueDay: "1" });
+  const [form, setForm] = useState({ tenantIds: [], propertyId: "", unit: "", startDate: "", endDate: "", rentAmount: "", dueDay: "1" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
   const add = async () => {
-    if (!form.tenantId || !form.rentAmount) return;
-    const { error } = await supabase.from("contracts").insert({
-      landlord_id: user.id, tenant_id: form.tenantId, property_id: form.propertyId, unit: form.unit,
+    if (!form.tenantIds.length || !form.rentAmount) return;
+    const { data: newContract, error } = await supabase.from("contracts").insert({
+      landlord_id: user.id, property_id: form.propertyId, unit: form.unit,
       start_date: form.startDate, end_date: form.endDate,
       rent_amount: +form.rentAmount, due_day: +form.dueDay, status: "active",
-    });
-    if (!error) { await refresh(); setShow(false); }
+    }).select().single();
+    if (error || !newContract) return;
+    await Promise.all(form.tenantIds.map(tid =>
+      supabase.from("contract_tenants").insert({ contract_id: newContract.id, tenant_id: tid })
+    ));
+    if (form.startDate) {
+      await Promise.all(form.tenantIds.map(tid =>
+        supabase.from("tenant_profiles").update({ move_in_date: form.startDate }).eq("id", tid)
+      ));
+    }
+    await refresh();
+    setShow(false);
   };
 
   return (
@@ -1216,7 +1226,26 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
       {show && (
         <Modal title={t.addLeaseTitle} onClose={() => setShow(false)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Sel label={t.colTenant} value={form.tenantId} onChange={v => setF("tenantId",v)} options={[{value:"",label:t.selectTenant},...data.tenants.map(ten => ({value:ten.id,label:tenantFullName(ten)}))]} />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8 }}>{t.colTenants}</div>
+              <div style={{ maxHeight: 160, overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px" }}>
+                {data.tenants.map(ten => (
+                  <label key={ten.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={form.tenantIds.includes(ten.id)}
+                      onChange={() => setForm(f => ({
+                        ...f,
+                        tenantIds: f.tenantIds.includes(ten.id)
+                          ? f.tenantIds.filter(id => id !== ten.id)
+                          : [...f.tenantIds, ten.id]
+                      }))}
+                    />
+                    <span style={{ fontSize: 14, color: "#0f172a" }}>{tenantFullName(ten)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
             <Inp label={t.monthlyRent} value={form.rentAmount} onChange={v => setF("rentAmount",v)} type="number" />
