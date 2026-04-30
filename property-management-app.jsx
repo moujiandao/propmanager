@@ -957,12 +957,11 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   };
 
   const currentTenants = data.tenants.filter(t => t.status?.toLowerCase() === "current tenant");
+  const futureTenants  = data.tenants.filter(t => t.status?.toLowerCase() === "future tenant");
 
-  // Build grouped structure when groupBy === "unit"
-  const tenantGroups = (() => {
-    if (groupBy === "none") return null;
+  const buildGroups = (tenantList) => {
     const map = {};
-    currentTenants.forEach(ten => {
+    tenantList.forEach(ten => {
       const prop = data.properties.find(p => p.id === ten.propertyId);
       const key = `${ten.propertyId}::${ten.unit || "—"}`;
       if (!map[key]) map[key] = { prop, unit: ten.unit || "—", tenants: [] };
@@ -973,7 +972,10 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       if (pa !== pb) return pa.localeCompare(pb);
       return String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
     });
-  })();
+  };
+
+  const tenantGroups = groupBy === "none" ? null : buildGroups(currentTenants);
+  const futureGroups  = groupBy === "none" ? null : buildGroups(futureTenants);
 
   const renderTenantRow = (ten) => {
     const prop = data.properties.find(p => p.id === ten.propertyId);
