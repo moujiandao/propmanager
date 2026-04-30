@@ -643,7 +643,7 @@ const LandlordDashboard = ({ data, t }) => {
                   <tr key={p.id} style={{ borderTop: "1px solid #f8fafc" }}>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14, fontWeight: 500 }}>{ten ? tenantFullName(ten) : "—"}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14 }}>{fmt(p.amount || ten?.monthlyRent || 0)}</td>
-                    <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.dueDate)}</td>
+                    <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{p.dueDate ? fmtDate(p.dueDate.slice(0,7) + "-05") : "—"}</td>
                   </tr>
                 );
               })}
@@ -866,8 +866,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
       {/* Display by toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px" }}>Display by</span>
-        {[["none", "All"], ["unit", "Property + Unit"]].map(([val, label]) => (
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px" }}>{t.displayBy}</span>
+        {[["none", t.displayAll], ["unit", t.displayByUnit]].map(([val, label]) => (
           <button key={val} onClick={() => setGroupBy(val)}
             style={{ padding: "5px 12px", borderRadius: 7, border: "1.5px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s",
               borderColor: groupBy === val ? "#4f46e5" : "#e2e8f0",
@@ -882,7 +882,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ background: "#f8fafc" }}>
             <tr style={{ color: "#64748b", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              {[t.colTenant, t.colContact, t.colProperty, "Monthly Rent", t.colBank, t.colRecurring, t.colStatus, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left" }}>{h}</th>)}
+              {[t.colTenant, t.colContact, t.colProperty, t.colMonthlyRent, t.colBank, t.colRecurring, t.colStatus, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left" }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
