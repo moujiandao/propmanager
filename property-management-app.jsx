@@ -532,7 +532,7 @@ const StatCard = ({ label, value, sub, icon, color = "#4f46e5" }) => (
 );
 
 // ─── LANDLORD DASHBOARD ───────────────────────────────────────────────────────
-const LandlordDashboard = ({ data, t }) => {
+const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelectedTenantId }) => {
   const { properties, tenants, payments, maintenance, contracts, units = [] } = data;
   const occupied = properties.filter(p => p.status === "occupied").length;
   const futureTenants = tenants.filter(t => t.status === "future tenant");
@@ -559,14 +559,14 @@ const LandlordDashboard = ({ data, t }) => {
   const sixMoStr = sixMo.toISOString().split("T")[0];
   const currentVacancies = units.filter(u => u.status === "vacant").map(u => {
     const prop = properties.find(p => p.id === u.propertyId);
-    return { key: `v-${u.id}`, unitLabel: u.unitNumber || "—", propertyAddress: prop?.address || "", status: "vacant", dateLabel: "Vacant now", tenantName: null };
+    return { key: `v-${u.id}`, unitLabel: u.unitNumber || "—", propertyAddress: prop?.address || "", propertyId: u.propertyId, tenantId: null, status: "vacant", dateLabel: "Vacant now", tenantName: null };
   });
   const upcomingVacancies = tenants
     .filter(ten => ten.moveOutDate && ten.moveOutDate >= todayStr && ten.moveOutDate <= sixMoStr)
     .map(ten => {
       const unit = units.find(u => u.id === ten.unitId);
       const prop = properties.find(p => p.id === ten.propertyId);
-      return { key: `m-${ten.id}`, unitLabel: unit?.unitNumber || ten.unit || "—", propertyAddress: prop?.address || "", status: "pending", dateLabel: `${t.dashVacating} ${fmtDate(ten.moveOutDate)}`, tenantName: tenantFullName(ten) };
+      return { key: `m-${ten.id}`, unitLabel: unit?.unitNumber || ten.unit || "—", propertyAddress: prop?.address || "", propertyId: ten.propertyId, tenantId: ten.id, status: "pending", dateLabel: `${t.dashVacating} ${fmtDate(ten.moveOutDate)}`, tenantName: tenantFullName(ten) };
     });
   const vacancies = [...currentVacancies, ...upcomingVacancies];
 
@@ -590,8 +590,27 @@ const LandlordDashboard = ({ data, t }) => {
           ) : vacancies.map(v => (
             <div key={v.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Unit {v.unitLabel} · {v.propertyAddress}</div>
-                <div style={{ fontSize: 12, color: "#94a3b8" }}>{v.tenantName ? `${v.tenantName} · ${v.dateLabel}` : v.dateLabel}</div>
+                <div
+                  style={{ fontSize: 14, fontWeight: 600, color: v.propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: v.propertyId && setPage ? "pointer" : "default" }}
+                  onClick={() => { if (v.propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(v.propertyId); setPage("property-detail"); } }}
+                  onMouseEnter={e => { if (v.propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
+                  onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                >
+                  Unit {v.unitLabel} · {v.propertyAddress}
+                </div>
+                <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                  {v.tenantName ? (
+                    <>
+                      <span
+                        style={{ cursor: v.tenantId && setPage ? "pointer" : "default", color: v.tenantId && setPage ? "#4f46e5" : "#94a3b8" }}
+                        onClick={() => { if (v.tenantId && setPage && setSelectedTenantId) { setSelectedTenantId(v.tenantId); setPage("tenant-detail"); } }}
+                        onMouseEnter={e => { if (v.tenantId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
+                        onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                      >{v.tenantName}</span>
+                      {` · ${v.dateLabel}`}
+                    </>
+                  ) : v.dateLabel}
+                </div>
               </div>
               <Badge status={v.status} t={t} />
             </div>
@@ -611,7 +630,12 @@ const LandlordDashboard = ({ data, t }) => {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#22c55e,#16a34a)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenantFullName(ten)}</div>
+                    <div
+                      style={{ fontSize: 14, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", cursor: setPage ? "pointer" : "default" }}
+                      onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
+                      onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
+                      onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                    >{tenantFullName(ten)}</div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit || data.units?.find(u => u.id === ten.unitId)?.unitNumber || "—"} · {prop?.address || "—"}</div>
                   </div>
                 </div>
@@ -2407,7 +2431,7 @@ export default function App() {
     if (user.role === "landlord") {
       const props = { data, setData, t, refresh, user };
       switch (page) {
-        case "dashboard":        return <LandlordDashboard {...props} />;
+        case "dashboard":        return <LandlordDashboard {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} setSelectedTenantId={setSelectedTenantId} />;
         case "properties":       return <PropertiesPage {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} />;
         case "tenants":          return <TenantsPage {...props} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
         case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={fetchAllData} user={user} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
