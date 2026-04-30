@@ -65,6 +65,7 @@ const T = {
     dashVacanciesEmpty: "No vacant units, and no tenants scheduled to move out in the next 6 months.",
     dashNewTenantsEmpty: "No upcoming tenants scheduled.", dashVacating: "Vacating", dashMoveIn: "Move-in",
     dashTenantCount: (n) => `${n} tenant${n === 1 ? "" : "s"}`, dashUnitCount: (n) => `${n} unit${n === 1 ? "" : "s"}`, dashUpcomingCount: (n) => `${n} upcoming`,
+    dashUnitsToRentOut: "Units to Rent Out", dashUnitsToRentOutEmpty: "All units are covered for the next 6 months.", dashAvailable: "Available",
     paySubtitleTracker: "Monthly rent tracker by unit", payZelleName: "Zelle Name", payMoveOutDate: "Move-out Date",
     payUnitLabel: (n) => `Unit ${n}`, payUnassigned: "Unassigned",
     saveChanges: "Save Changes", saving: "Saving...", discard: "Discard",
@@ -147,6 +148,7 @@ const T = {
     dashVacanciesEmpty: "暂无空置单元，且未来6个月内无租客计划退租。",
     dashNewTenantsEmpty: "暂无待入住租客。", dashVacating: "退租日期", dashMoveIn: "入住日",
     dashTenantCount: (n) => `${n} 位租客`, dashUnitCount: (n) => `${n} 套单元`, dashUpcomingCount: (n) => `${n} 位待入住`,
+    dashUnitsToRentOut: "待出租单元", dashUnitsToRentOutEmpty: "未来6个月内所有单元均已有租客安排。", dashAvailable: "可用日期",
     paySubtitleTracker: "按单元的月租追踪", payZelleName: "Zelle姓名", payMoveOutDate: "退租日期",
     payUnitLabel: (n) => `单元 ${n}`, payUnassigned: "未分配单元",
     saveChanges: "保存更改", saving: "保存中…", discard: "撤销更改",
@@ -570,6 +572,22 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
     });
   const vacancies = [...currentVacancies, ...upcomingVacancies];
 
+  const unitsToRentOut = units.reduce((acc, unit) => {
+    const currentInUnit = tenants.filter(ten => ten.unitId === unit.id && ten.status === "current tenant");
+    if (currentInUnit.length === 0) return acc;
+    const allMovingOutSoon = currentInUnit.every(ten =>
+      ten.moveOutDate && ten.moveOutDate >= todayStr && ten.moveOutDate <= sixMoStr
+    );
+    if (!allMovingOutSoon) return acc;
+    const futureInUnit = tenants.filter(ten => ten.unitId === unit.id && ten.status === "future tenant");
+    const hasFutureCoverage = futureInUnit.some(ten => ten.moveInDate && ten.moveInDate <= sixMoStr);
+    if (hasFutureCoverage) return acc;
+    const prop = properties.find(p => p.id === unit.propertyId);
+    const latestMoveOut = currentInUnit.map(ten => ten.moveOutDate).sort().pop();
+    acc.push({ unit, propertyAddress: prop?.address || "—", propertyId: unit.propertyId, latestMoveOut });
+    return acc;
+  }, []);
+
   return (
     <div>
       <PageHeader title={t.dashTitle} subtitle={t.dashSubtitle} />
@@ -692,6 +710,29 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
             </tbody>
           </table>
         </div>
+      </div>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", marginTop: 20 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashUnitsToRentOut}</h3>
+          <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(unitsToRentOut.length)}</span>
+        </div>
+        {unitsToRentOut.length === 0 ? (
+          <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashUnitsToRentOutEmpty}</div>
+        ) : unitsToRentOut.map(({ unit, propertyAddress, propertyId, latestMoveOut }) => (
+          <div key={unit.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
+            <div
+              style={{ fontSize: 14, fontWeight: 600, color: propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: propertyId && setPage ? "pointer" : "default" }}
+              onClick={() => { if (propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(propertyId); setPage("property-detail"); } }}
+              onMouseEnter={e => { if (propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+            >
+              Unit {unit.unitNumber || "—"} · {propertyAddress}
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#ef4444" }}>{t.dashAvailable} {latestMoveOut ? fmtDate(latestMoveOut) : "—"}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

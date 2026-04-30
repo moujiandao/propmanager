@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-04-30]
+
+### Added
+- Dashboard "Units to Rent Out" full-width panel: surfaces units where all current tenants have a move-out date within 6 months and no future tenant is lined up within that window
+
 ## [2026-04-29]
 
 ### Added
