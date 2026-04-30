@@ -748,7 +748,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         </td>
         <td style={{ padding: "14px 20px" }}>
           <div style={{ fontSize: 13, color: "#374151" }}>{prop?.address || "—"}</div>
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit || data.units.find(u => u.id === ten.unitId)?.unitNumber || "—"}</div>
         </td>
         <td style={{ padding: "14px 20px" }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: ten.monthlyRent ? "#0f172a" : "#94a3b8" }}>
