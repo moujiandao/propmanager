@@ -640,7 +640,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
   // Resolve linked data
   const property = (data.properties || []).find(p => p.id === tenant.propertyId)
   const linkedUnit = (data.units || []).find(u => u.id === tenant.unitId)
-  const housemates = (data.tenants || []).filter(t => t.unitId && t.unitId === tenant.unitId && t.id !== tenantId)
+  const housemates = (data.tenants || []).filter(t => t.unitId && t.unitId === tenant.unitId && t.id !== tenantId && t.status === "current tenant")
   const tenantDocs = (data.documents || []).filter(d => d.tenantId === tenantId)
   const parsableDocs = tenantDocs.filter(d => d.aiExtracted !== null && d.aiExtracted !== undefined)
 
@@ -743,7 +743,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", letterSpacing: "-0.5px" }}>
-              {tenant.name}
+              {tenant.name}{tenant.lastName ? ` ${tenant.lastName}` : ""}
             </h1>
             <p style={{ margin: "3px 0 0", color: "#64748b", fontSize: 13 }}>
               {tenant.email}

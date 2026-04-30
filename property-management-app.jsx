@@ -1111,6 +1111,8 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
     return groups;
   }, [data.tenants, data.units]);
 
+  const allTenants = useMemo(() => grouped.flatMap(g => g.tenants), [grouped]);
+
   const getContract = (tenant) => data.contracts.find(c => c.tenantId === tenant.id);
 
   const toggle = (tenantId, monthKey) => {
@@ -1118,6 +1120,18 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
     setChecked(prev => {
       const next = { ...prev };
       if (next[mapKey]) { delete next[mapKey]; } else { next[mapKey] = true; }
+      return next;
+    });
+  };
+
+  const toggleColumn = (monthKey) => {
+    const allChecked = allTenants.every(t => !!checked[`${t.id}-${monthKey}`]);
+    setChecked(prev => {
+      const next = { ...prev };
+      for (const tenant of allTenants) {
+        const mapKey = `${tenant.id}-${monthKey}`;
+        if (allChecked) { delete next[mapKey]; } else { next[mapKey] = true; }
+      }
       return next;
     });
   };
@@ -1222,6 +1236,25 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                 <th key={m.key} style={{ padding: "14px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{m.label}</th>
               ))}
             </tr>
+            <tr style={{ borderTop: "1px solid #e2e8f0", background: "#f1f5f9" }}>
+              <td colSpan={4} />
+              {months.map(m => {
+                const allChecked = allTenants.length > 0 && allTenants.every(t => !!checked[`${t.id}-${m.key}`]);
+                const someChecked = !allChecked && allTenants.some(t => !!checked[`${t.id}-${m.key}`]);
+                return (
+                  <td key={m.key} style={{ padding: "5px 10px", textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      ref={el => { if (el) el.indeterminate = someChecked; }}
+                      onChange={() => toggleColumn(m.key)}
+                      style={{ width: 15, height: 15, cursor: "pointer", accentColor: "#4f46e5" }}
+                      title={allChecked ? "Uncheck all" : "Check all"}
+                    />
+                  </td>
+                );
+              })}
+            </tr>
           </thead>
           <tbody>
             {grouped.map(({ unit, tenants }) => (
@@ -1232,7 +1265,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                   </td>
                 </tr>
                 {tenants.map(tenant => {
-                  const rentAmount = getContract(tenant)?.rentAmount || null;
+                  const rentAmount = getContract(tenant)?.rentAmount || tenant.monthlyRent || null;
                   const hasMovingOut = !!tenant.moveOutDate;
                   return (
                     <tr key={tenant.id} style={{ borderTop: "1px solid #f1f5f9", background: hasMovingOut ? "#f0fdf4" : "transparent" }}>

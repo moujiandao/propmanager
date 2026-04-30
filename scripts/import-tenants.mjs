@@ -82,11 +82,9 @@ async function main() {
     const authEmail = realEmail || `${name.toLowerCase().replace(/\s+/g, ".")}.${Date.now()}@placeholder.local`;
 
     // Create auth user (required — tenant_profiles.id is a FK to auth.users)
-    const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
-      email: authEmail,
-      email_confirm: true,
-      user_metadata: { role: "tenant", name },
-    });
+    const createPayload = { email: authEmail, email_confirm: true, user_metadata: { role: "tenant", name } };
+    if (row.password?.trim()) createPayload.password = row.password.trim();
+    const { data: authData, error: authErr } = await supabase.auth.admin.createUser(createPayload);
 
     if (authErr) {
       console.error(`  [ERROR] "${name}" — auth user creation failed: ${authErr.message}`);
@@ -101,6 +99,7 @@ async function main() {
       id: userId,
       landlord_id: landlordId,
       name,
+      last_name: row.last_name?.trim() || null,
       email: realEmail || authEmail,
       phone: row.phone?.trim() || null,
       property_id: unitRecord.property_id,
@@ -115,7 +114,7 @@ async function main() {
       has_cosigner: row.has_cosigner?.trim().toLowerCase() === "true",
       home_address: row.home_address?.trim() || null,
       age: row.age ? parseInt(row.age) : null,
-      status: "active",
+      status: row.status?.trim() || "current tenant",
     };
 
     const { error: profileErr } = await supabase.from("tenant_profiles").insert(profile);
@@ -134,7 +133,7 @@ async function main() {
 
   // Recompute occupancy for all units after import
   console.log("\nRecomputing unit occupancy...");
-  const { data: allTenants } = await supabase.from("tenant_profiles").select("unit_id").not("unit_id", "is", null);
+  const { data: allTenants } = await supabase.from("tenant_profiles").select("unit_id").eq("status", "current tenant").not("unit_id", "is", null);
   const occupiedUnitIds = new Set((allTenants || []).map(t => t.unit_id));
   for (const unit of units) {
     const newStatus = occupiedUnitIds.has(unit.id) ? "occupied" : "vacant";
