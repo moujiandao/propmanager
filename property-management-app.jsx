@@ -80,7 +80,12 @@ const T = {
     newPasswordLabel: "New Password (leave blank to keep current)", minCharsPlaceholder: "Min. 8 characters",
     emailReadOnly: "Email address cannot be changed here. To update a tenant's email, do so from Supabase Auth.",
     deleteTenant: "Delete Tenant", deleteWarning: "This will permanently remove their account and all associated data. This cannot be undone.",
-    deleting: "Deleting…", langLabel: "Language", navDocuments: "Documents",
+    deleting: "Deleting…", langLabel: "Language", navDocuments: "Documents", navAdminUsers: "Admin Users",
+    adminUsersTitle: "Admin Users", adminUsersSubtitle: "Create additional landlord accounts",
+    adminName: "Name", adminEmail: "Email", adminPassword: "Password",
+    adminCreateBtn: "Create Admin Account", adminCreating: "Creating…",
+    adminSuccess: "Admin account created successfully.",
+    adminErrFields: "All fields are required.", adminErrPassword: "Password must be at least 8 characters.",
     navPaymentPortal: "Payment Portal", navPaymentHistory: "Payment History", navMyProfile: "My Profile",
     statusCurrentTenant: "Current Tenant", statusFutureTenant: "Future Tenant", statusPreviousTenant: "Previous Tenant",
   },
@@ -156,7 +161,12 @@ const T = {
     newPasswordLabel: "新密码（留空则保持原密码）", minCharsPlaceholder: "至少8位字符",
     emailReadOnly: "此处无法修改电子邮件。如需更新租客邮箱，请在Supabase Auth中操作。",
     deleteTenant: "删除租客", deleteWarning: "这将永久删除其账号及所有相关数据，此操作无法撤销。",
-    deleting: "删除中…", langLabel: "语言", navDocuments: "文件",
+    deleting: "删除中…", langLabel: "语言", navDocuments: "文件", navAdminUsers: "管理员用户",
+    adminUsersTitle: "管理员用户", adminUsersSubtitle: "创建额外的房东账号",
+    adminName: "姓名", adminEmail: "电子邮件", adminPassword: "密码",
+    adminCreateBtn: "创建管理员账号", adminCreating: "创建中…",
+    adminSuccess: "管理员账号创建成功。",
+    adminErrFields: "所有字段均为必填项。", adminErrPassword: "密码至少需要8位字符。",
     navPaymentPortal: "付款门户", navPaymentHistory: "付款记录", navMyProfile: "我的资料",
     statusCurrentTenant: "现租客", statusFutureTenant: "待入住租客", statusPreviousTenant: "前租客",
   }
@@ -434,6 +444,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
     { id: "contracts", label: t.navLeases, icon: "file" },
     { id: "email", label: t.navEmail, icon: "mail" },
     { id: "documents", label: t.navDocuments, icon: "key" },
+    { id: "admin-users", label: t.navAdminUsers, icon: "users" },
   ];
   const tenantNav = [
     { id: "dashboard", label: t.navDashboard, icon: "home" },
@@ -633,7 +644,7 @@ const LandlordDashboard = ({ data, t }) => {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-                {[t.colTenant, t.colAmount, t.colDueDate].map(h => <th key={h} style={{ padding: "0 12px 10px 0", textAlign: "left" }}>{h}</th>)}
+                {[t.colTenant, t.colAmount, t.colDueDate].map(h => <th key={h} style={{ padding: "0 12px 10px 0", textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -882,7 +893,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ background: "#f8fafc" }}>
             <tr style={{ color: "#64748b", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              {[t.colTenant, t.colContact, t.colProperty, t.colMonthlyRent, t.colBank, t.colRecurring, t.colStatus, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left" }}>{h}</th>)}
+              {[t.colTenant, t.colContact, t.colProperty, t.colMonthlyRent, t.colBank, t.colRecurring, t.colStatus, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -1284,10 +1295,10 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
           <thead style={{ background: "#f8fafc" }}>
             <tr style={{ color: "#64748b", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              <th style={{ padding: "14px 18px", textAlign: "left" }}>{t.colTenant}</th>
-              <th style={{ padding: "14px 18px", textAlign: "left" }}>{t.payZelleName}</th>
-              <th style={{ padding: "14px 18px", textAlign: "left" }}>{t.rent}</th>
-              <th style={{ padding: "14px 18px", textAlign: "left", minWidth: 100 }}>{t.payMoveOutDate}</th>
+              <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.colTenant}</th>
+              <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.payZelleName}</th>
+              <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.rent}</th>
+              <th style={{ padding: "14px 18px", textAlign: "left", minWidth: 100, whiteSpace: "nowrap" }}>{t.payMoveOutDate}</th>
               {months.map(m => (
                 <th key={m.key} style={{ padding: "14px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{m.label}</th>
               ))}
@@ -1883,6 +1894,45 @@ const DocumentsPage = ({ data, refresh }) => {
   );
 };
 
+// ─── ADMIN USERS PAGE ─────────────────────────────────────────────────────────
+const AdminUsersPage = ({ t }) => {
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const handleSubmit = async () => {
+    setMsg(null);
+    if (!form.name || !form.email || !form.password) { setMsg({ text: t.adminErrFields, error: true }); return; }
+    if (form.password.length < 8) { setMsg({ text: t.adminErrPassword, error: true }); return; }
+    setLoading(true);
+    const res = await fetch("/api/auth/register-landlord", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    const json = await res.json();
+    setLoading(false);
+    if (json.error) { setMsg({ text: json.error, error: true }); return; }
+    setMsg({ text: t.adminSuccess, error: false });
+    setForm({ name: "", email: "", password: "" });
+  };
+
+  return (
+    <div style={{ maxWidth: 520 }}>
+      <PageHeader title={t.adminUsersTitle} subtitle={t.adminUsersSubtitle} />
+      <div style={{ background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f1f5f9" }}>
+        <Inp label={t.adminName} value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} />
+        <Inp label={t.adminEmail} value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" />
+        <Inp label={t.adminPassword} value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} type="password" placeholder={t.minCharsPlaceholder} />
+        {msg && <p style={{ fontSize: 13, margin: "8px 0", color: msg.error ? "#ef4444" : "#22c55e" }}>{msg.text}</p>}
+        <Btn onClick={handleSubmit} disabled={loading} style={{ marginTop: 8 }}>
+          {loading ? t.adminCreating : t.adminCreateBtn}
+        </Btn>
+      </div>
+    </div>
+  );
+};
+
 // ─── TENANT PROFILE PAGE ──────────────────────────────────────────────────────
 const TenantProfilePage = ({ user, setUser }) => {
   const cardStyle = { background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f1f5f9", marginBottom: 20 };
@@ -2137,6 +2187,7 @@ export default function App() {
         case "email":            return <EmailPage {...props} />;
         case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={fetchAllData} user={user} />;
         case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
+        case "admin-users":      return <AdminUsersPage t={t} />;
         default:                 return <LandlordDashboard {...props} />;
       }
     } else {
