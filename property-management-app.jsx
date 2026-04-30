@@ -1022,12 +1022,13 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                   return (
                     <Fragment key={`${prop?.id}::${unit}`}>
                       <tr>
-                        <td colSpan={8} style={{ padding: "10px 20px", background: "#1e293b", borderTop: "2px solid #334155" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9" }}>{prop?.address || "No property"}</span>
-                            <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>· Unit {unit}</span>
-                            <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>{tenants.length} tenant{tenants.length !== 1 ? "s" : ""}</span>
-                            {totalRent > 0 && <span style={{ fontSize: 12, fontWeight: 600, color: "#a5b4fc" }}>{fmt(totalRent)}/mo</span>}
+                        <td colSpan={8} style={{ padding: "12px 20px", background: "#1e293b", borderTop: "2px solid #334155" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <span style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.2px" }}>{prop?.address || "No property"}</span>
+                            <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>·</span>
+                            <span style={{ fontSize: 14, color: "#94a3b8", fontWeight: 600 }}>Unit {unit}</span>
+                            <span style={{ marginLeft: "auto", fontSize: 12, color: "#475569" }}>{tenants.length} tenant{tenants.length !== 1 ? "s" : ""}</span>
+                            {totalRent > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>{fmt(totalRent)}/mo</span>}
                           </div>
                         </td>
                       </tr>
