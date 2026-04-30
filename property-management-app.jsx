@@ -633,7 +633,7 @@ const LandlordDashboard = ({ data, t }) => {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-                {[t.colTenant, t.colAmount, t.colDueDate, t.colPaidDate].map(h => <th key={h} style={{ padding: "0 12px 10px 0", textAlign: "left" }}>{h}</th>)}
+                {[t.colTenant, t.colAmount, t.colDueDate].map(h => <th key={h} style={{ padding: "0 12px 10px 0", textAlign: "left" }}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -644,7 +644,6 @@ const LandlordDashboard = ({ data, t }) => {
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14, fontWeight: 500 }}>{ten ? tenantFullName(ten) : "—"}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14 }}>{fmt(p.amount || ten?.monthlyRent || 0)}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.dueDate)}</td>
-                    <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.paidDate)}</td>
                   </tr>
                 );
               })}
@@ -1285,10 +1284,10 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
           <thead style={{ background: "#f8fafc" }}>
             <tr style={{ color: "#64748b", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              <th style={{ padding: "14px 18px", textAlign: "left" }}>Tenant</th>
-              <th style={{ padding: "14px 18px", textAlign: "left" }}>Zelle Name</th>
-              <th style={{ padding: "14px 18px", textAlign: "left" }}>Rent</th>
-              <th style={{ padding: "14px 18px", textAlign: "left", minWidth: 100 }}>Move-out Date</th>
+              <th style={{ padding: "14px 18px", textAlign: "left" }}>{t.colTenant}</th>
+              <th style={{ padding: "14px 18px", textAlign: "left" }}>{t.payZelleName}</th>
+              <th style={{ padding: "14px 18px", textAlign: "left" }}>{t.rent}</th>
+              <th style={{ padding: "14px 18px", textAlign: "left", minWidth: 100 }}>{t.payMoveOutDate}</th>
               {months.map(m => (
                 <th key={m.key} style={{ padding: "14px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{m.label}</th>
               ))}
@@ -1318,7 +1317,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
               <Fragment key={unit?.id || "unassigned"}>
                 <tr>
                   <td colSpan={colCount} style={{ padding: "8px 18px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".6px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-                    {unit ? `Unit ${unit.unitNumber}` : "Unassigned"}
+                    {unit ? t.payUnitLabel(unit.unitNumber) : t.payUnassigned}
                   </td>
                 </tr>
                 {tenants.map(tenant => {
