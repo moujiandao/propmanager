@@ -933,12 +933,11 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   };
 
   const currentTenants = data.tenants.filter(t => t.status?.toLowerCase() === "current tenant");
+  const futureTenants  = data.tenants.filter(t => t.status?.toLowerCase() === "future tenant");
 
-  // Build grouped structure when groupBy === "unit"
-  const tenantGroups = (() => {
-    if (groupBy === "none") return null;
+  const buildGroups = (tenantList) => {
     const map = {};
-    currentTenants.forEach(ten => {
+    tenantList.forEach(ten => {
       const prop = data.properties.find(p => p.id === ten.propertyId);
       const key = `${ten.propertyId}::${ten.unit || "—"}`;
       if (!map[key]) map[key] = { prop, unit: ten.unit || "—", tenants: [] };
@@ -949,7 +948,10 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       if (pa !== pb) return pa.localeCompare(pb);
       return String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
     });
-  })();
+  };
+
+  const tenantGroups = groupBy === "none" ? null : buildGroups(currentTenants);
+  const futureGroups = groupBy === "none" ? null : buildGroups(futureTenants);
 
   const renderTenantRow = (ten) => {
     const prop = data.properties.find(p => p.id === ten.propertyId);
@@ -1658,7 +1660,7 @@ const EmailPage = ({ data, setData, t, refresh }) => {
 // ─── TENANT PAGES (English only — tenant UI not translated) ──────────────────
 const TenantDashboard = ({ data, user }) => {
   const tenant = data.tenants.find(t => t.id === user.id);
-  const contract = data.contracts.find(c => c.tenantId === user.id);
+  const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const property = data.properties.find(p => p.id === tenant?.propertyId);
   const payments = data.payments.filter(p => p.tenantId === user.id).sort((a,b) => new Date(b.dueDate)-new Date(a.dueDate));
   const openMaint = data.maintenance.filter(m => m.tenantId === user.id && m.status !== "resolved");
@@ -1715,7 +1717,7 @@ const PaymentPortal = ({ data, setData, user, refresh }) => {
   const [bankForm, setBankForm] = useState({ routingNumber: "", accountNumber: "", accountName: "", accountType: "checking" });
   const [success, setSuccess] = useState(false);
   const tenant = data.tenants.find(t => t.id === user.id);
-  const contract = data.contracts.find(c => c.tenantId === user.id);
+  const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const toggleRecurring = async () => {
     await supabase.from("tenant_profiles").update({ recurring_payment: !tenant.recurringPayment }).eq("id", user.id);
     await refresh();
@@ -1881,7 +1883,7 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
 };
 
 const TenantLeasePage = ({ data, user }) => {
-  const contract = data.contracts.find(c => c.tenantId === user.id);
+  const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const tenant = data.tenants.find(t => t.id === user.id);
   const property = data.properties.find(p => p.id === tenant?.propertyId);
   if (!contract) return <div style={{ padding:32,color:"#64748b" }}>No active lease found.</div>;
