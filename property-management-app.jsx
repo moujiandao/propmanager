@@ -578,12 +578,12 @@ const LandlordDashboard = ({ data, t }) => {
             </div>
           ))}
         </div>
-        <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", gridColumn: "1/-1" }}>
+        <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.recentPayments}</h3>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-                {[t.colTenant, t.colAmount, t.colDueDate, t.colPaidDate, t.colType, t.colAchStatus, t.colStatus].map(h => <th key={h} style={{ padding: "0 12px 10px 0", textAlign: "left" }}>{h}</th>)}
+                {[t.colTenant, t.colAmount, t.colDueDate, t.colPaidDate].map(h => <th key={h} style={{ padding: "0 12px 10px 0", textAlign: "left" }}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -595,9 +595,6 @@ const LandlordDashboard = ({ data, t }) => {
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14 }}>{fmt(p.amount)}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.dueDate)}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.paidDate)}</td>
-                    <td style={{ padding: "11px 12px 11px 0", fontSize: 12, color: "#64748b" }}>{p.type === "recurring" ? t.typeRecurring : t.typeOneTime}</td>
-                    <td style={{ padding: "11px 12px 11px 0" }}>{p.achStatus ? <Badge status={p.achStatus} t={t} /> : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                    <td style={{ padding: "11px 12px 11px 0" }}><Badge status={p.status} t={t} /></td>
                   </tr>
                 );
               })}
