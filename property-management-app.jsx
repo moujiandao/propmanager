@@ -1182,14 +1182,16 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
       <PageHeader title={t.conTitle} subtitle={t.conSubtitle(data.contracts.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addLease}</Btn>} />
       <div style={{ display: "grid", gap: 14 }}>
         {data.contracts.map(c => {
-          const ten = data.tenants.find(ten => ten.id === c.tenantId);
           const prop = data.properties.find(p => p.id === c.propertyId);
           const daysLeft = Math.ceil((new Date(c.endDate)-new Date())/86400000);
           return (
             <div key={c.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: 16, alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colTenant}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{ten ? tenantFullName(ten) : "—"}</div>
+                <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colTenants}</div>
+                {c.tenantIds.map(tid => {
+                  const ten = data.tenants.find(t => t.id === tid);
+                  return ten ? <div key={tid} style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{tenantFullName(ten)}</div> : null;
+                })}
                 <div style={{ fontSize: 12, color: "#64748b" }}>{prop?.address} · {c.unit}</div>
               </div>
               <div>
