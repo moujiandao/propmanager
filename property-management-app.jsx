@@ -1025,7 +1025,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colDaysRemaining}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft > 0 ? `${daysLeft} ${t.daysRemaining}` : t.expired}</div>
+                <div style={{ fontSize: daysLeft <= 0 ? 14 : 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft > 0 ? `${daysLeft} ${t.daysRemaining}` : "Month to Month"}</div>
               </div>
               <Badge status={c.status} t={t} />
             </div>
@@ -1162,7 +1162,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
         const row = {
           landlord_id: user.id,
           tenant_id: tenantId,
-          amount: contract?.rentAmount || 0,
+          amount: contract?.rentAmount || tenant?.monthlyRent || 0,
           due_date: `${monthKey}-01`,
           paid_date: new Date().toISOString().split("T")[0],
           status: "completed",
