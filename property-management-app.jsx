@@ -676,6 +676,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const setEF = (k,v) => setEditForm(f => ({...f,[k]:v}));
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const fileInputRefs = useRef({});
@@ -724,6 +725,10 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
     }).eq("id", editing.id);
     if (!error) { await refresh(); setEditing(null); }
   };
+  const deleteProperty = async () => {
+    const { error } = await supabase.from("properties").delete().eq("id", confirmDelete.id);
+    if (!error) { await refresh(); setConfirmDelete(null); }
+  };
 
   return (
     <div>
@@ -766,6 +771,10 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
                     <button onClick={e => openEdit(p, e)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#94a3b8", borderRadius: 6, display: "flex", alignItems: "center" }}
                       onMouseEnter={e => e.currentTarget.style.color = "#4f46e5"} onMouseLeave={e => e.currentTarget.style.color = "#94a3b8"}>
                       <Icon name="edit" size={15} />
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); setConfirmDelete(p); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#94a3b8", borderRadius: 6, display: "flex", alignItems: "center" }}
+                      onMouseEnter={e => e.currentTarget.style.color = "#ef4444"} onMouseLeave={e => e.currentTarget.style.color = "#94a3b8"}>
+                      <Icon name="trash" size={15} />
                     </button>
                     <Badge status={p.status} t={t} />
                   </div>
@@ -819,6 +828,15 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
             <Btn variant="secondary" onClick={() => setEditing(null)}>{t.cancel}</Btn>
             <Btn onClick={saveEdit}>Save Changes</Btn>
+          </div>
+        </Modal>
+      )}
+      {confirmDelete && (
+        <Modal title="Delete Property" onClose={() => setConfirmDelete(null)}>
+          <p style={{ margin: "0 0 20px", fontSize: 14, color: "#374151" }}>Are you sure you want to delete <strong>{confirmDelete.address}</strong>? This cannot be undone.</p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setConfirmDelete(null)}>{t.cancel}</Btn>
+            <Btn onClick={deleteProperty} style={{ background: "#ef4444" }}>Delete</Btn>
           </div>
         </Modal>
       )}
@@ -1986,10 +2004,13 @@ const DocumentsPage = ({ data, refresh }) => {
 };
 
 // ─── ADMIN USERS PAGE ─────────────────────────────────────────────────────────
-const AdminUsersPage = ({ t }) => {
+const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const handleSubmit = async () => {
     setMsg(null);
@@ -2006,20 +2027,98 @@ const AdminUsersPage = ({ t }) => {
     if (json.error) { setMsg({ text: json.error, error: true }); return; }
     setMsg({ text: t.adminSuccess, error: false });
     setForm({ name: "", email: "", password: "" });
+    if (refresh) refresh();
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    const res = await fetch("/api/auth/delete-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: confirmDelete.id, role: confirmDelete.role }),
+    });
+    const json = await res.json();
+    if (!res.ok) { setDeleteError(json.error || "Delete failed"); setDeleting(false); return; }
+    if (refresh) await refresh();
+    setConfirmDelete(null);
+    setDeleting(false);
+  };
+
+  const landlords = (data?.landlords || []).map(l => ({ ...l, role: "admin", displayName: l.name || l.email }));
+  const tenants   = (data?.tenants   || []).map(t => ({ ...t, role: "tenant", displayName: tenantFullName(t) }));
+  const allUsers  = [...landlords, ...tenants].sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  const RoleBadge = ({ role }) => (
+    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase", letterSpacing: ".5px",
+      background: role === "admin" ? "rgba(79,70,229,.12)" : "rgba(34,197,94,.12)",
+      color: role === "admin" ? "#4f46e5" : "#16a34a" }}>
+      {role === "admin" ? "Admin" : "Tenant"}
+    </span>
+  );
+
   return (
-    <div style={{ maxWidth: 520 }}>
+    <div>
       <PageHeader title={t.adminUsersTitle} subtitle={t.adminUsersSubtitle} />
-      <div style={{ background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f1f5f9" }}>
-        <Inp label={t.adminName} value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} />
-        <Inp label={t.adminEmail} value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" />
-        <Inp label={t.adminPassword} value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} type="password" placeholder={t.minCharsPlaceholder} />
-        {msg && <p style={{ fontSize: 13, margin: "8px 0", color: msg.error ? "#ef4444" : "#22c55e" }}>{msg.text}</p>}
-        <Btn onClick={handleSubmit} disabled={loading} style={{ marginTop: 8 }}>
-          {loading ? t.adminCreating : t.adminCreateBtn}
-        </Btn>
+
+      {/* User list */}
+      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden", marginBottom: 28 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#f8fafc" }}>
+              {["Name", "Email", "Role", ""].map(h => (
+                <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {allUsers.map(u => (
+              <tr key={u.id} style={{ borderTop: "1px solid #f8fafc" }}>
+                <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{u.displayName}</td>
+                <td style={{ padding: "14px 20px", fontSize: 13, color: "#64748b" }}>{u.email || "—"}</td>
+                <td style={{ padding: "14px 20px" }}><RoleBadge role={u.role} /></td>
+                <td style={{ padding: "14px 20px", textAlign: "right" }}>
+                  {u.id !== currentUser?.id && (
+                    <button onClick={() => { setDeleteError(null); setConfirmDelete(u); }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, padding: "4px 8px", borderRadius: 6 }}
+                      onMouseEnter={e => e.currentTarget.style.color = "#ef4444"} onMouseLeave={e => e.currentTarget.style.color = "#94a3b8"}>
+                      <Icon name="trash" size={14} /> Delete
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      {/* Create admin form */}
+      <div style={{ maxWidth: 520 }}>
+        <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Create Admin User</h3>
+        <div style={{ background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f1f5f9" }}>
+          <Inp label={t.adminName} value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} />
+          <Inp label={t.adminEmail} value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" />
+          <Inp label={t.adminPassword} value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} type="password" placeholder={t.minCharsPlaceholder} />
+          {msg && <p style={{ fontSize: 13, margin: "8px 0", color: msg.error ? "#ef4444" : "#22c55e" }}>{msg.text}</p>}
+          <Btn onClick={handleSubmit} disabled={loading} style={{ marginTop: 8 }}>
+            {loading ? t.adminCreating : t.adminCreateBtn}
+          </Btn>
+        </div>
+      </div>
+
+      {confirmDelete && (
+        <Modal title="Delete User" onClose={() => setConfirmDelete(null)}>
+          <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
+            Are you sure you want to delete <strong>{confirmDelete.displayName}</strong>?
+          </p>
+          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#94a3b8" }}>This will permanently remove their account and cannot be undone.</p>
+          {deleteError && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#ef4444" }}>{deleteError}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setConfirmDelete(null)} disabled={deleting}>Cancel</Btn>
+            <Btn onClick={handleDelete} disabled={deleting} style={{ background: "#ef4444" }}>{deleting ? "Deleting..." : "Delete"}</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
@@ -2195,7 +2294,7 @@ export default function App() {
     setLoadingData(true);
     try {
       if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes] = await Promise.all([
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
           supabase.from("contracts").select("*"),
@@ -2204,6 +2303,7 @@ export default function App() {
           supabase.from("email_settings").select("*").single(),
           supabase.from("units").select("*").order("unit_number", { ascending: true }),
           supabase.from("documents").select("*").order("uploaded_at", { ascending: false }),
+          supabase.from("landlord_profiles").select("*"),
         ]);
         const today = new Date().toISOString().split("T")[0];
         const units = (unitRes.data || []).map(mapUnit).map(unit => {
@@ -2223,6 +2323,7 @@ export default function App() {
           emailSettings: mapEmailSettings(emailRes.data),
           units,
           documents:     (docRes.data   || []).map(mapDocument),
+          landlords:     (llRes.data    || []),
         });
       } else {
         // Tenant: fetch own profile + related data
@@ -2278,7 +2379,7 @@ export default function App() {
         case "email":            return <EmailPage {...props} />;
         case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={fetchAllData} user={user} />;
         case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
-        case "admin-users":      return <AdminUsersPage t={t} />;
+        case "admin-users":      return <AdminUsersPage t={t} data={data} user={user} refresh={fetchAllData} />;
         default:                 return <LandlordDashboard {...props} />;
       }
     } else {
