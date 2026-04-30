@@ -1018,12 +1018,12 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             Are you sure you want to delete <strong>{tenantFullName(deleteTarget)}</strong>?
           </p>
           <p style={{ margin: "0 0 20px", fontSize: 13, color: "#94a3b8" }}>
-            This will permanently remove their account and all associated data. This cannot be undone.
+            {t.deleteWarning}
           </p>
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Btn>
+            <Btn variant="secondary" onClick={() => setDeleteTarget(null)}>{t.cancel}</Btn>
             <button onClick={confirmDelete} disabled={deleting} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1, fontFamily: "inherit" }}>
-              {deleting ? "Deleting…" : "Delete Tenant"}
+              {deleting ? t.deleting : t.deleteTenant}
             </button>
           </div>
         </Modal>
