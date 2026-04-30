@@ -59,6 +59,30 @@ const T = {
     st_active: "Active", st_open: "Open", "st_in-progress": "In Progress", st_resolved: "Resolved",
     "st_current tenant": "Current Tenant", "st_future tenant": "Future Tenant", "st_previous tenant": "Previous Tenant",
     st_occupied: "Occupied", st_vacant: "Vacant",
+    dashUnpaidRent: "Unpaid Rent", dashVacancies: "Vacancies — Now & Next 6 Months", dashNewTenants: "New Tenants",
+    dashUnpaidEmpty: "All active tenants have paid this month.",
+    dashVacanciesEmpty: "No vacant units, and no tenants scheduled to move out in the next 6 months.",
+    dashNewTenantsEmpty: "No upcoming tenants scheduled.", dashVacating: "Vacating", dashMoveIn: "Move-in",
+    dashTenantCount: (n) => `${n} tenant${n === 1 ? "" : "s"}`, dashUnitCount: (n) => `${n} unit${n === 1 ? "" : "s"}`, dashUpcomingCount: (n) => `${n} upcoming`,
+    paySubtitleTracker: "Monthly rent tracker by unit", payZelleName: "Zelle Name", payMoveOutDate: "Move-out Date",
+    payUnitLabel: (n) => `Unit ${n}`, payUnassigned: "Unassigned",
+    saveChanges: "Save Changes", saving: "Saving...", discard: "Discard",
+    displayBy: "Display by", displayAll: "All", displayByUnit: "Property + Unit",
+    colMonthlyRent: "Monthly Rent", editBtn: "Edit",
+    firstName: "First Name", lastName: "Last Name",
+    zelleNameLabel: "Zelle Name", zelleNamePlaceholder: "Name or phone on Zelle",
+    moveInDateReq: "Move-in Date *", moveInDate: "Move-in Date", moveOutDate: "Move-out Date",
+    createLoginLabel: "Create tenant portal login",
+    createLoginDesc: "Optional — only needed if the tenant will log in to pay rent or submit maintenance requests",
+    creating: "Creating…", noPropOption: "— No property —", selectPropFirst: "— Select a property first —",
+    noUnitAssigned: "— No unit assigned —", noUnitsYet: "No units — add units first from the property page",
+    monthlyPaymentLabel: "Monthly Payment ($)", passwordReset: "Password Reset",
+    newPasswordLabel: "New Password (leave blank to keep current)", minCharsPlaceholder: "Min. 8 characters",
+    emailReadOnly: "Email address cannot be changed here. To update a tenant's email, do so from Supabase Auth.",
+    deleteTenant: "Delete Tenant", deleteWarning: "This will permanently remove their account and all associated data. This cannot be undone.",
+    deleting: "Deleting…", langLabel: "Language", navDocuments: "Documents",
+    navPaymentPortal: "Payment Portal", navPaymentHistory: "Payment History", navMyProfile: "My Profile",
+    statusCurrentTenant: "Current Tenant", statusFutureTenant: "Future Tenant", statusPreviousTenant: "Previous Tenant",
   },
   zh: {
     appName: "房产管理", landlord: "房东", tenant: "租客", signIn: "登录",
@@ -109,9 +133,35 @@ const T = {
     reminder7Day: "逾期7天", reminder7DayDesc: "最终警告",
     st_completed: "已完成", st_pending: "待处理", st_overdue: "已逾期", st_failed: "失败",
     st_active: "有效", st_open: "待处理", "st_in-progress": "处理中", st_resolved: "已解决",
+    "st_current tenant": "现租客", "st_future tenant": "待入住租客", "st_previous tenant": "前租客",
     st_occupied: "已出租", st_vacant: "空置",
+    dashUnpaidRent: "未付租金", dashVacancies: "空置情况 — 当前及未来6个月", dashNewTenants: "新租客",
+    dashUnpaidEmpty: "所有现租客本月已付款。",
+    dashVacanciesEmpty: "暂无空置单元，且未来6个月内无租客计划退租。",
+    dashNewTenantsEmpty: "暂无待入住租客。", dashVacating: "退租日期", dashMoveIn: "入住日",
+    dashTenantCount: (n) => `${n} 位租客`, dashUnitCount: (n) => `${n} 套单元`, dashUpcomingCount: (n) => `${n} 位待入住`,
+    paySubtitleTracker: "按单元的月租追踪", payZelleName: "Zelle姓名", payMoveOutDate: "退租日期",
+    payUnitLabel: (n) => `单元 ${n}`, payUnassigned: "未分配单元",
+    saveChanges: "保存更改", saving: "保存中…", discard: "撤销更改",
+    displayBy: "分组方式", displayAll: "全部", displayByUnit: "房产 + 单元",
+    colMonthlyRent: "月租金", editBtn: "编辑",
+    firstName: "名", lastName: "姓",
+    zelleNameLabel: "Zelle姓名", zelleNamePlaceholder: "Zelle上的姓名或电话",
+    moveInDateReq: "入住日期 *", moveInDate: "入住日期", moveOutDate: "退租日期",
+    createLoginLabel: "创建租客门户账号",
+    createLoginDesc: "可选 — 仅在租客需要登录付款或提交维修请求时使用",
+    creating: "创建中…", noPropOption: "— 无房产 —", selectPropFirst: "— 请先选择房产 —",
+    noUnitAssigned: "— 未分配单元 —", noUnitsYet: "暂无单元 — 请先在房产页面添加单元",
+    monthlyPaymentLabel: "月租金（$）", passwordReset: "密码重置",
+    newPasswordLabel: "新密码（留空则保持原密码）", minCharsPlaceholder: "至少8位字符",
+    emailReadOnly: "此处无法修改电子邮件。如需更新租客邮箱，请在Supabase Auth中操作。",
+    deleteTenant: "删除租客", deleteWarning: "这将永久删除其账号及所有相关数据，此操作无法撤销。",
+    deleting: "删除中…", langLabel: "语言", navDocuments: "文件",
+    navPaymentPortal: "付款门户", navPaymentHistory: "付款记录", navMyProfile: "我的资料",
+    statusCurrentTenant: "现租客", statusFutureTenant: "待入住租客", statusPreviousTenant: "前租客",
   }
 };
+
 
 
 
@@ -225,7 +275,7 @@ export const Btn = ({ children, onClick, variant = "primary", size = "md", icon 
 const LangToggle = ({ lang, setLang }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 9, background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.08)", marginBottom: 10 }}>
     <span style={{ color: "#64748b" }}><Icon name="globe" size={14} /></span>
-    <span style={{ fontSize: 11, color: "#64748b", flex: 1, textTransform: "uppercase", letterSpacing: ".6px", fontWeight: 600 }}>Language</span>
+    <span style={{ fontSize: 11, color: "#64748b", flex: 1, textTransform: "uppercase", letterSpacing: ".6px", fontWeight: 600 }}>{lang === "zh" ? "语言" : "Language"}</span>
     <div style={{ display: "flex", background: "rgba(0,0,0,.3)", borderRadius: 6, padding: 3, gap: 2 }}>
       {[["en", "EN"], ["zh", "中文"]].map(([l, label]) => (
         <button key={l} onClick={() => setLang(l)}
@@ -383,14 +433,14 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
   const landlordBottomNav = [
     { id: "contracts", label: t.navLeases, icon: "file" },
     { id: "email", label: t.navEmail, icon: "mail" },
-    { id: "documents", label: "Documents", icon: "key" },
+    { id: "documents", label: t.navDocuments, icon: "key" },
   ];
   const tenantNav = [
-    { id: "dashboard", label: "Dashboard", icon: "home" },
-    { id: "payment-portal", label: "Payment Portal", icon: "dollar" },
-    { id: "payment-history", label: "Payment History", icon: "clock" },
-    { id: "profile", label: "My Profile", icon: "key" },
-    { id: "maintenance-new", label: "Maintenance", icon: "wrench" },
+    { id: "dashboard", label: t.navDashboard, icon: "home" },
+    { id: "payment-portal", label: t.navPaymentPortal, icon: "dollar" },
+    { id: "payment-history", label: t.navPaymentHistory, icon: "clock" },
+    { id: "profile", label: t.navMyProfile, icon: "key" },
+    { id: "maintenance-new", label: t.navMaintenance, icon: "wrench" },
   ];
   const nav = user.role === "landlord" ? landlordNav : tenantNav;
   const bottomNav = user.role === "landlord" ? landlordBottomNav : [];
@@ -498,7 +548,7 @@ const LandlordDashboard = ({ data, t }) => {
     .map(ten => {
       const unit = units.find(u => u.id === ten.unitId);
       const prop = properties.find(p => p.id === ten.propertyId);
-      return { key: `m-${ten.id}`, unitLabel: unit?.unitNumber || ten.unit || "—", propertyAddress: prop?.address || "", status: "pending", dateLabel: `Vacating ${fmtDate(ten.moveOutDate)}`, tenantName: tenantFullName(ten) };
+      return { key: `m-${ten.id}`, unitLabel: unit?.unitNumber || ten.unit || "—", propertyAddress: prop?.address || "", status: "pending", dateLabel: `${t.dashVacating} ${fmtDate(ten.moveOutDate)}`, tenantName: tenantFullName(ten) };
     });
   const vacancies = [...currentVacancies, ...upcomingVacancies];
 
@@ -514,11 +564,11 @@ const LandlordDashboard = ({ data, t }) => {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Unpaid Rent — {currentMonthLabel}</h3>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{unpaidTenants.length} tenant{unpaidTenants.length === 1 ? "" : "s"}</span>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashUnpaidRent} — {currentMonthLabel}</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashTenantCount(unpaidTenants.length)}</span>
           </div>
           {unpaidTenants.length === 0 ? (
-            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>All active tenants have paid this month.</div>
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashUnpaidEmpty}</div>
           ) : unpaidTenants.map(ten => {
             const prop = properties.find(p => p.id === ten.propertyId);
             return (
@@ -537,11 +587,11 @@ const LandlordDashboard = ({ data, t }) => {
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>New Tenants</h3>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{futureTenants.length} upcoming</span>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashNewTenants}</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUpcomingCount(futureTenants.length)}</span>
           </div>
           {futureTenants.length === 0 ? (
-            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>No upcoming tenants scheduled.</div>
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashNewTenantsEmpty}</div>
           ) : futureTenants.map(ten => {
             const prop = properties.find(p => p.id === ten.propertyId);
             return (
@@ -555,7 +605,7 @@ const LandlordDashboard = ({ data, t }) => {
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8" }}>Move-in</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{t.dashMoveIn}</div>
                 </div>
               </div>
             );
@@ -563,11 +613,11 @@ const LandlordDashboard = ({ data, t }) => {
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Vacancies — Now & Next 6 Months</h3>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{vacancies.length} unit{vacancies.length === 1 ? "" : "s"}</span>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashVacancies}</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(vacancies.length)}</span>
           </div>
           {vacancies.length === 0 ? (
-            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>No vacant units, and no tenants scheduled to move out in the next 6 months.</div>
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashVacanciesEmpty}</div>
           ) : vacancies.map(v => (
             <div key={v.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
               <div>
@@ -592,7 +642,7 @@ const LandlordDashboard = ({ data, t }) => {
                 return (
                   <tr key={p.id} style={{ borderTop: "1px solid #f8fafc" }}>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14, fontWeight: 500 }}>{ten ? tenantFullName(ten) : "—"}</td>
-                    <td style={{ padding: "11px 12px 11px 0", fontSize: 14 }}>{fmt(p.amount)}</td>
+                    <td style={{ padding: "11px 12px 11px 0", fontSize: 14 }}>{fmt(p.amount || ten?.monthlyRent || 0)}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.dueDate)}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{fmtDate(p.paidDate)}</td>
                   </tr>
@@ -1217,17 +1267,17 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
 
   return (
     <div>
-      <PageHeader title={t.payTitle} subtitle="Monthly rent tracker by unit" />
+      <PageHeader title={t.payTitle} subtitle={t.paySubtitleTracker} />
       {payError && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontSize: 13, color: "#dc2626" }}>{payError}</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <button onClick={saveChanges} disabled={saving || !hasChanges}
           style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: hasChanges ? "#4f46e5" : "#e2e8f0", color: hasChanges ? "#fff" : "#94a3b8", fontSize: 14, fontWeight: 600, cursor: (saving || !hasChanges) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? t.saving : t.saveChanges}
         </button>
         {hasChanges && (
           <button onClick={() => setChecked({ ...saved })}
             style={{ padding: "9px 16px", borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Discard
+            {t.discard}
           </button>
         )}
       </div>
