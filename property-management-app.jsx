@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createClient } from '@/lib/supabase/client';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage } from './phase2-components';
 
@@ -26,6 +26,7 @@ const T = {
     addProperty: "Add Property", addPropertyTitle: "Add New Property",
     streetAddress: "Street Address", city: "City", zip: "ZIP", type: "Type", units: "Units", status: "Status",
     tenants: "Tenants", revenue: "Revenue",
+    uploadPhoto: "Upload Photo", uploadingPhoto: "Uploading…", changePhoto: "Change Photo",
     tenTitle: "Tenants", tenSubtitle: (n) => `${n} active tenants`,
     addTenant: "Add Tenant", addTenantTitle: "Add New Tenant",
     fullName: "Full Name", phone: "Phone", loginPassword: "Login Password", tempPassword: "Temporary password",
@@ -107,6 +108,7 @@ const T = {
     addProperty: "添加房产", addPropertyTitle: "添加新房产",
     streetAddress: "街道地址", city: "城市", zip: "邮编", type: "类型", units: "单元数", status: "状态",
     tenants: "租客", revenue: "收入",
+    uploadPhoto: "上传照片", uploadingPhoto: "上传中…", changePhoto: "更换照片",
     tenTitle: "租客管理", tenSubtitle: (n) => `共 ${n} 名活跃租客`,
     addTenant: "添加租客", addTenantTitle: "添加新租客",
     fullName: "姓名", phone: "电话", loginPassword: "登录密码", tempPassword: "临时密码",
@@ -671,6 +673,29 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ address: "", city: "", state: "CA", zip: "", units: "1", type: "Single Family", status: "vacant" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const setEF = (k,v) => setEditForm(f => ({...f,[k]:v}));
+  const [uploadingId, setUploadingId] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const fileInputRefs = useRef({});
+
+  const handleImageUpload = async (propertyId, file) => {
+    if (!file) return;
+    setUploadingId(propertyId);
+    setUploadError(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("propertyId", propertyId);
+    const res = await fetch("/api/properties/upload-image", { method: "POST", body: fd });
+    const json = await res.json();
+    if (!res.ok) {
+      setUploadError(json.error || "Upload failed");
+    } else {
+      await refresh();
+    }
+    setUploadingId(null);
+  };
   const add = async () => {
     if (!form.address) return;
     const { error } = await supabase.from("properties").insert({
@@ -678,6 +703,18 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
       units: +form.units, type: form.type, status: form.status,
     });
     if (!error) { await refresh(); setShow(false); }
+  };
+  const openEdit = (p, e) => {
+    e.stopPropagation();
+    setEditing(p);
+    setEditForm({ address: p.address, city: p.city, state: p.state, zip: p.zip, units: String(p.units || ""), type: p.type || "Single Family", status: p.status || "vacant" });
+  };
+  const saveEdit = async () => {
+    const { error } = await supabase.from("properties").update({
+      address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip,
+      units: +editForm.units, type: editForm.type, status: editForm.status,
+    }).eq("id", editing.id);
+    if (!error) { await refresh(); setEditing(null); }
   };
 
   return (
@@ -690,23 +727,51 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
           const occupiedUnits = propertyUnits.filter(u => u.status === 'occupied').length;
           const totalUnits = propertyUnits.length;
           return (
-            <div key={p.id} onClick={() => { if (setSelectedPropertyId && setPage) { setSelectedPropertyId(p.id); setPage('property-detail'); } }} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", boxShadow: "0 1px 3px rgba(0,0,0,.04)", cursor: setSelectedPropertyId ? "pointer" : "default", transition: "box-shadow .15s" }}
+            <div key={p.id} onClick={() => { if (setSelectedPropertyId && setPage) { setSelectedPropertyId(p.id); setPage('property-detail'); } }} style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: "1px solid #f1f5f9", boxShadow: "0 1px 3px rgba(0,0,0,.04)", cursor: setSelectedPropertyId ? "pointer" : "default", transition: "box-shadow .15s" }}
               onMouseEnter={e => { if (setSelectedPropertyId) e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.10)"; }}
               onMouseLeave={e => { if (setSelectedPropertyId) e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.04)"; }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                <div style={{ width: 44, height: 44, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}><Icon name="home" size={22} /></div>
-                <Badge status={p.status} t={t} />
+              <div style={{ position: "relative", height: 160, background: "#f1f5f9", overflow: "hidden" }}
+                onClick={e => e.stopPropagation()}>
+                {p.imageUrl
+                  ? <img src={p.imageUrl} alt={p.address} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="home" size={40} color="#cbd5e1" /></div>
+                }
+                <input
+                  ref={el => { fileInputRefs.current[p.id] = el; }}
+                  type="file" accept="image/*" style={{ display: "none" }}
+                  onChange={e => handleImageUpload(p.id, e.target.files[0])}
+                />
+                <button
+                  onClick={() => { setUploadError(null); fileInputRefs.current[p.id]?.click(); }}
+                  disabled={uploadingId === p.id}
+                  style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(15,23,42,0.7)", color: "#fff", border: "none", borderRadius: 7, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: uploadingId === p.id ? "default" : "pointer", backdropFilter: "blur(4px)" }}>
+                  {uploadingId === p.id ? t.uploadingPhoto : p.imageUrl ? t.changePhoto : t.uploadPhoto}
+                </button>
+                {uploadError && uploadingId !== p.id && (
+                  <div style={{ position: "absolute", top: 8, left: 8, right: 8, background: "rgba(220,38,38,0.85)", color: "#fff", borderRadius: 7, padding: "5px 10px", fontSize: 11, fontWeight: 600 }}>{uploadError}</div>
+                )}
               </div>
-              <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{p.address}</h3>
-              <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>{p.city}, {p.state} {p.zip} · {p.type}</p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>Occupied Units</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{occupiedUnits}<span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 400 }}>/{totalUnits}</span></div>
+              <div style={{ padding: 22 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{p.address}</h3>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button onClick={e => openEdit(p, e)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#94a3b8", borderRadius: 6, display: "flex", alignItems: "center" }}
+                      onMouseEnter={e => e.currentTarget.style.color = "#4f46e5"} onMouseLeave={e => e.currentTarget.style.color = "#94a3b8"}>
+                      <Icon name="edit" size={15} />
+                    </button>
+                    <Badge status={p.status} t={t} />
+                  </div>
                 </div>
-                <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>{t.revenue}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{fmt(rev)}</div>
+                <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>{p.city}, {p.state} {p.zip} · {p.type}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>Occupied Units</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{occupiedUnits}<span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 400 }}>/{totalUnits}</span></div>
+                  </div>
+                  <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>{t.revenue}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{fmt(rev)}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -728,6 +793,24 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
             <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
             <Btn onClick={add}>{t.addProperty}</Btn>
+          </div>
+        </Modal>
+      )}
+      {editing && (
+        <Modal title="Edit Property" onClose={() => setEditing(null)}>
+          <Inp label={t.streetAddress} value={editForm.address} onChange={v => setEF("address",v)} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Inp label={t.city} value={editForm.city} onChange={v => setEF("city",v)} />
+            <Inp label={t.zip} value={editForm.zip} onChange={v => setEF("zip",v)} />
+          </div>
+          <Sel label={t.type} value={editForm.type} onChange={v => setEF("type",v)} options={["Single Family","Duplex","Condo","Apartment","Townhouse"].map(x => ({value:x,label:x}))} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Inp label={t.units} value={editForm.units} onChange={v => setEF("units",v)} type="number" />
+            <Sel label={t.status} value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"vacant",label:t.st_vacant},{value:"occupied",label:t.st_occupied}]} />
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+            <Btn variant="secondary" onClick={() => setEditing(null)}>{t.cancel}</Btn>
+            <Btn onClick={saveEdit}>Save Changes</Btn>
           </div>
         </Modal>
       )}
@@ -2086,7 +2169,7 @@ export default function App() {
   }, []);
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
-  const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "" });
+  const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "", imageUrl: p.image_url || null });
   const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
   const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
