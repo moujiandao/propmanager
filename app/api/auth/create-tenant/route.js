@@ -5,7 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request) {
   const supabaseAdmin = await createClient()
-  const { name, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, status } = await request.json()
+  const { name, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, status, moveInDate, moveOutDate } = await request.json()
 
   // Use provided email or generate a placeholder so auth user can be created without one
   const authEmail = email?.trim() || `${name.trim().toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@placeholder.local`
@@ -48,7 +48,9 @@ export async function POST(request) {
       unit,
       unit_id: resolvedUnitId,
       zelle_name: zelleName?.trim() || null,
-      status: tenantStatus
+      status: tenantStatus,
+      move_in_date: moveInDate || null,
+      move_out_date: moveOutDate || null,
     })
 
   if (profileError) return Response.json({ error: profileError.message }, { status: 400 })

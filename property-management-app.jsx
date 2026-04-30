@@ -644,7 +644,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
 const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTenantId }) => {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", createLogin: false });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
   const [editTenant, setEditTenant] = useState(null);
@@ -668,7 +668,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "" });
+    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "" });
   };
 
   const saveEdit = async () => {
@@ -688,6 +688,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         monthlyRent: editForm.monthlyRent || null,
         password: editForm.password || null,
         zelleName: editForm.zelleName || null,
+        moveInDate: editForm.moveInDate || null,
+        moveOutDate: editForm.moveOutDate || null,
       }),
     });
     const json = await res.json();
@@ -698,7 +700,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   };
 
   const add = async () => {
-    if (!form.name) return;
+    if (!form.name || !form.moveInDate) return;
     setSaving(true);
     const res = await fetch("/api/auth/create-tenant", {
       method: "POST",
@@ -709,9 +711,10 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         password: form.createLogin ? form.password : null,
         propertyId: form.propertyId, unit: form.unit,
         zelleName: form.zelleName, status: form.status, landlordId: user.id,
+        moveInDate: form.moveInDate, moveOutDate: form.moveOutDate || null,
       }),
     });
-    if (res.ok) { await refresh(); setShow(false); setForm({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", createLogin: false }); }
+    if (res.ok) { await refresh(); setShow(false); setForm({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false }); }
     setSaving(false);
   };
 
@@ -833,6 +836,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
             <Inp label="Zelle Name" value={form.zelleName} onChange={v => setF("zelleName",v)} placeholder="Name or phone on Zelle" />
             <Sel label="Status" value={form.status} onChange={v => setF("status",v)} options={[{value:"current tenant",label:"Current Tenant"},{value:"future tenant",label:"Future Tenant"},{value:"previous tenant",label:"Previous Tenant"}]} />
+            <Inp label="Move-in Date *" value={form.moveInDate} onChange={v => setF("moveInDate",v)} type="date" />
+            <Inp label="Move-out Date" value={form.moveOutDate||""} onChange={v => setF("moveOutDate",v)} type="date" />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 14px", background: "#f8fafc", borderRadius: 9, border: "1px solid #e2e8f0" }}>
             <Toggle value={form.createLogin} onChange={v => setF("createLogin", v)} />
@@ -901,6 +906,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Inp label="Monthly Payment ($)" value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
             <Sel label="Status" value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"current tenant",label:"Current Tenant"},{value:"future tenant",label:"Future Tenant"},{value:"previous tenant",label:"Previous Tenant"}]} />
             <Inp label="Zelle Name" value={editForm.zelleName} onChange={v => setEF("zelleName",v)} placeholder="Name or phone on Zelle" />
+            <Inp label="Move-in Date" value={editForm.moveInDate} onChange={v => setEF("moveInDate",v)} type="date" />
+            <Inp label="Move-out Date" value={editForm.moveOutDate} onChange={v => setEF("moveOutDate",v)} type="date" />
           </div>
           <div style={{ marginTop: 4, marginBottom: 4 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Password Reset</div>
@@ -1179,7 +1186,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
               <th style={{ padding: "14px 18px", textAlign: "left" }}>Tenant</th>
               <th style={{ padding: "14px 18px", textAlign: "left" }}>Zelle Name</th>
               <th style={{ padding: "14px 18px", textAlign: "left" }}>Rent</th>
-              <th style={{ padding: "14px 18px", textAlign: "left", minWidth: 100 }}>Move-out</th>
+              <th style={{ padding: "14px 18px", textAlign: "left", minWidth: 100 }}>Move-out Date</th>
               {months.map(m => (
                 <th key={m.key} style={{ padding: "14px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{m.label}</th>
               ))}
