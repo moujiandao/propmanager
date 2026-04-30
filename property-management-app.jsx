@@ -867,7 +867,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   const [editError, setEditError] = useState("");
 
-  const [groupBy, setGroupBy] = useState("none");
+  const [groupBy, setGroupBy] = useState("unit");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const confirmDelete = async () => {
@@ -1022,12 +1022,12 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                   return (
                     <Fragment key={`${prop?.id}::${unit}`}>
                       <tr>
-                        <td colSpan={8} style={{ padding: "10px 20px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                        <td colSpan={8} style={{ padding: "10px 20px", background: "#1e293b", borderTop: "2px solid #334155" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{prop?.address || "No property"}</span>
-                            <span style={{ fontSize: 12, color: "#64748b" }}>· Unit {unit}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9" }}>{prop?.address || "No property"}</span>
+                            <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>· Unit {unit}</span>
                             <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>{tenants.length} tenant{tenants.length !== 1 ? "s" : ""}</span>
-                            {totalRent > 0 && <span style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{fmt(totalRent)}/mo</span>}
+                            {totalRent > 0 && <span style={{ fontSize: 12, fontWeight: 600, color: "#a5b4fc" }}>{fmt(totalRent)}/mo</span>}
                           </div>
                         </td>
                       </tr>
