@@ -1330,7 +1330,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
 
   const allTenants = useMemo(() => grouped.flatMap(g => g.tenants), [grouped]);
 
-  const getContract = (tenant) => data.contracts.find(c => c.tenantId === tenant.id);
+  const getContract = (tenant) => data.contracts.find(c => c.tenantIds.includes(tenant.id));
 
   const toggle = (tenantId, monthKey) => {
     const mapKey = `${tenantId}-${monthKey}`;
