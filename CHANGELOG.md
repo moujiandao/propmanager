@@ -7,6 +7,13 @@
 - Add Tenant modal: `Status` dropdown with picklist values `Current Tenant`, `Future Tenant`, `Previous Tenant`
 - Add Tenant modal: `Create portal login` toggle making email/password optional (placeholder email used when the tenant has no portal account)
 
+### Fixed
+- Logout on page refresh: add `middleware.js` to refresh Supabase session tokens on every request, and replace manual `getSession()` with `onAuthStateChange` listener for reliable session restoration
+- TenantsPage header count now filters by `status === "current tenant"` instead of counting every row in `tenant_profiles` (so future/previous tenants no longer inflate the "active tenants" total)
+- Unit occupancy now follows the rule "occupied iff ≥1 tenant on the unit has `status = current tenant`": `create-tenant` and `update-tenant` API routes recompute on insert and on either `unit_id` *or* `status` changes
+- `create-tenant` API now persists `unit_id` (resolved from explicit `unitId` or by matching `unit_number` within the property) so the Edit Tenant unit dropdown shows the correct selection after creation
+- `scripts/backfill-tenant-units.mjs` and `scripts/recompute-occupancy.mjs` for one-off DB cleanup of legacy rows missing `unit_id` or with stale unit `status`
+
 ### Changed
 - `PaymentsPage` table now has 4 fixed columns: Tenant (clickable → tenant detail), Zelle Name, Rent, Move-out date (green when populated, green row tint); followed by 12 monthly checkboxes
 - `PaymentsPage` adds a bold "Total" row after each unit group showing summed rent

@@ -5,7 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request) {
   const supabaseAdmin = await createClient()
-  const { name, email, phone, propertyId, unit, landlordId, password, zelleName, status } = await request.json()
+  const { name, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, status } = await request.json()
 
   // Use provided email or generate a placeholder so auth user can be created without one
   const authEmail = email?.trim() || `${name.trim().toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@placeholder.local`
@@ -21,6 +21,21 @@ export async function POST(request) {
 
   if (authError) return Response.json({ error: authError.message }, { status: 400 })
 
+  // Resolve unit_id: prefer the explicit unitId from the client; otherwise look it up by
+  // (property_id, unit_number) so the unit dropdown stays in sync with the text field.
+  let resolvedUnitId = unitId || null
+  if (!resolvedUnitId && propertyId && unit) {
+    const { data: matchedUnit } = await supabaseAdmin
+      .from('units')
+      .select('id')
+      .eq('property_id', propertyId)
+      .eq('unit_number', String(unit))
+      .maybeSingle()
+    resolvedUnitId = matchedUnit?.id || null
+  }
+
+  const tenantStatus = status || 'current tenant'
+
   const { error: profileError } = await supabaseAdmin
     .from('tenant_profiles')
     .insert({
@@ -31,11 +46,35 @@ export async function POST(request) {
       phone,
       property_id: propertyId,
       unit,
+      unit_id: resolvedUnitId,
       zelle_name: zelleName?.trim() || null,
-      status: status || 'current tenant'
+      status: tenantStatus
     })
 
   if (profileError) return Response.json({ error: profileError.message }, { status: 400 })
+
+  // If the new tenant occupies a unit, recompute occupancy for the entire property
+  if (resolvedUnitId && tenantStatus === 'current tenant' && propertyId) {
+    const { data: propertyUnits } = await supabaseAdmin
+      .from('units')
+      .select('id')
+      .eq('property_id', propertyId)
+
+    if (propertyUnits?.length) {
+      const unitIds = propertyUnits.map(u => u.id)
+      const { data: occupiedTenants } = await supabaseAdmin
+        .from('tenant_profiles')
+        .select('unit_id')
+        .in('unit_id', unitIds)
+        .eq('status', 'current tenant')
+
+      const occupiedUnitIds = new Set((occupiedTenants || []).map(t => t.unit_id))
+      for (const u of propertyUnits) {
+        const newStatus = occupiedUnitIds.has(u.id) ? 'occupied' : 'vacant'
+        await supabaseAdmin.from('units').update({ status: newStatus }).eq('id', u.id)
+      }
+    }
+  }
 
   // Welcome emails temporarily disabled
   if (false && email?.trim()) {

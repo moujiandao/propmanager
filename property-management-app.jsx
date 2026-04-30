@@ -705,7 +705,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   return (
     <div>
-      <PageHeader title={t.tenTitle} subtitle={t.tenSubtitle(data.tenants.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addTenant}</Btn>} />
+      <PageHeader title={t.tenTitle} subtitle={t.tenSubtitle(data.tenants.filter(x => x.status === "current tenant").length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addTenant}</Btn>} />
       <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ background: "#f8fafc" }}>
@@ -1804,17 +1804,19 @@ export default function App() {
   useEffect(() => { document.body.style.margin = "0"; document.body.style.background = "#f8fafc"; }, []);
   useEffect(() => { if (user) fetchAllData(); }, [user]);
 
-  // Restore session on page load / hot reload
+  // Restore session on page load and react to auth state changes
   useEffect(() => {
-    const restoreSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-      const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", session.user.id).single();
-      if (landlord) { setUser({ id: landlord.id, authId: session.user.id, role: "landlord", email: session.user.email, name: landlord.name || session.user.email?.split("@")[0] }); return; }
-      const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", session.user.id).single();
-      if (tenant) { setUser({ id: tenant.id, authId: session.user.id, role: "tenant", email: session.user.email, name: tenant.name || session.user.email?.split("@")[0] }); }
+    const resolveUser = async (authUser) => {
+      if (!authUser) { setUser(null); return; }
+      const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", authUser.id).single();
+      if (landlord) { setUser({ id: landlord.id, authId: authUser.id, role: "landlord", email: authUser.email, name: landlord.name || authUser.email?.split("@")[0] }); return; }
+      const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", authUser.id).single();
+      if (tenant) { setUser({ id: tenant.id, authId: authUser.id, role: "tenant", email: authUser.email, name: tenant.name || authUser.email?.split("@")[0] }); }
     };
-    restoreSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      resolveUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────

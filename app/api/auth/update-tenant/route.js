@@ -9,10 +9,10 @@ export async function POST(request) {
 
   const supabase = await createClient()
 
-  // Capture the tenant's previous unit_id before updating, so we can recompute occupancy for the old unit too
+  // Capture the tenant's previous unit_id and status so we can recompute occupancy when either changes
   const { data: prevTenant } = await supabase
     .from('tenant_profiles')
-    .select('unit_id, property_id')
+    .select('unit_id, property_id, status')
     .eq('id', tenantId)
     .single()
 
@@ -53,29 +53,29 @@ export async function POST(request) {
     }
   }
 
-  // Recompute unit occupancy if unitId changed (or if a property is set)
-  // Determine which property to recompute for — use the updated propertyId, falling back to prev
+  // Recompute occupancy when either the assigned unit or the tenant's status changes —
+  // a tenant flipping current → previous should free the unit even if unit_id stays the same.
   const affectedPropertyId = propertyId || prevTenant?.property_id
   const unitIdChanged = unitId !== undefined && unitId !== prevTenant?.unit_id
+  const statusChanged = status !== undefined && status !== prevTenant?.status
 
-  if (unitIdChanged && affectedPropertyId) {
-    // Fetch all units for this property
+  if ((unitIdChanged || statusChanged) && affectedPropertyId) {
     const { data: propertyUnits } = await supabase
       .from('units')
       .select('id')
       .eq('property_id', affectedPropertyId)
 
     if (propertyUnits && propertyUnits.length > 0) {
-      // Fetch all tenants that have a unit_id pointing to one of these units
       const unitIds = propertyUnits.map(u => u.id)
+      // Only "current tenant" rows count toward occupancy
       const { data: occupiedTenants } = await supabase
         .from('tenant_profiles')
         .select('unit_id')
         .in('unit_id', unitIds)
+        .eq('status', 'current tenant')
 
       const occupiedUnitIds = new Set((occupiedTenants || []).map(t => t.unit_id))
 
-      // Update each unit's status based on whether any tenant is assigned to it
       for (const unit of propertyUnits) {
         const newStatus = occupiedUnitIds.has(unit.id) ? 'occupied' : 'vacant'
         await supabase.from('units').update({ status: newStatus }).eq('id', unit.id)
