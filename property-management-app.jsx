@@ -1386,7 +1386,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
 
   const allTenants = useMemo(() => grouped.flatMap(g => g.tenants), [grouped]);
 
-  const getContract = (tenant) => data.contracts.find(c => c.tenantId === tenant.id);
+  const getContract = (tenant) => data.contracts.find(c => c.tenantIds.includes(tenant.id));
 
   const toggle = (tenantId, monthKey) => {
     const mapKey = `${tenantId}-${monthKey}`;
@@ -1714,7 +1714,7 @@ const EmailPage = ({ data, setData, t, refresh }) => {
 // ─── TENANT PAGES (English only — tenant UI not translated) ──────────────────
 const TenantDashboard = ({ data, user }) => {
   const tenant = data.tenants.find(t => t.id === user.id);
-  const contract = data.contracts.find(c => c.tenantId === user.id);
+  const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const property = data.properties.find(p => p.id === tenant?.propertyId);
   const payments = data.payments.filter(p => p.tenantId === user.id).sort((a,b) => new Date(b.dueDate)-new Date(a.dueDate));
   const openMaint = data.maintenance.filter(m => m.tenantId === user.id && m.status !== "resolved");
@@ -1771,7 +1771,7 @@ const PaymentPortal = ({ data, setData, user, refresh }) => {
   const [bankForm, setBankForm] = useState({ routingNumber: "", accountNumber: "", accountName: "", accountType: "checking" });
   const [success, setSuccess] = useState(false);
   const tenant = data.tenants.find(t => t.id === user.id);
-  const contract = data.contracts.find(c => c.tenantId === user.id);
+  const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const toggleRecurring = async () => {
     await supabase.from("tenant_profiles").update({ recurring_payment: !tenant.recurringPayment }).eq("id", user.id);
     await refresh();
@@ -1937,7 +1937,7 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
 };
 
 const TenantLeasePage = ({ data, user }) => {
-  const contract = data.contracts.find(c => c.tenantId === user.id);
+  const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const tenant = data.tenants.find(t => t.id === user.id);
   const property = data.properties.find(p => p.id === tenant?.propertyId);
   if (!contract) return <div style={{ padding:32,color:"#64748b" }}>No active lease found.</div>;
@@ -2404,7 +2404,7 @@ export default function App() {
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "", imageUrl: p.image_url || null });
   const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
-  const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
+  const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
   const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
@@ -2423,7 +2423,7 @@ export default function App() {
         const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
-          supabase.from("contracts").select("*"),
+          supabase.from("contracts").select("*, contract_tenants(tenant_id)"),
           supabase.from("payments").select("*").order("due_date", { ascending: false }),
           supabase.from("maintenance_requests").select("*").order("created_at", { ascending: false }),
           supabase.from("email_settings").select("*").single(),
@@ -2463,7 +2463,7 @@ export default function App() {
         const contractId = ctRows?.[0]?.contract_id;
         const [propRes, conRes, payRes, maintRes] = await Promise.all([
           tenant?.propertyId ? supabase.from("properties").select("*").eq("id", tenant.propertyId) : Promise.resolve({ data: [] }),
-          contractId ? supabase.from("contracts").select("*").eq("id", contractId) : Promise.resolve({ data: [] }),
+          contractId ? supabase.from("contracts").select("*, contract_tenants(tenant_id)").eq("id", contractId) : Promise.resolve({ data: [] }),
           supabase.from("payments").select("*").eq("tenant_id", user.id).order("due_date", { ascending: false }),
           supabase.from("maintenance_requests").select("*").eq("tenant_id", user.id).order("created_at", { ascending: false }),
         ]);
