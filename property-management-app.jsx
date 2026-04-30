@@ -643,7 +643,7 @@ const LandlordDashboard = ({ data, t }) => {
                   <tr key={p.id} style={{ borderTop: "1px solid #f8fafc" }}>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14, fontWeight: 500 }}>{ten ? tenantFullName(ten) : "—"}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14 }}>{fmt(p.amount || ten?.monthlyRent || 0)}</td>
-                    <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{p.dueDate ? fmtDate(p.dueDate.slice(0,7) + "-05") : "—"}</td>
+                    <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#64748b" }}>{p.dueDate ? fmtDate(p.dueDate.slice(0,7) + "-05T12:00:00") : "—"}</td>
                   </tr>
                 );
               })}
@@ -849,7 +849,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <td style={{ padding: "14px 20px" }}>
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={() => openEdit(ten)} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
-              <Icon name="edit" size={13} /> Edit
+              <Icon name="edit" size={13} /> {t.editBtn}
             </button>
             <button onClick={() => setDeleteTarget(ten)} style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" }}>
               <Icon name="trash" size={13} />
@@ -915,21 +915,21 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       {show && (
         <Modal title={t.addTenantTitle} onClose={() => setShow(false)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Inp label="First Name" value={form.name} onChange={v => setF("name",v)} placeholder="Jane" />
-            <Inp label="Last Name" value={form.lastName||""} onChange={v => setF("lastName",v)} placeholder="Smith" />
+            <Inp label={t.firstName} value={form.name} onChange={v => setF("name",v)} placeholder="Jane" />
+            <Inp label={t.lastName} value={form.lastName||""} onChange={v => setF("lastName",v)} placeholder="Smith" />
             <Inp label={t.phone} value={form.phone} onChange={v => setF("phone",v)} />
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
-            <Inp label="Zelle Name" value={form.zelleName} onChange={v => setF("zelleName",v)} placeholder="Name or phone on Zelle" />
-            <Sel label="Status" value={form.status} onChange={v => setF("status",v)} options={[{value:"current tenant",label:"Current Tenant"},{value:"future tenant",label:"Future Tenant"},{value:"previous tenant",label:"Previous Tenant"}]} />
-            <Inp label="Move-in Date *" value={form.moveInDate} onChange={v => setF("moveInDate",v)} type="date" />
-            <Inp label="Move-out Date" value={form.moveOutDate||""} onChange={v => setF("moveOutDate",v)} type="date" />
+            <Inp label={t.zelleNameLabel} value={form.zelleName} onChange={v => setF("zelleName",v)} placeholder={t.zelleNamePlaceholder} />
+            <Sel label={t.colStatus} value={form.status} onChange={v => setF("status",v)} options={[{value:"current tenant",label:t.statusCurrentTenant},{value:"future tenant",label:t.statusFutureTenant},{value:"previous tenant",label:t.statusPreviousTenant}]} />
+            <Inp label={t.moveInDateReq} value={form.moveInDate} onChange={v => setF("moveInDate",v)} type="date" />
+            <Inp label={t.moveOutDate} value={form.moveOutDate||""} onChange={v => setF("moveOutDate",v)} type="date" />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 14px", background: "#f8fafc", borderRadius: 9, border: "1px solid #e2e8f0" }}>
             <Toggle value={form.createLogin} onChange={v => setF("createLogin", v)} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Create tenant portal login</div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>Optional — only needed if the tenant will log in to pay rent or submit maintenance requests</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{t.createLoginLabel}</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{t.createLoginDesc}</div>
             </div>
           </div>
           {form.createLogin && (
@@ -940,7 +940,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
           )}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
             <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
-            <Btn onClick={add}>{saving ? "Creating…" : "Add Tenant"}</Btn>
+            <Btn onClick={add}>{saving ? t.creating : t.addTenant}</Btn>
           </div>
         </Modal>
       )}
@@ -949,12 +949,12 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       {editTenant && (
         <Modal title={`Edit — ${tenantFullName(editTenant)}`} onClose={() => setEditTenant(null)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Inp label="First Name" value={editForm.name} onChange={v => setEF("name",v)} />
-            <Inp label="Last Name" value={editForm.lastName||""} onChange={v => setEF("lastName",v)} />
-            <Inp label="Phone" value={editForm.phone} onChange={v => setEF("phone",v)} />
-            <Sel label="Property" value={editForm.propertyId} onChange={v => setEF("propertyId",v)} options={[{value:"",label:"— No property —"},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
+            <Inp label={t.firstName} value={editForm.name} onChange={v => setEF("name",v)} />
+            <Inp label={t.lastName} value={editForm.lastName||""} onChange={v => setEF("lastName",v)} />
+            <Inp label={t.phone} value={editForm.phone} onChange={v => setEF("phone",v)} />
+            <Sel label={t.navProperties} value={editForm.propertyId} onChange={v => setEF("propertyId",v)} options={[{value:"",label:t.noPropOption},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>Unit</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{t.unit}</div>
               {(() => {
                 const propUnits = (data.units || []).filter(u => u.propertyId === editForm.propertyId);
                 return (
@@ -970,15 +970,15 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                     disabled={!editForm.propertyId}
                   >
                     {!editForm.propertyId ? (
-                      <option value="">— Select a property first —</option>
+                      <option value="">{t.selectPropFirst}</option>
                     ) : propUnits.length === 0 ? (
                       <>
-                        <option value="">— No unit assigned —</option>
-                        <option value="" disabled>No units — add units first from the property page</option>
+                        <option value="">{t.noUnitAssigned}</option>
+                        <option value="" disabled>{t.noUnitsYet}</option>
                       </>
                     ) : (
                       <>
-                        <option value="">— No unit assigned —</option>
+                        <option value="">{t.noUnitAssigned}</option>
                         {propUnits.map(u => (
                           <option key={u.id} value={u.id}>
                             Unit {u.unitNumber} — {u.bedrooms}bd/{u.bathrooms}ba ({u.status})
@@ -990,30 +990,30 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                 );
               })()}
             </div>
-            <Inp label="Monthly Payment ($)" value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
-            <Sel label="Status" value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"current tenant",label:"Current Tenant"},{value:"future tenant",label:"Future Tenant"},{value:"previous tenant",label:"Previous Tenant"}]} />
-            <Inp label="Zelle Name" value={editForm.zelleName} onChange={v => setEF("zelleName",v)} placeholder="Name or phone on Zelle" />
-            <Inp label="Move-in Date" value={editForm.moveInDate} onChange={v => setEF("moveInDate",v)} type="date" />
-            <Inp label="Move-out Date" value={editForm.moveOutDate} onChange={v => setEF("moveOutDate",v)} type="date" />
+            <Inp label={t.monthlyPaymentLabel} value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
+            <Sel label={t.colStatus} value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"current tenant",label:t.statusCurrentTenant},{value:"future tenant",label:t.statusFutureTenant},{value:"previous tenant",label:t.statusPreviousTenant}]} />
+            <Inp label={t.zelleNameLabel} value={editForm.zelleName} onChange={v => setEF("zelleName",v)} placeholder={t.zelleNamePlaceholder} />
+            <Inp label={t.moveInDate} value={editForm.moveInDate} onChange={v => setEF("moveInDate",v)} type="date" />
+            <Inp label={t.moveOutDate} value={editForm.moveOutDate} onChange={v => setEF("moveOutDate",v)} type="date" />
           </div>
           <div style={{ marginTop: 4, marginBottom: 4 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Password Reset</div>
-            <Inp label="New Password (leave blank to keep current)" value={editForm.password} onChange={v => setEF("password",v)} type="password" placeholder="Min. 8 characters" />
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>{t.passwordReset}</div>
+            <Inp label={t.newPasswordLabel} value={editForm.password} onChange={v => setEF("password",v)} type="password" placeholder={t.minCharsPlaceholder} />
           </div>
           {editError && <p style={{ color: "#ef4444", fontSize: 13, margin: "0 0 12px" }}>{editError}</p>}
           <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 9, padding: 12, marginBottom: 16, fontSize: 13, color: "#0369a1" }}>
-            Email address cannot be changed here. To update a tenant&apos;s email, do so from Supabase Auth.
+            {t.emailReadOnly}
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setEditTenant(null)}>{t.cancel}</Btn>
-            <Btn onClick={saveEdit}>{editSaving ? "Saving…" : "Save Changes"}</Btn>
+            <Btn onClick={saveEdit}>{editSaving ? t.saving : t.saveChanges}</Btn>
           </div>
         </Modal>
       )}
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <Modal title="Delete Tenant" onClose={() => setDeleteTarget(null)}>
+        <Modal title={t.deleteTenant} onClose={() => setDeleteTarget(null)}>
           <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
             Are you sure you want to delete <strong>{tenantFullName(deleteTarget)}</strong>?
           </p>
