@@ -18,7 +18,7 @@ const T = {
     statActiveLeases: "active leases", statPending: "Pending Payments", statRequireAttention: "require attention",
     statOpenMaint: "Open Maintenance", statRequests: "requests",
     tenantPaymentStatus: "Tenant Payment Status", recentMaintenance: "Recent Maintenance", recentPayments: "Recent Payments",
-    colTenant: "Tenant", colAmount: "Amount", colDueDate: "Due Date", colPaidDate: "Paid Date",
+    colTenant: "Tenant", colTenants: "Tenants", colAmount: "Amount", colDueDate: "Due Date", colPaidDate: "Paid Date",
     colType: "Type", colAchStatus: "ACH Status", colStatus: "Status", colContact: "Contact",
     colProperty: "Property / Unit", colBank: "Bank", colRecurring: "Recurring",
     colTerm: "Term", colDaysRemaining: "Days Remaining",
@@ -36,7 +36,7 @@ const T = {
     tenantNote: "The tenant will log in with their email address and the password you set above.",
     createTenantAccount: "Create Tenant Account",
     conTitle: "Leases & Contracts", conSubtitle: (n) => `${n} contracts`,
-    addLease: "Add Lease", addLeaseTitle: "Add New Lease",
+    addLease: "Add Lease", addLeaseTitle: "Add New Lease", editLeaseTitle: "Edit Lease",
     selectTenant: "Select tenant", monthlyRent: "Monthly Rent ($)",
     startDate: "Start Date", endDate: "End Date", dueDayLabel: "Due Day (1-28)",
     dueOf: "Due:", ofMonth: "of month", expired: "Expired", daysRemaining: "days", rent: "Rent", term: "Term",
@@ -100,7 +100,7 @@ const T = {
     statActiveLeases: "有效合同", statPending: "待处理付款", statRequireAttention: "需要关注",
     statOpenMaint: "待处理维修", statRequests: "个请求",
     tenantPaymentStatus: "租客付款状态", recentMaintenance: "最近维修请求", recentPayments: "最近付款记录",
-    colTenant: "租客", colAmount: "金额", colDueDate: "到期日", colPaidDate: "付款日",
+    colTenant: "租客", colTenants: "租客", colAmount: "金额", colDueDate: "到期日", colPaidDate: "付款日",
     colType: "类型", colAchStatus: "ACH状态", colStatus: "状态", colContact: "联系方式",
     colProperty: "房产 / 单元", colBank: "银行账户", colRecurring: "自动续费",
     colTerm: "合同期限", colDaysRemaining: "剩余天数",
@@ -118,7 +118,7 @@ const T = {
     tenantNote: "租客将使用其电子邮件地址和您设置的密码登录系统。",
     createTenantAccount: "创建租客账号",
     conTitle: "租约与合同", conSubtitle: (n) => `共 ${n} 份合同`,
-    addLease: "添加租约", addLeaseTitle: "添加新租约",
+    addLease: "添加租约", addLeaseTitle: "添加新租约", editLeaseTitle: "编辑租约",
     selectTenant: "选择租客", monthlyRent: "月租金（$）",
     startDate: "开始日期", endDate: "结束日期", dueDayLabel: "到期日（1-28日）",
     dueOf: "到期日：每月", ofMonth: "日", expired: "已到期", daysRemaining: "天", rent: "租金", term: "期限",
@@ -1218,6 +1218,36 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
+  const [editContract, setEditContract] = useState(null);
+  const [editForm, setEditForm] = useState(EMPTY_FORM);
+  const setEF = (k,v) => setEditForm(f => ({...f,[k]:v}));
+  const openEdit = (c) => {
+    setEditContract(c);
+    setEditForm({ tenantIds: c.tenantIds || [], propertyId: c.propertyId || "", unit: c.unit || "", startDate: c.startDate || "", endDate: c.endDate || "", rentAmount: c.rentAmount ? String(c.rentAmount) : "", dueDay: c.dueDay ? String(c.dueDay) : "1" });
+  };
+  const save = async () => {
+    if (!editForm.rentAmount || !editForm.tenantIds.length) return;
+    const { error } = await supabase.from("contracts").update({
+      property_id: editForm.propertyId, unit: editForm.unit,
+      start_date: editForm.startDate, end_date: editForm.endDate,
+      rent_amount: +editForm.rentAmount, due_day: +editForm.dueDay,
+    }).eq("id", editContract.id);
+    if (error) return;
+    const { error: delError } = await supabase.from("contract_tenants").delete().eq("contract_id", editContract.id);
+    if (delError) return;
+    const ctResults = await Promise.all(editForm.tenantIds.map(tid =>
+      supabase.from("contract_tenants").insert({ contract_id: editContract.id, tenant_id: tid })
+    ));
+    if (ctResults.some(r => r.error)) return;
+    const newTenants = editForm.tenantIds.filter(tid => !editContract.tenantIds.includes(tid));
+    if (editForm.startDate && newTenants.length) {
+      await Promise.all(newTenants.map(tid =>
+        supabase.from("tenant_profiles").update({ move_in_date: editForm.startDate }).eq("id", tid)
+      ));
+    }
+    setEditContract(null);
+    await refresh();
+  };
   const add = async () => {
     if (!form.tenantIds.length || !form.rentAmount) return;
     const { data: newContract, error } = await supabase.from("contracts").insert({
@@ -1272,11 +1302,42 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colDaysRemaining}</div>
                 <div style={{ fontSize: daysLeft <= 0 ? 14 : 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft > 0 ? `${daysLeft} ${t.daysRemaining}` : "Month to Month"}</div>
               </div>
-              <Badge status={c.status} t={t} />
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                <Badge status={c.status} t={t} />
+                <Btn variant="secondary" size="sm" icon="edit" onClick={() => openEdit(c)}>{t.editBtn}</Btn>
+              </div>
             </div>
           );
         })}
       </div>
+      {editContract && (
+        <Modal title={t.editLeaseTitle} onClose={() => setEditContract(null)} wide>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ fontSize: 13, color: "#374151", fontWeight: 600, marginBottom: 6 }}>{t.colTenants}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto", padding: "4px 0" }}>
+                {data.tenants.filter(ten => ten.status !== "previous tenant").map(ten => (
+                  <label key={ten.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "#0f172a" }}>
+                    <input type="checkbox" checked={editForm.tenantIds.includes(ten.id)}
+                      onChange={e => { const ids = e.target.checked ? [...editForm.tenantIds, ten.id] : editForm.tenantIds.filter(id => id !== ten.id); setEF("tenantIds", ids); }} />
+                    {tenantFullName(ten)}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <Sel label={t.navProperties} value={editForm.propertyId} onChange={v => setEF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
+            <Inp label={t.unit} value={editForm.unit} onChange={v => setEF("unit",v)} />
+            <Inp label={t.monthlyRent} value={editForm.rentAmount} onChange={v => setEF("rentAmount",v)} type="number" />
+            <Inp label={t.startDate} value={editForm.startDate} onChange={v => setEF("startDate",v)} type="date" />
+            <Inp label={t.endDate} value={editForm.endDate} onChange={v => setEF("endDate",v)} type="date" />
+            <Inp label={t.dueDayLabel} value={editForm.dueDay} onChange={v => setEF("dueDay",v)} type="number" />
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+            <Btn variant="secondary" onClick={() => setEditContract(null)}>{t.cancel}</Btn>
+            <Btn onClick={save}>{t.saveChanges}</Btn>
+          </div>
+        </Modal>
+      )}
       {show && (
         <Modal title={t.addLeaseTitle} onClose={() => { setForm(EMPTY_FORM); setShow(false); }} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
