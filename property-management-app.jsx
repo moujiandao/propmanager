@@ -2045,9 +2045,7 @@ const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
     setDeleting(false);
   };
 
-  const landlords = (data?.landlords || []).map(l => ({ ...l, role: "admin", displayName: l.name || l.email }));
-  const tenants   = (data?.tenants   || []).map(t => ({ ...t, role: "tenant", displayName: tenantFullName(t) }));
-  const allUsers  = [...landlords, ...tenants].sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const allUsers = (data?.landlords || []).map(l => ({ ...l, role: "admin", displayName: l.name || l.email })).sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   const RoleBadge = ({ role }) => (
     <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase", letterSpacing: ".5px",
@@ -2066,7 +2064,7 @@ const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f8fafc" }}>
-              {["Name", "Email", "Role", ""].map(h => (
+              {["Name", "Email", ""].map(h => (
                 <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px" }}>{h}</th>
               ))}
             </tr>
@@ -2076,7 +2074,6 @@ const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
               <tr key={u.id} style={{ borderTop: "1px solid #f8fafc" }}>
                 <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{u.displayName}</td>
                 <td style={{ padding: "14px 20px", fontSize: 13, color: "#64748b" }}>{u.email || "—"}</td>
-                <td style={{ padding: "14px 20px" }}><RoleBadge role={u.role} /></td>
                 <td style={{ padding: "14px 20px", textAlign: "right" }}>
                   {u.id !== currentUser?.id && (
                     <button onClick={() => { setDeleteError(null); setConfirmDelete(u); }}
