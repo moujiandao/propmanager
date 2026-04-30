@@ -137,6 +137,7 @@ export const Icon = ({ name, size = 18 }) => {
     calendar: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
     trending: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
     globe: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>,
+    trash: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>,
   };
   return icons[name] || null;
 };
@@ -653,6 +654,16 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   const [editError, setEditError] = useState("");
 
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const confirmDelete = async () => {
+    setDeleting(true);
+    await fetch("/api/auth/delete-tenant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenantId: deleteTarget.id }) });
+    await refresh();
+    setDeleteTarget(null);
+    setDeleting(false);
+  };
+
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
@@ -741,9 +752,14 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                   <td style={{ padding: "14px 20px" }}>{ten.recurringPayment ? <span style={{ color: "#3b82f6", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="refresh" size={14} />{t.recurringEnabled}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.recurringOff}</span>}</td>
                   <td style={{ padding: "14px 20px" }}><Badge status={ten.status} t={t} /></td>
                   <td style={{ padding: "14px 20px" }}>
-                    <button onClick={() => openEdit(ten)} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
-                      <Icon name="edit" size={13} /> Edit
-                    </button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => openEdit(ten)} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                        <Icon name="edit" size={13} /> Edit
+                      </button>
+                      <button onClick={() => setDeleteTarget(ten)} style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" }}>
+                        <Icon name="trash" size={13} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -842,6 +858,24 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setEditTenant(null)}>{t.cancel}</Btn>
             <Btn onClick={saveEdit}>{editSaving ? "Saving…" : "Save Changes"}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <Modal title="Delete Tenant" onClose={() => setDeleteTarget(null)}>
+          <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
+            Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
+          </p>
+          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#94a3b8" }}>
+            This will permanently remove their account and all associated data. This cannot be undone.
+          </p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Btn>
+            <button onClick={confirmDelete} disabled={deleting} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1, fontFamily: "inherit" }}>
+              {deleting ? "Deleting…" : "Delete Tenant"}
+            </button>
           </div>
         </Modal>
       )}
