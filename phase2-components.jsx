@@ -137,7 +137,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
 
                 {/* Unit number */}
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ width: 40, height: 40, background: isOccupied ? "rgba(217,119,6,.15)" : "rgba(148,163,184,.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                  <div style={{ width: 40, height: 40, background: isOccupied ? "rgba(79,70,229,.15)" : "rgba(148,163,184,.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
                     <Icon name="home" size={18} />
                   </div>
                   <h3 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
@@ -933,7 +933,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {tenantDocs.map(doc => (
-                <div key={doc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: doc.documentType === "lease" ? "rgba(217,119,6,.08)" : "rgba(255,255,255,.03)", borderRadius: 9, padding: "10px 14px", border: doc.documentType === "lease" ? "1px solid rgba(217,119,6,.2)" : "1px solid rgba(255,255,255,.06)" }}>
+                <div key={doc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: doc.documentType === "lease" ? "rgba(79,70,229,.08)" : "rgba(255,255,255,.03)", borderRadius: 9, padding: "10px 14px", border: doc.documentType === "lease" ? "1px solid rgba(79,70,229,.2)" : "1px solid rgba(255,255,255,.06)" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.fileName}</span>

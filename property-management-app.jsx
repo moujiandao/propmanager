@@ -229,7 +229,7 @@ const LangToggle = ({ lang, setLang }) => (
       {[["en", "EN"], ["zh", "中文"]].map(([l, label]) => (
         <button key={l} onClick={() => setLang(l)}
           style={{ padding: "3px 9px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "inherit", transition: "all .15s",
-            background: lang === l ? "rgba(217,119,6,.9)" : "transparent",
+            background: lang === l ? "rgba(79,70,229,.9)" : "transparent",
             color: lang === l ? "#fff" : "#64748b" }}>
           {label}
         </button>
@@ -295,7 +295,7 @@ const LoginPage = ({ onLogin }) => {
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); * { box-sizing: border-box; } body { margin: 0; -webkit-font-smoothing: antialiased; }`}</style>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-        {[...Array(8)].map((_, i) => <div key={i} style={{ position: "absolute", width: 2, height: 2, background: `rgba(217,119,6,${0.15+i*0.05})`, borderRadius: "50%", top: `${10+i*12}%`, left: `${5+i*13}%`, boxShadow: `0 0 ${20+i*10}px ${8+i*4}px rgba(217,119,6,${0.05+i*0.02})` }} />)}
+        {[...Array(8)].map((_, i) => <div key={i} style={{ position: "absolute", width: 2, height: 2, background: `rgba(79,70,229,${0.15+i*0.05})`, borderRadius: "50%", top: `${10+i*12}%`, left: `${5+i*13}%`, boxShadow: `0 0 ${20+i*10}px ${8+i*4}px rgba(79,70,229,${0.05+i*0.02})` }} />)}
       </div>
       <div style={{ width: "100%", maxWidth: 420, padding: 24 }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
@@ -308,7 +308,7 @@ const LoginPage = ({ onLogin }) => {
           <div style={{ display: "flex", gap: 8, marginBottom: 24, background: "rgba(0,0,0,.2)", borderRadius: 10, padding: 4 }}>
             {["landlord", "tenant"].map(t => (
               <button key={t} onClick={() => setTab(t)}
-                style={{ flex: 1, padding: "8px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", transition: "all .2s", background: tab === t ? "rgba(217,119,6,.9)" : "transparent", color: tab === t ? "#fff" : "#94a3b8" }}>
+                style={{ flex: 1, padding: "8px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", transition: "all .2s", background: tab === t ? "rgba(79,70,229,.9)" : "transparent", color: tab === t ? "#fff" : "#94a3b8" }}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}
@@ -412,7 +412,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
           return (
             <button key={item.id} onClick={() => onNavigate(item.id)}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", marginBottom: 3, textAlign: "left", fontFamily: "inherit", transition: "all .15s",
-                background: active ? "rgba(217,119,6,.15)" : "transparent", color: active ? "#a5b4fc" : "#94a3b8", fontWeight: active ? 600 : 400, fontSize: 14 }}>
+                background: active ? "rgba(79,70,229,.15)" : "transparent", color: active ? "#a5b4fc" : "#94a3b8", fontWeight: active ? 600 : 400, fontSize: 14 }}>
               <Icon name={item.icon} size={17} />{item.label}
               {active && <span style={{ marginLeft: "auto", width: 4, height: 4, background: "#4f46e5", borderRadius: "50%" }} />}
             </button>
@@ -1285,7 +1285,7 @@ const EmailPage = ({ data, setData, t, refresh }) => {
         {reminders.map(r => (
           <div key={r.key} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 11, background: s[r.key]?"rgba(217,119,6,.1)":"#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: s[r.key]?"#4f46e5":"#94a3b8" }}><Icon name="mail" size={19} /></div>
+              <div style={{ width: 42, height: 42, borderRadius: 11, background: s[r.key]?"rgba(79,70,229,.1)":"#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: s[r.key]?"#4f46e5":"#94a3b8" }}><Icon name="mail" size={19} /></div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#0f172a" }}>{r.label}</div>
                 <div style={{ fontSize: 13, color: "#64748b" }}>{r.desc}</div>
@@ -1447,7 +1447,7 @@ const PaymentPortal = ({ data, setData, user, refresh }) => {
           <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
               <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ width: 42, height: 42, borderRadius: 11, background: tenant.recurringPayment?"rgba(217,119,6,.1)":"#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: tenant.recurringPayment?"#4f46e5":"#94a3b8" }}><Icon name="refresh" size={19} /></div>
+                <div style={{ width: 42, height: 42, borderRadius: 11, background: tenant.recurringPayment?"rgba(79,70,229,.1)":"#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: tenant.recurringPayment?"#4f46e5":"#94a3b8" }}><Icon name="refresh" size={19} /></div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Auto-Pay</div>
                   <div style={{ fontSize: 13, color: "#64748b" }}>Pay {fmt(contract.rentAmount)} on the {contract.dueDay}{contract.dueDay===1?"st":"th"}</div>
@@ -1664,7 +1664,7 @@ const DocumentsPage = ({ data, refresh }) => {
         <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden" }}>
           {data.properties.map(p => (
             <button key={p.id} onClick={() => setSelectedId(p.id)}
-              style={{ width: "100%", padding: "14px 16px", border: "none", borderBottom: "1px solid #f8fafc", background: p.id === selectedId ? "rgba(217,119,6,.08)" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+              style={{ width: "100%", padding: "14px 16px", border: "none", borderBottom: "1px solid #f8fafc", background: p.id === selectedId ? "rgba(79,70,229,.08)" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: p.id === selectedId ? "#4f46e5" : "#0f172a" }}>{p.address}</div>
               <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{p.city} · {p.driveLink ? "✓ Linked" : "No folder"}</div>
             </button>
