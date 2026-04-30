@@ -66,6 +66,11 @@ const T = {
     dashNewTenantsEmpty: "No upcoming tenants scheduled.", dashVacating: "Vacating", dashMoveIn: "Move-in",
     dashTenantCount: (n) => `${n} tenant${n === 1 ? "" : "s"}`, dashUnitCount: (n) => `${n} unit${n === 1 ? "" : "s"}`, dashUpcomingCount: (n) => `${n} upcoming`,
     dashUnitsToRentOut: "Units to Rent Out", dashUnitsToRentOutEmpty: "All units are covered for the next 6 months.", dashAvailable: "Available",
+    dashTransitions: "Unit Transitions — Next 6 Months", dashTransitionsEmpty: "No unit transitions in the next 6 months.",
+    dashMovingOut: "Moving out", dashMovingIn: "Moving in",
+    dashGap: (mo, d) => mo > 0 && d > 0 ? `Gap ${mo}mo ${d}d` : mo > 0 ? `Gap ${mo}mo` : `Gap ${d}d`,
+    dashGapUnresolved: "Unresolved",
+    dashVacantNow: "Vacant now", dashNoOutgoing: "No outgoing tenant", dashNoIncoming: "New tenants needed", dashAvailableNow: "Available now",
     paySubtitleTracker: "Monthly rent tracker by unit", payZelleName: "Zelle Name", payMoveOutDate: "Move-out Date",
     payUnitLabel: (n) => `Unit ${n}`, payUnassigned: "Unassigned",
     saveChanges: "Save Changes", saving: "Saving...", discard: "Discard",
@@ -149,6 +154,11 @@ const T = {
     dashNewTenantsEmpty: "暂无待入住租客。", dashVacating: "退租日期", dashMoveIn: "入住日",
     dashTenantCount: (n) => `${n} 位租客`, dashUnitCount: (n) => `${n} 套单元`, dashUpcomingCount: (n) => `${n} 位待入住`,
     dashUnitsToRentOut: "待出租单元", dashUnitsToRentOutEmpty: "未来6个月内所有单元均已有租客安排。", dashAvailable: "可用日期",
+    dashTransitions: "单元交接 — 未来 6 个月", dashTransitionsEmpty: "未来 6 个月内无单元交接。",
+    dashMovingOut: "搬出", dashMovingIn: "搬入",
+    dashGap: (mo, d) => mo > 0 && d > 0 ? `空档 ${mo} 个月 ${d} 天` : mo > 0 ? `空档 ${mo} 个月` : `空档 ${d} 天`,
+    dashGapUnresolved: "未确定",
+    dashVacantNow: "目前空置", dashNoOutgoing: "无搬出租客", dashNoIncoming: "需招新租客", dashAvailableNow: "目前可用",
     paySubtitleTracker: "按单元的月租追踪", payZelleName: "Zelle姓名", payMoveOutDate: "退租日期",
     payUnitLabel: (n) => `单元 ${n}`, payUnassigned: "未分配单元",
     saveChanges: "保存更改", saving: "保存中…", discard: "撤销更改",
@@ -208,7 +218,13 @@ export const Icon = ({ name, size = 18 }) => {
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 const fmt = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+const fmtDate = (d) => {
+  if (!d) return "—";
+  // Date-only strings ("YYYY-MM-DD") parse as UTC midnight by default, which renders as the previous day
+  // in negative-offset timezones. Append T00:00:00 so the value is interpreted as local midnight.
+  const iso = typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T00:00:00` : d;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
 const tenantFullName = (ten) => [ten.name, ten.lastName].filter(Boolean).join(" ");
 
 const statusColors = {
@@ -537,7 +553,6 @@ const StatCard = ({ label, value, sub, icon, color = "#4f46e5" }) => (
 const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelectedTenantId }) => {
   const { properties, tenants, payments, maintenance, contracts, units = [] } = data;
   const occupied = properties.filter(p => p.status === "occupied").length;
-  const futureTenants = tenants.filter(t => t.status === "future tenant");
   const pendingPayments = payments.filter(p => p.status === "pending" || p.status === "overdue");
   const openMaint = maintenance.filter(m => m.status !== "resolved");
 
@@ -559,34 +574,73 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
   );
   const sixMo = new Date(now.getFullYear(), now.getMonth() + 6, now.getDate());
   const sixMoStr = sixMo.toISOString().split("T")[0];
-  const currentVacancies = units.filter(u => u.status === "vacant").map(u => {
-    const prop = properties.find(p => p.id === u.propertyId);
-    return { key: `v-${u.id}`, unitLabel: u.unitNumber || "—", propertyAddress: prop?.address || "", propertyId: u.propertyId, tenantId: null, status: "vacant", dateLabel: "Vacant now", tenantName: null };
-  });
-  const upcomingVacancies = tenants
-    .filter(ten => ten.moveOutDate && ten.moveOutDate >= todayStr && ten.moveOutDate <= sixMoStr)
-    .map(ten => {
-      const unit = units.find(u => u.id === ten.unitId);
-      const prop = properties.find(p => p.id === ten.propertyId);
-      return { key: `m-${ten.id}`, unitLabel: unit?.unitNumber || ten.unit || "—", propertyAddress: prop?.address || "", propertyId: ten.propertyId, tenantId: ten.id, status: "pending", dateLabel: `${t.dashVacating} ${fmtDate(ten.moveOutDate)}`, tenantName: tenantFullName(ten) };
-    });
-  const vacancies = [...currentVacancies, ...upcomingVacancies];
 
-  const unitsToRentOut = units.reduce((acc, unit) => {
-    const currentInUnit = tenants.filter(ten => ten.unitId === unit.id && ten.status === "current tenant");
-    if (currentInUnit.length === 0) return acc;
-    const allMovingOutSoon = currentInUnit.every(ten =>
-      ten.moveOutDate && ten.moveOutDate >= todayStr && ten.moveOutDate <= sixMoStr
-    );
-    if (!allMovingOutSoon) return acc;
-    const futureInUnit = tenants.filter(ten => ten.unitId === unit.id && ten.status === "future tenant");
-    const hasFutureCoverage = futureInUnit.some(ten => ten.moveInDate && ten.moveInDate <= sixMoStr);
-    if (hasFutureCoverage) return acc;
-    const prop = properties.find(p => p.id === unit.propertyId);
-    const latestMoveOut = currentInUnit.map(ten => ten.moveOutDate).sort().pop();
-    acc.push({ unit, propertyAddress: prop?.address || "—", propertyId: unit.propertyId, latestMoveOut });
-    return acc;
-  }, []);
+  // Per-unit transition rows: outgoing (current tenant moving out in next 6mo) + incoming (future tenant)
+  const transitionRows = (() => {
+    const map = new Map();
+    const keyFor = (propertyId, unitId, unitLabel) =>
+      `${propertyId || "_"}::${unitId || unitLabel || "_"}`;
+    const ensureRow = (k, propertyId, propertyAddress, unitId, unitLabel) => {
+      if (!map.has(k)) map.set(k, {
+        key: k, propertyId, propertyAddress, unitId, unitLabel,
+        outgoing: [], incoming: [], vacantNow: false,
+      });
+      return map.get(k);
+    };
+
+    tenants
+      .filter(ten => ten.status === "current tenant" && ten.moveOutDate
+                     && ten.moveOutDate >= todayStr && ten.moveOutDate <= sixMoStr)
+      .forEach(ten => {
+        const unit = units.find(u => u.id === ten.unitId);
+        const prop = properties.find(p => p.id === ten.propertyId);
+        const k = keyFor(ten.propertyId, ten.unitId, ten.unit);
+        ensureRow(k, ten.propertyId, prop?.address || "", ten.unitId, unit?.unitNumber || ten.unit || "—").outgoing.push(ten);
+      });
+
+    tenants
+      .filter(ten => ten.status === "future tenant")
+      .forEach(ten => {
+        const unit = units.find(u => u.id === ten.unitId);
+        const prop = properties.find(p => p.id === ten.propertyId);
+        const k = keyFor(ten.propertyId, ten.unitId, ten.unit);
+        ensureRow(k, ten.propertyId, prop?.address || "", ten.unitId, unit?.unitNumber || ten.unit || "—").incoming.push(ten);
+      });
+
+    units.filter(u => u.status === "vacant").forEach(u => {
+      const prop = properties.find(p => p.id === u.propertyId);
+      const k = keyFor(u.propertyId, u.id, u.unitNumber);
+      ensureRow(k, u.propertyId, prop?.address || "", u.id, u.unitNumber || "—").vacantNow = true;
+    });
+
+    return Array.from(map.values()).map(row => {
+      // Sort each side by date
+      row.outgoing.sort((a, b) => (a.moveOutDate || "").localeCompare(b.moveOutDate || ""));
+      row.incoming.sort((a, b) => (a.moveInDate || "").localeCompare(b.moveInDate || ""));
+      // Gap = calendar months + days between latest move-out and earliest move-in
+      let gapMonths = 0, gapDays = 0;
+      const latestOut = row.outgoing.length ? row.outgoing[row.outgoing.length - 1].moveOutDate : null;
+      const earliestIn = row.incoming.length && row.incoming[0].moveInDate ? row.incoming[0].moveInDate : null;
+      if (latestOut && earliestIn) {
+        const out = new Date(`${latestOut}T00:00:00`);
+        const incoming = new Date(`${earliestIn}T00:00:00`);
+        if (incoming > out) {
+          gapMonths = (incoming.getFullYear() - out.getFullYear()) * 12 + (incoming.getMonth() - out.getMonth());
+          gapDays = incoming.getDate() - out.getDate();
+          if (gapDays < 0) {
+            gapMonths -= 1;
+            // days in the calendar month preceding `incoming`
+            gapDays += new Date(incoming.getFullYear(), incoming.getMonth(), 0).getDate();
+          }
+        }
+      }
+      return { ...row, gapMonths, gapDays };
+    }).sort((a, b) => {
+      if (a.propertyAddress !== b.propertyAddress)
+        return a.propertyAddress.localeCompare(b.propertyAddress);
+      return String(a.unitLabel).localeCompare(String(b.unitLabel), undefined, { numeric: true });
+    });
+  })();
 
   return (
     <div>
@@ -597,74 +651,115 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
         <StatCard label={t.statPending} value={pendingPayments.length} sub={t.statRequireAttention} icon="clock" color="#ef4444" />
         <StatCard label={t.statOpenMaint} value={openMaint.length} sub={t.statRequests} icon="wrench" color="#818cf8" />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashVacancies}</h3>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(vacancies.length)}</span>
-          </div>
-          {vacancies.length === 0 ? (
-            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashVacanciesEmpty}</div>
-          ) : vacancies.map(v => (
-            <div key={v.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
-              <div>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashTransitions}</h3>
+          <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(transitionRows.length)}</span>
+        </div>
+        {transitionRows.length === 0 ? (
+          <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashTransitionsEmpty}</div>
+        ) : transitionRows.map(row => {
+          const showGapBadge = row.gapMonths > 0 || row.gapDays > 0;
+          const showUnresolvedBadge = !showGapBadge && (row.outgoing.length > 0 || row.vacantNow) && row.incoming.length === 0;
+          return (
+            <div key={row.key} style={{ padding: "14px 0", borderBottom: "1px solid #f8fafc" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                 <div
-                  style={{ fontSize: 14, fontWeight: 600, color: v.propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: v.propertyId && setPage ? "pointer" : "default" }}
-                  onClick={() => { if (v.propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(v.propertyId); setPage("property-detail"); } }}
-                  onMouseEnter={e => { if (v.propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
+                  style={{ fontSize: 14, fontWeight: 600, color: row.propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: row.propertyId && setPage ? "pointer" : "default" }}
+                  onClick={() => { if (row.propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(row.propertyId); setPage("property-detail"); } }}
+                  onMouseEnter={e => { if (row.propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
                   onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                 >
-                  Unit {v.unitLabel} · {v.propertyAddress}
+                  Unit {row.unitLabel} · {row.propertyAddress}
                 </div>
-                <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                  {v.tenantName ? (
-                    <>
-                      <span
-                        style={{ cursor: v.tenantId && setPage ? "pointer" : "default", color: v.tenantId && setPage ? "#4f46e5" : "#94a3b8" }}
-                        onClick={() => { if (v.tenantId && setPage && setSelectedTenantId) { setSelectedTenantId(v.tenantId); setPage("tenant-detail"); } }}
-                        onMouseEnter={e => { if (v.tenantId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
-                        onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-                      >{v.tenantName}</span>
-                      {` · ${v.dateLabel}`}
-                    </>
-                  ) : v.dateLabel}
+                {showGapBadge && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "3px 8px", borderRadius: 6, letterSpacing: ".3px" }}>
+                    {t.dashGap(row.gapMonths, row.gapDays)}
+                  </span>
+                )}
+                {showUnresolvedBadge && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#991b1b", background: "#fee2e2", padding: "3px 8px", borderRadius: 6, letterSpacing: ".3px" }}>
+                    {t.dashGapUnresolved}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{t.dashMovingOut}</div>
+                  {row.outgoing.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {row.outgoing.map(ten => (
+                        <div key={ten.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#fb923c,#ea580c)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
+                          <div>
+                            <div
+                              style={{ fontSize: 13, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", cursor: setPage ? "pointer" : "default" }}
+                              onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
+                              onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
+                              onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                            >{tenantFullName(ten)}</div>
+                            <div style={{ fontSize: 12, color: "#94a3b8" }}>{fmtDate(ten.moveOutDate)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#94a3b8", fontStyle: "italic" }}>
+                      {row.vacantNow ? t.dashVacantNow : t.dashNoOutgoing}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{t.dashMovingIn}</div>
+                  {row.incoming.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {row.incoming.map(ten => (
+                        <div key={ten.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#22c55e,#16a34a)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
+                          <div>
+                            <div
+                              style={{ fontSize: 13, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", cursor: setPage ? "pointer" : "default" }}
+                              onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
+                              onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
+                              onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                            >{tenantFullName(ten)}</div>
+                            <div style={{ fontSize: 12, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (() => {
+                    const latestOut = row.outgoing.length ? row.outgoing[row.outgoing.length - 1].moveOutDate : null;
+                    let availableLabel = null;
+                    if (latestOut) {
+                      const next = new Date(`${latestOut}T00:00:00`);
+                      next.setDate(next.getDate() + 1);
+                      const iso = next.toISOString().slice(0, 10);
+                      availableLabel = `Unit ${row.unitLabel} ${t.dashAvailable} ${fmtDate(iso)}`;
+                    } else if (row.vacantNow) {
+                      availableLabel = `Unit ${row.unitLabel} ${t.dashAvailableNow}`;
+                    }
+                    return (
+                      <div>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#b91c1c", background: "#fee2e2", border: "1px solid #fecaca", padding: "6px 10px", borderRadius: 8, letterSpacing: ".2px" }}>
+                          <span style={{ fontSize: 14, lineHeight: 1 }}>⚠</span>
+                          {t.dashNoIncoming}
+                        </div>
+                        {availableLabel && (
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#b91c1c", marginTop: 8 }}>
+                            {availableLabel}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
-              <Badge status={v.status} t={t} />
             </div>
-          ))}
-        </div>
-        <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashNewTenants}</h3>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUpcomingCount(futureTenants.length)}</span>
-          </div>
-          {futureTenants.length === 0 ? (
-            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashNewTenantsEmpty}</div>
-          ) : futureTenants.map(ten => {
-            const prop = properties.find(p => p.id === ten.propertyId);
-            return (
-              <div key={ten.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#22c55e,#16a34a)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
-                  <div>
-                    <div
-                      style={{ fontSize: 14, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", cursor: setPage ? "pointer" : "default" }}
-                      onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
-                      onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
-                      onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-                    >{tenantFullName(ten)}</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit || data.units?.find(u => u.id === ten.unitId)?.unitNumber || "—"} · {prop?.address || "—"}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{t.dashMoveIn}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashUnpaidRent} — {currentMonthLabel}</h3>
@@ -710,29 +805,6 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
             </tbody>
           </table>
         </div>
-      </div>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", marginTop: 20 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashUnitsToRentOut}</h3>
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(unitsToRentOut.length)}</span>
-        </div>
-        {unitsToRentOut.length === 0 ? (
-          <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashUnitsToRentOutEmpty}</div>
-        ) : unitsToRentOut.map(({ unit, propertyAddress, propertyId, latestMoveOut }) => (
-          <div key={unit.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
-            <div
-              style={{ fontSize: 14, fontWeight: 600, color: propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: propertyId && setPage ? "pointer" : "default" }}
-              onClick={() => { if (propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(propertyId); setPage("property-detail"); } }}
-              onMouseEnter={e => { if (propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
-              onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-            >
-              Unit {unit.unitNumber || "—"} · {propertyAddress}
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#ef4444" }}>{t.dashAvailable} {latestMoveOut ? fmtDate(latestMoveOut) : "—"}</div>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -1000,23 +1072,23 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const currentTenants = data.tenants.filter(t => t.status?.toLowerCase() === "current tenant");
   const futureTenants  = data.tenants.filter(t => t.status?.toLowerCase() === "future tenant");
 
-  const buildGroups = (tenantList) => {
+  // Combined groups: each unit has both current + future tenants stacked together
+  const tenantGroups = groupBy === "none" ? null : (() => {
     const map = {};
-    tenantList.forEach(ten => {
+    const ensureGroup = (ten) => {
       const prop = data.properties.find(p => p.id === ten.propertyId);
       const key = `${ten.propertyId}::${ten.unit || "—"}`;
-      if (!map[key]) map[key] = { prop, unit: ten.unit || "—", tenants: [] };
-      map[key].tenants.push(ten);
-    });
+      if (!map[key]) map[key] = { prop, unit: ten.unit || "—", current: [], future: [] };
+      return map[key];
+    };
+    currentTenants.forEach(ten => ensureGroup(ten).current.push(ten));
+    futureTenants.forEach(ten => ensureGroup(ten).future.push(ten));
     return Object.values(map).sort((a, b) => {
       const pa = a.prop?.address || ""; const pb = b.prop?.address || "";
       if (pa !== pb) return pa.localeCompare(pb);
       return String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
     });
-  };
-
-  const tenantGroups = groupBy === "none" ? null : buildGroups(currentTenants);
-  const futureGroups  = groupBy === "none" ? null : buildGroups(futureTenants);
+  })();
 
   const renderTenantRow = (ten) => {
     const prop = data.properties.find(p => p.id === ten.propertyId);
@@ -1092,8 +1164,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
               </>
             ) : (
               <>
-                {tenantGroups.map(({ prop, unit, tenants }) => {
-                  const totalRent = tenants.reduce((s, t) => s + (t.monthlyRent || 0), 0);
+                {tenantGroups.map(({ prop, unit, current, future }) => {
+                  const totalRent = current.reduce((s, t) => s + (t.monthlyRent || 0), 0);
                   return (
                     <Fragment key={`${prop?.id}::${unit}`}>
                       <tr>
@@ -1102,30 +1174,25 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                             <span style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.2px" }}>{prop?.address || "No property"}</span>
                             <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>·</span>
                             <span style={{ fontSize: 14, color: "#94a3b8", fontWeight: 600 }}>Unit {unit}</span>
-                            <span style={{ marginLeft: "auto", fontSize: 12, color: "#475569" }}>{tenants.length} tenant{tenants.length !== 1 ? "s" : ""}</span>
+                            <span style={{ marginLeft: "auto", fontSize: 12, color: "#475569" }}>{current.length} tenant{current.length !== 1 ? "s" : ""}</span>
                             {totalRent > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>{fmt(totalRent)}/mo</span>}
                           </div>
                         </td>
                       </tr>
-                      {tenants.map(ten => renderTenantRow(ten))}
+                      {current.map(ten => renderTenantRow(ten))}
+                      {future.length > 0 && (
+                        <>
+                          <tr>
+                            <td colSpan={6} style={{ padding: "8px 20px", background: "#f8fafc", borderTop: "1px solid #e2e8f0", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".6px" }}>
+                              {t.statusFutureTenant}
+                            </td>
+                          </tr>
+                          {future.map(ten => renderTenantRow(ten))}
+                        </>
+                      )}
                     </Fragment>
                   );
                 })}
-                {futureGroups.length > 0 && futureGroups.map(({ prop, unit, tenants }) => (
-                  <Fragment key={`future-${prop?.id}::${unit}`}>
-                    <tr>
-                      <td colSpan={6} style={{ padding: "12px 20px", background: "#334155", borderTop: "2px solid #475569" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <span style={{ fontSize: 15, fontWeight: 800, color: "#cbd5e1", letterSpacing: "-0.2px" }}>{prop?.address || "No property"}</span>
-                          <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>·</span>
-                          <span style={{ fontSize: 14, color: "#94a3b8", fontWeight: 600 }}>Unit {unit}</span>
-                          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".4px" }}>{t.statusFutureTenant}</span>
-                        </div>
-                      </td>
-                    </tr>
-                    {tenants.map(ten => renderTenantRow(ten))}
-                  </Fragment>
-                ))}
               </>
             )}
           </tbody>

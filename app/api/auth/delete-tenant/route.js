@@ -1,10 +1,14 @@
-import { createClient } from '../../../../lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request) {
   const { tenantId } = await request.json()
   if (!tenantId) return Response.json({ error: 'tenantId is required.' }, { status: 400 })
 
-  const supabase = await createClient()
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 
   // Capture unit/property before deleting so we can recompute occupancy
   const { data: tenant } = await supabase

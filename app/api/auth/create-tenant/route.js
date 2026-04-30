@@ -1,10 +1,14 @@
-import { createClient } from '../../../../lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request) {
-  const supabaseAdmin = await createClient()
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
   const { name, lastName, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, status, moveInDate, moveOutDate } = await request.json()
 
   // Use provided email or generate a placeholder so auth user can be created without one
@@ -43,7 +47,7 @@ export async function POST(request) {
       landlord_id: landlordId,
       name,
       last_name: lastName || null,
-      email: email?.trim() || null,
+      email: email?.trim() || authEmail,
       phone,
       property_id: propertyId,
       unit,
