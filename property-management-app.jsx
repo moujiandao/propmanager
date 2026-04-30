@@ -665,7 +665,7 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
             <div key={row.key} style={{ padding: "14px 0", borderBottom: "1px solid #f8fafc" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                 <div
-                  style={{ fontSize: 14, fontWeight: 600, color: row.propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: row.propertyId && setPage ? "pointer" : "default" }}
+                  style={{ fontSize: 16, fontWeight: 700, color: row.propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: row.propertyId && setPage ? "pointer" : "default" }}
                   onClick={() => { if (row.propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(row.propertyId); setPage("property-detail"); } }}
                   onMouseEnter={e => { if (row.propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
                   onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
@@ -673,57 +673,57 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
                   Unit {row.unitLabel} · {row.propertyAddress}
                 </div>
                 {showGapBadge && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "3px 8px", borderRadius: 6, letterSpacing: ".3px" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "4px 10px", borderRadius: 6, letterSpacing: ".3px" }}>
                     {t.dashGap(row.gapMonths, row.gapDays)}
                   </span>
                 )}
                 {showUnresolvedBadge && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#991b1b", background: "#fee2e2", padding: "3px 8px", borderRadius: 6, letterSpacing: ".3px" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#991b1b", background: "#fee2e2", padding: "4px 10px", borderRadius: 6, letterSpacing: ".3px" }}>
                     {t.dashGapUnresolved}
                   </span>
                 )}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{t.dashMovingOut}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>{t.dashMovingOut}</div>
                   {row.outgoing.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {row.outgoing.map(ten => (
-                        <div key={ten.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#fb923c,#ea580c)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
+                        <div key={ten.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#fb923c,#ea580c)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
                           <div>
                             <div
-                              style={{ fontSize: 13, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", cursor: setPage ? "pointer" : "default" }}
+                              style={{ fontSize: 15, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", cursor: setPage ? "pointer" : "default" }}
                               onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
                               onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                             >{tenantFullName(ten)}</div>
-                            <div style={{ fontSize: 12, color: "#94a3b8" }}>{fmtDate(ten.moveOutDate)}</div>
+                            <div style={{ fontSize: 13, color: "#94a3b8" }}>{fmtDate(ten.moveOutDate)}</div>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 13, color: "#94a3b8", fontStyle: "italic" }}>
+                    <div style={{ fontSize: 14, color: "#94a3b8", fontStyle: "italic" }}>
                       {row.vacantNow ? t.dashVacantNow : t.dashNoOutgoing}
                     </div>
                   )}
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{t.dashMovingIn}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>{t.dashMovingIn}</div>
                   {row.incoming.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {row.incoming.map(ten => (
-                        <div key={ten.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#22c55e,#16a34a)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
+                        <div key={ten.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#22c55e,#16a34a)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
                           <div>
                             <div
-                              style={{ fontSize: 13, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", cursor: setPage ? "pointer" : "default" }}
+                              style={{ fontSize: 15, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", cursor: setPage ? "pointer" : "default" }}
                               onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
                               onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                             >{tenantFullName(ten)}</div>
-                            <div style={{ fontSize: 12, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
+                            <div style={{ fontSize: 13, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
                           </div>
                         </div>
                       ))}
@@ -741,12 +741,12 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
                     }
                     return (
                       <div>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#b91c1c", background: "#fee2e2", border: "1px solid #fecaca", padding: "6px 10px", borderRadius: 8, letterSpacing: ".2px" }}>
-                          <span style={{ fontSize: 14, lineHeight: 1 }}>⚠</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 700, color: "#b91c1c", background: "#fee2e2", border: "1px solid #fecaca", padding: "7px 12px", borderRadius: 8, letterSpacing: ".2px" }}>
+                          <span style={{ fontSize: 15, lineHeight: 1 }}>⚠</span>
                           {t.dashNoIncoming}
                         </div>
                         {availableLabel && (
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#b91c1c", marginTop: 8 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#b91c1c", marginTop: 8 }}>
                             {availableLabel}
                           </div>
                         )}
