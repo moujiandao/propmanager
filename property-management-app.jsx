@@ -2318,9 +2318,34 @@ export default function App() {
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [selectedTenantId, setSelectedTenantId] = useState(null);
   const t = T[lang];
+  const prevPageRef = useRef(null);
 
   useEffect(() => { document.body.style.margin = "0"; document.body.style.background = "#f8fafc"; }, []);
   useEffect(() => { if (user) fetchAllData(); }, [user]);
+
+  // Sync browser history with internal page state
+  useEffect(() => {
+    const state = { page, propertyId: selectedPropertyId, tenantId: selectedTenantId };
+    if (prevPageRef.current === null) {
+      window.history.replaceState(state, "");
+    } else if (prevPageRef.current !== page) {
+      window.history.pushState(state, "");
+    }
+    prevPageRef.current = page;
+  }, [page, selectedPropertyId, selectedTenantId]);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.state?.page) {
+        setPage(e.state.page);
+        setSelectedPropertyId(e.state.propertyId ?? null);
+        setSelectedTenantId(e.state.tenantId ?? null);
+      }
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
 
   // Restore session on page load and react to auth state changes
   useEffect(() => {
