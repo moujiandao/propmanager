@@ -784,7 +784,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
       )}
 
       {/* 2-column grid of info cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
 
         {/* Contact */}
         <TenantCard title="Contact">

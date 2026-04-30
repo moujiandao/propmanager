@@ -732,7 +732,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     });
   })();
 
-  const TenantRow = ({ ten }) => {
+  const renderTenantRow = (ten) => {
     const prop = data.properties.find(p => p.id === ten.propertyId);
     return (
       <tr key={ten.id} style={{ borderTop: "1px solid #f8fafc" }}>
@@ -799,11 +799,11 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
           </thead>
           <tbody>
             {groupBy === "none"
-              ? data.tenants.map(ten => <TenantRow key={ten.id} ten={ten} />)
+              ? data.tenants.map(ten => renderTenantRow(ten))
               : tenantGroups.map(({ prop, unit, tenants }) => {
                   const totalRent = tenants.reduce((s, t) => s + (t.monthlyRent || 0), 0);
                   return (
-                    <React.Fragment key={`${prop?.id}::${unit}`}>
+                    <Fragment key={`${prop?.id}::${unit}`}>
                       <tr>
                         <td colSpan={8} style={{ padding: "10px 20px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -814,8 +814,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                           </div>
                         </td>
                       </tr>
-                      {tenants.map(ten => <TenantRow key={ten.id} ten={ten} />)}
-                    </React.Fragment>
+                      {tenants.map(ten => renderTenantRow(ten))}
+                    </Fragment>
                   );
                 })
             }
