@@ -78,7 +78,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
   const occupiedCount = units.filter(u => u.status === 'occupied').length
 
   return (
-    <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Crimson Pro', Georgia, serif" }}>
+    <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
         <button
@@ -93,7 +93,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
           Back
         </button>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Playfair Display', Georgia, serif", letterSpacing: "-0.5px" }}>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", letterSpacing: "-0.5px" }}>
             {property.address}
           </h1>
           <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
@@ -140,7 +140,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
                   <div style={{ width: 40, height: 40, background: isOccupied ? "rgba(217,119,6,.15)" : "rgba(148,163,184,.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
                     <Icon name="home" size={18} />
                   </div>
-                  <h3 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  <h3 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
                     Unit {unit.unitNumber}
                   </h3>
                   <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
@@ -632,7 +632,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
 
   if (!tenant) {
     return (
-      <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Crimson Pro', Georgia, serif" }}>
+      <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
         <button onClick={onBack} style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, padding: "8px 14px", color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 24 }}>
           ← Back
         </button>
@@ -727,7 +727,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
   const displayRent = linkedUnit?.monthlyRent || tenant.monthlyRent
 
   return (
-    <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Crimson Pro', Georgia, serif" }}>
+    <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
         <button
@@ -746,7 +746,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
             {tenant.name.charAt(0)}
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Playfair Display', Georgia, serif", letterSpacing: "-0.5px" }}>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", letterSpacing: "-0.5px" }}>
               {tenant.name}
             </h1>
             <p style={{ margin: "3px 0 0", color: "#64748b", fontSize: 13 }}>

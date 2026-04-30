@@ -182,7 +182,7 @@ export const Modal = ({ title, onClose, children, wide }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
     <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: wide ? 680 : 480, maxHeight: "90vh", overflow: "auto", boxShadow: "0 24px 60px rgba(0,0,0,.15)" }}>
       <div style={{ padding: "24px 28px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display', Georgia, serif" }}>{title}</h3>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{title}</h3>
         <button onClick={onClose} style={{ background: "#f8fafc", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}><Icon name="x" size={16} /></button>
       </div>
       <div style={{ padding: 28 }}>{children}</div>
@@ -291,15 +291,15 @@ const LoginPage = ({ onLogin }) => {
   const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 6, letterSpacing: ".5px", textTransform: "uppercase" };
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Crimson Pro',Georgia,serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Crimson+Pro:wght@300;400;600&display=swap');`}</style>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); * { box-sizing: border-box; } body { margin: 0; -webkit-font-smoothing: antialiased; }`}</style>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
         {[...Array(8)].map((_, i) => <div key={i} style={{ position: "absolute", width: 2, height: 2, background: `rgba(217,119,6,${0.15+i*0.05})`, borderRadius: "50%", top: `${10+i*12}%`, left: `${5+i*13}%`, boxShadow: `0 0 ${20+i*10}px ${8+i*4}px rgba(217,119,6,${0.05+i*0.02})` }} />)}
       </div>
       <div style={{ width: "100%", maxWidth: 420, padding: 24 }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,#d97706,#92400e)", borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Icon name="home" size={28} /></div>
-          <h1 style={{ color: "#f8fafc", fontSize: 22, fontWeight: 700, margin: "0 0 6px", fontFamily: "'Playfair Display',Georgia,serif" }}>2703 Ridge Rd Berkeley CA</h1>
+          <h1 style={{ color: "#f8fafc", fontSize: 22, fontWeight: 700, margin: "0 0 6px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>2703 Ridge Rd Berkeley CA</h1>
           <p style={{ color: "#94a3b8", margin: 0, fontSize: 15, fontWeight: 300 }}>Property management, simplified.</p>
         </div>
         <div style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 32 }}>
@@ -326,7 +326,7 @@ const LoginPage = ({ onLogin }) => {
               ))}
               {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
               <button onClick={handleLogin} disabled={loading}
-                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Playfair Display',Georgia,serif" }}>
+                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
                 {loading ? "Signing in…" : "Sign In"}
               </button>
               {tab === "landlord" && (
@@ -354,7 +354,7 @@ const LoginPage = ({ onLogin }) => {
               ))}
               {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
               <button onClick={handleSignup} disabled={loading}
-                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Playfair Display',Georgia,serif" }}>
+                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
                 {loading ? "Creating account…" : "Create Account"}
               </button>
               <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 13, color: "#64748b" }}>
@@ -391,12 +391,12 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
   const nav = user.role === "landlord" ? landlordNav : tenantNav;
 
   return (
-    <div style={{ width: 240, background: "#0f172a", minHeight: "100vh", display: "flex", flexDirection: "column", position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 100, fontFamily: "'Crimson Pro',Georgia,serif" }}>
+    <div style={{ width: 240, background: "#0f172a", minHeight: "100vh", display: "flex", flexDirection: "column", position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 100, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
       <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 38, height: 38, background: "linear-gradient(135deg,#d97706,#92400e)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#fff" }}><Icon name="building" size={20} /></div>
           <div>
-            <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',Georgia,serif" }}>{t.appName}</div>
+            <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 16, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.appName}</div>
             <div style={{ color: "#475569", fontSize: 11, textTransform: "uppercase", letterSpacing: ".7px" }}>{user.role === "landlord" ? t.landlord : t.tenant}</div>
           </div>
         </div>
@@ -436,7 +436,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
 export const PageHeader = ({ title, subtitle, action }) => (
   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
     <div>
-      <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif", letterSpacing: "-0.5px" }}>{title}</h1>
+      <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", letterSpacing: "-0.5px" }}>{title}</h1>
       {subtitle && <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 14 }}>{subtitle}</p>}
     </div>
     {action}
@@ -448,7 +448,7 @@ const StatCard = ({ label, value, sub, icon, color = "#d97706" }) => (
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
       <div>
         <p style={{ margin: "0 0 6px", color: "#64748b", fontSize: 13, fontWeight: 500 }}>{label}</p>
-        <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{value}</p>
+        <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{value}</p>
         {sub && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#94a3b8" }}>{sub}</p>}
       </div>
       <div style={{ width: 42, height: 42, borderRadius: 11, background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", color }}><Icon name={icon} size={20} /></div>
@@ -501,7 +501,7 @@ const LandlordDashboard = ({ data, t }) => {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>Unpaid Rent — {currentMonthLabel}</h3>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Unpaid Rent — {currentMonthLabel}</h3>
             <span style={{ fontSize: 12, color: "#94a3b8" }}>{unpaidTenants.length} tenant{unpaidTenants.length === 1 ? "" : "s"}</span>
           </div>
           {unpaidTenants.length === 0 ? (
@@ -524,7 +524,7 @@ const LandlordDashboard = ({ data, t }) => {
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>Vacancies — Now & Next 6 Months</h3>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Vacancies — Now & Next 6 Months</h3>
             <span style={{ fontSize: 12, color: "#94a3b8" }}>{vacancies.length} unit{vacancies.length === 1 ? "" : "s"}</span>
           </div>
           {vacancies.length === 0 ? (
@@ -540,7 +540,7 @@ const LandlordDashboard = ({ data, t }) => {
           ))}
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", gridColumn: "1/-1" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{t.recentPayments}</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.recentPayments}</h3>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
@@ -601,7 +601,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
                 <div style={{ width: 44, height: 44, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "#d97706" }}><Icon name="home" size={22} /></div>
                 <Badge status={p.status} t={t} />
               </div>
-              <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{p.address}</h3>
+              <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{p.address}</h3>
               <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>{p.city}, {p.state} {p.zip} · {p.type}</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
@@ -876,12 +876,12 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
             <div key={c.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: 16, alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colTenant}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{ten?.name||"—"}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{ten?.name||"—"}</div>
                 <div style={{ fontSize: 12, color: "#64748b" }}>{prop?.address} · {c.unit}</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.rent}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{fmt(c.rentAmount)}<span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 400 }}>/mo</span></div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{fmt(c.rentAmount)}<span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 400 }}>/mo</span></div>
                 <div style={{ fontSize: 12, color: "#64748b" }}>{t.dueOf} {c.dueDay}{t.ofMonth}</div>
               </div>
               <div>
@@ -891,7 +891,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colDaysRemaining}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{daysLeft > 0 ? `${daysLeft} ${t.daysRemaining}` : t.expired}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft > 0 ? `${daysLeft} ${t.daysRemaining}` : t.expired}</div>
               </div>
               <Badge status={c.status} t={t} />
             </div>
@@ -1300,7 +1300,7 @@ const TenantDashboard = ({ data, user }) => {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>Your Unit</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Your Unit</h3>
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
             <div style={{ width: 50, height: 50, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", color: "#d97706", flexShrink: 0 }}><Icon name="home" size={24} /></div>
             <div>
@@ -1321,7 +1321,7 @@ const TenantDashboard = ({ data, user }) => {
           )}
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>Recent Payments</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Recent Payments</h3>
           {payments.slice(0,4).map(p => (
             <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f8fafc" }}>
               <div>
@@ -1473,7 +1473,7 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
       {success && <div style={{ background:"#dcfce7",border:"1px solid #86efac",borderRadius:12,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:10,color:"#166534",fontSize:14,fontWeight:600 }}><Icon name="check" size={18} />Request submitted! Your landlord will be notified.</div>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #f1f5f9" }}>
-          <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>New Request</h3>
+          <h3 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>New Request</h3>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Description</label>
             <textarea value={form.description} onChange={e => setForm(f => ({...f,description:e.target.value}))} placeholder="Describe the issue in detail..." rows={5}
@@ -1483,7 +1483,7 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
           <Btn icon="plus" onClick={submit}>Submit Request</Btn>
         </div>
         <div>
-          <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>My Requests</h3>
+          <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>My Requests</h3>
           <div style={{ display: "grid", gap: 12 }}>
             {myReqs.map(m => {
               const pC = { high:"#ef4444",medium:"#f59e0b",low:"#3b82f6" };
@@ -1522,7 +1522,7 @@ const TenantLeasePage = ({ data, user }) => {
           <div style={{ display: "flex", gap: 14, marginBottom: 22 }}>
             <div style={{ width: 52, height: 52, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", color: "#d97706" }}><Icon name="file" size={24} /></div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>Lease Agreement</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Lease Agreement</div>
               <div style={{ fontSize: 13, color: "#64748b" }}>{property?.address} · {tenant?.unit}</div>
             </div>
           </div>
@@ -1536,7 +1536,7 @@ const TenantLeasePage = ({ data, user }) => {
         <div>
           <div style={{ background: daysLeft<60?"#fef2f2":"#f0fdf4", borderRadius: 14, padding: 24, border: `1px solid ${daysLeft<60?"#fca5a5":"#86efac"}`, marginBottom: 16 }}>
             <div style={{ fontSize: 13, color: daysLeft<60?"#991b1b":"#166534", fontWeight: 600, marginBottom: 6 }}>LEASE EXPIRY</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: daysLeft<60?"#ef4444":"#22c55e", fontFamily: "'Playfair Display',Georgia,serif" }}>{daysLeft} days</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: daysLeft<60?"#ef4444":"#22c55e", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft} days</div>
             <div style={{ fontSize: 14, color: daysLeft<60?"#991b1b":"#166534" }}>Expires {fmtDate(contract.endDate)}</div>
           </div>
           <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
@@ -1566,7 +1566,7 @@ const PaymentHistoryPage = ({ data, user }) => {
           <tbody>
             {payments.map(p => (
               <tr key={p.id} style={{ borderTop: "1px solid #f8fafc" }}>
-                <td style={{ padding:"14px 20px",fontSize:16,fontWeight:700,color:"#0f172a",fontFamily:"'Playfair Display',Georgia,serif" }}>{fmt(p.amount)}</td>
+                <td style={{ padding:"14px 20px",fontSize:16,fontWeight:700,color:"#0f172a",fontFamily:"'Inter',system-ui,-apple-system,sans-serif" }}>{fmt(p.amount)}</td>
                 <td style={{ padding:"14px 20px",fontSize:13,color:"#64748b" }}>{fmtDate(p.dueDate)}</td>
                 <td style={{ padding:"14px 20px",fontSize:13,color:"#64748b" }}>{fmtDate(p.paidDate)}</td>
                 <td style={{ padding:"14px 20px",fontSize:12,color:"#64748b",textTransform:"capitalize" }}>{p.type}</td>
@@ -1640,7 +1640,7 @@ const DocumentsPage = ({ data, refresh }) => {
         {/* Right panel */}
         <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", padding: 24 }}>
           <div style={{ marginBottom: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif" }}>{selected?.address}</h3>
+            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{selected?.address}</h3>
             <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>Paste a Google Drive folder or file share link below.</p>
             <div style={{ display: "flex", gap: 10 }}>
               <input value={link} onChange={e => { setLink(e.target.value); setMsg(""); }}
@@ -1670,7 +1670,7 @@ const DocumentsPage = ({ data, refresh }) => {
 // ─── TENANT PROFILE PAGE ──────────────────────────────────────────────────────
 const TenantProfilePage = ({ user, setUser }) => {
   const cardStyle = { background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f1f5f9", marginBottom: 20 };
-  const headStyle = { margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Playfair Display',Georgia,serif", paddingBottom: 14, borderBottom: "1px solid #f1f5f9" };
+  const headStyle = { margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", paddingBottom: 14, borderBottom: "1px solid #f1f5f9" };
   const msgStyle = (err) => ({ fontSize: 13, marginTop: 8, color: err ? "#ef4444" : "#22c55e" });
 
   // ── Name ──
@@ -1898,8 +1898,8 @@ export default function App() {
 
   if (loadingData && !data.properties.length && !data.tenants.length) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontFamily: "'Crimson Pro',Georgia,serif", color: "#64748b", fontSize: 16 }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Crimson+Pro:wght@300;400;500;600;700&display=swap');`}</style>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", color: "#64748b", fontSize: 16 }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); -webkit-font-smoothing: antialiased;`}</style>
         Loading your portfolio…
       </div>
     );
@@ -1945,8 +1945,8 @@ export default function App() {
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc", fontFamily: "'Crimson Pro',Georgia,serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Crimson+Pro:wght@300;400;500;600;700&display=swap'); * { box-sizing: border-box; } body { margin: 0; }`}</style>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); * { box-sizing: border-box; } body { margin: 0; -webkit-font-smoothing: antialiased; }`}</style>
       <Sidebar user={user} currentPage={page} onNavigate={setPage} onLogout={handleLogout} lang={lang} setLang={setLang} t={t} />
       <main style={{ marginLeft: 240, flex: 1, padding: "36px 40px", minHeight: "100vh" }}>
         {renderPage()}
