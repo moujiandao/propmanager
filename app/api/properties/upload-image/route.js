@@ -1,10 +1,16 @@
-import { createClient } from '../../../../lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ALLOWED_EXT = new Set(['jpg', 'jpeg', 'png', 'webp'])
 
 export async function POST(request) {
-  const supabase = await createClient()
+  // Initialize inside handler so env vars are definitely resolved
+  const adminClient = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
   const formData = await request.formData()
   const file = formData.get('file')
   const propertyId = formData.get('propertyId')
@@ -24,7 +30,7 @@ export async function POST(request) {
   }
 
   // Confirm the property belongs to this landlord
-  const { data: property } = await supabase
+  const { data: property } = await adminClient
     .from('properties')
     .select('id')
     .eq('id', propertyId)
@@ -38,26 +44,25 @@ export async function POST(request) {
   const path = `${propertyId}.${ext}`
   const bytes = await file.arrayBuffer()
 
-  // upsert: true overwrites same extension; switching extensions leaves the old file in storage
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await adminClient.storage
     .from('property-images')
     .upload(path, bytes, { contentType: file.type, upsert: true })
 
   if (uploadError) {
-    return Response.json({ error: uploadError.message }, { status: 400 })
+    return Response.json({ error: `Storage: ${uploadError.message}` }, { status: 400 })
   }
 
-  const { data: { publicUrl } } = supabase.storage
+  const { data: { publicUrl } } = adminClient.storage
     .from('property-images')
     .getPublicUrl(path)
 
-  const { error: dbError } = await supabase
+  const { error: dbError } = await adminClient
     .from('properties')
     .update({ image_url: publicUrl })
     .eq('id', propertyId)
 
   if (dbError) {
-    return Response.json({ error: dbError.message }, { status: 400 })
+    return Response.json({ error: `DB: ${dbError.message}` }, { status: 400 })
   }
 
   return Response.json({ url: publicUrl })
