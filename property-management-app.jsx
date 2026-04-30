@@ -1212,17 +1212,27 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
 // ─── CONTRACTS PAGE ───────────────────────────────────────────────────────────
 const ContractsPage = ({ data, setData, t, refresh, user }) => {
+  const EMPTY_FORM = { tenantIds: [], propertyId: "", unit: "", startDate: "", endDate: "", rentAmount: "", dueDay: "1" };
   const [show, setShow] = useState(false);
-  const [form, setForm] = useState({ tenantId: "", propertyId: "", unit: "", startDate: "", endDate: "", rentAmount: "", dueDay: "1" });
+  const [form, setForm] = useState(EMPTY_FORM);
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
   const add = async () => {
-    if (!form.tenantId || !form.rentAmount) return;
-    const { error } = await supabase.from("contracts").insert({
-      landlord_id: user.id, tenant_id: form.tenantId, property_id: form.propertyId, unit: form.unit,
+    if (!form.tenantIds.length || !form.rentAmount) return;
+    const { data: newContract, error } = await supabase.from("contracts").insert({
+      landlord_id: user.id, property_id: form.propertyId, unit: form.unit,
       start_date: form.startDate, end_date: form.endDate,
       rent_amount: +form.rentAmount, due_day: +form.dueDay, status: "active",
-    });
-    if (!error) { await refresh(); setShow(false); }
+    }).select().single();
+    if (error) return;
+    const ctResults = await Promise.all(
+      form.tenantIds.map(tid =>
+        supabase.from("contract_tenants").insert({ contract_id: newContract.id, tenant_id: tid })
+      )
+    );
+    if (ctResults.some(r => r.error)) return;
+    setForm(EMPTY_FORM);
+    await refresh();
+    setShow(false);
   };
 
   return (
@@ -1230,14 +1240,20 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
       <PageHeader title={t.conTitle} subtitle={t.conSubtitle(data.contracts.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addLease}</Btn>} />
       <div style={{ display: "grid", gap: 14 }}>
         {data.contracts.map(c => {
-          const ten = data.tenants.find(ten => ten.id === c.tenantId);
           const prop = data.properties.find(p => p.id === c.propertyId);
           const daysLeft = Math.ceil((new Date(c.endDate)-new Date())/86400000);
           return (
             <div key={c.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: 16, alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colTenant}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{ten ? tenantFullName(ten) : "—"}</div>
+                {(c.tenantIds || []).map(tid => {
+                  const ten = data.tenants.find(t => t.id === tid);
+                  return (
+                    <div key={tid} style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+                      {ten ? tenantFullName(ten) : "Unknown Tenant"}
+                    </div>
+                  );
+                })}
                 <div style={{ fontSize: 12, color: "#64748b" }}>{prop?.address} · {c.unit}</div>
               </div>
               <div>
@@ -1260,9 +1276,30 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
         })}
       </div>
       {show && (
-        <Modal title={t.addLeaseTitle} onClose={() => setShow(false)} wide>
+        <Modal title={t.addLeaseTitle} onClose={() => { setForm(EMPTY_FORM); setShow(false); }} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Sel label={t.colTenant} value={form.tenantId} onChange={v => setF("tenantId",v)} options={[{value:"",label:t.selectTenant},...data.tenants.map(ten => ({value:ten.id,label:tenantFullName(ten)}))]} />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ fontSize: 13, color: "#374151", fontWeight: 600, marginBottom: 6 }}>{t.colTenant}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto", padding: "4px 0" }}>
+                {data.tenants
+                  .filter(ten => ten.status !== "previous tenant")
+                  .map(ten => (
+                    <label key={ten.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "#0f172a" }}>
+                      <input
+                        type="checkbox"
+                        checked={form.tenantIds.includes(ten.id)}
+                        onChange={e => {
+                          const ids = e.target.checked
+                            ? [...form.tenantIds, ten.id]
+                            : form.tenantIds.filter(id => id !== ten.id);
+                          setF("tenantIds", ids);
+                        }}
+                      />
+                      {tenantFullName(ten)}
+                    </label>
+                  ))}
+              </div>
+            </div>
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
             <Inp label={t.monthlyRent} value={form.rentAmount} onChange={v => setF("rentAmount",v)} type="number" />
@@ -1271,7 +1308,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
             <Inp label={t.dueDayLabel} value={form.dueDay} onChange={v => setF("dueDay",v)} type="number" />
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-            <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
+            <Btn variant="secondary" onClick={() => { setForm(EMPTY_FORM); setShow(false); }}>{t.cancel}</Btn>
             <Btn onClick={add}>{t.createLease}</Btn>
           </div>
         </Modal>
@@ -2416,9 +2453,15 @@ export default function App() {
         // Tenant: fetch own profile + related data
         const { data: tenRow } = await supabase.from("tenant_profiles").select("*").eq("id", user.id).single();
         const tenant = tenRow ? mapTenant(tenRow) : null;
+        const { data: ctRows } = await supabase
+          .from("contract_tenants")
+          .select("contract_id")
+          .eq("tenant_id", user.id)
+          .order("created_at", { ascending: false });
+        const contractId = ctRows?.[0]?.contract_id;
         const [propRes, conRes, payRes, maintRes] = await Promise.all([
           tenant?.propertyId ? supabase.from("properties").select("*").eq("id", tenant.propertyId) : Promise.resolve({ data: [] }),
-          supabase.from("contracts").select("*").eq("tenant_id", user.id),
+          contractId ? supabase.from("contracts").select("*").eq("id", contractId) : Promise.resolve({ data: [] }),
           supabase.from("payments").select("*").eq("tenant_id", user.id).order("due_date", { ascending: false }),
           supabase.from("maintenance_requests").select("*").eq("tenant_id", user.id).order("created_at", { ascending: false }),
         ]);
