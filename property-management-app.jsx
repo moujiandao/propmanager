@@ -2025,7 +2025,7 @@ const AdminUsersPage = ({ t, user: currentUser, refresh }) => {
   const loadUsers = async () => {
     const res = await fetch("/api/auth/list-users");
     const json = await res.json();
-    if (json.users) setAllUsers(json.users.map(u => ({ ...u, displayName: u.name || u.email })).sort((a, b) => a.displayName.localeCompare(b.displayName)));
+    if (json.users) setAllUsers(json.users.filter(u => u.role !== "tenant").map(u => ({ ...u, displayName: u.name || u.email })).sort((a, b) => a.displayName.localeCompare(b.displayName)));
   };
 
   useEffect(() => { loadUsers(); }, []);
