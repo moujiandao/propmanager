@@ -2452,6 +2452,7 @@ const EMPTY_EMAIL_SETTINGS = {
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
   const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [] });
   const [loadingData, setLoadingData] = useState(false);
@@ -2491,11 +2492,12 @@ export default function App() {
   // Restore session on page load and react to auth state changes
   useEffect(() => {
     const resolveUser = async (authUser) => {
-      if (!authUser) { setUser(null); return; }
+      if (!authUser) { setUser(null); setAuthLoading(false); return; }
       const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", authUser.id).single();
-      if (landlord) { setUser({ id: landlord.id, authId: authUser.id, role: "landlord", email: authUser.email, name: landlord.name || authUser.email?.split("@")[0] }); return; }
+      if (landlord) { setUser({ id: landlord.id, authId: authUser.id, role: "landlord", email: authUser.email, name: landlord.name || authUser.email?.split("@")[0] }); setAuthLoading(false); return; }
       const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", authUser.id).single();
       if (tenant) { setUser({ id: tenant.id, authId: authUser.id, role: "tenant", email: authUser.email, name: tenant.name || authUser.email?.split("@")[0] }); }
+      setAuthLoading(false);
     };
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       resolveUser(session?.user ?? null);
@@ -2586,6 +2588,7 @@ export default function App() {
     setLoadingData(false);
   };
 
+  if (authLoading) return null;
   if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} />;
 
   if (loadingData && !data.properties.length && !data.tenants.length) {
