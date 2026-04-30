@@ -103,7 +103,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
         <div style={{ marginLeft: "auto" }}>
           <button
             onClick={openAdd}
-            style={{ background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}
+            style={{ background: "linear-gradient(135deg,#4f46e5,#4338ca)", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}
             onMouseEnter={e => e.currentTarget.style.opacity = ".85"}
             onMouseLeave={e => e.currentTarget.style.opacity = "1"}
           >
@@ -150,7 +150,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
 
                 {/* Stats row */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#d97706" }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#4f46e5" }}>
                     {unit.monthlyRent ? fmt(unit.monthlyRent) + "/mo" : "—"}
                   </span>
                   <Badge status={unit.status || "vacant"} />
@@ -166,7 +166,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
                       <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
                         <button
                           onClick={() => onNavigateToTenant && onNavigateToTenant(t.id)}
-                          style={{ background: "none", border: "none", color: "#d97706", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13, fontFamily: "inherit", textAlign: "left" }}
+                          style={{ background: "none", border: "none", color: "#4f46e5", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13, fontFamily: "inherit", textAlign: "left" }}
                           onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
                           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                         >
@@ -364,7 +364,7 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
   if (filterTenant) docs = docs.filter(d => d.tenantId === filterTenant)
   if (filterType) docs = docs.filter(d => d.documentType === filterType)
 
-  const docTypeBadgeColor = { application: '#0ea5e9', lease: '#d97706', other: '#64748b' }
+  const docTypeBadgeColor = { application: '#0ea5e9', lease: '#4f46e5', other: '#64748b' }
 
   return (
     <div style={{ padding: '24px 32px' }}>
@@ -420,7 +420,7 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
                 {/* Approval panel */}
                 {parsedResult?.docId === doc.id && (
                   <div style={{ marginTop: 10, background: '#0f172a', borderRadius: 8, padding: 16, fontSize: 13 }}>
-                    <div style={{ color: '#d97706', fontWeight: 700, marginBottom: 12, fontSize: 15 }}>Parsed Results - Review & Apply</div>
+                    <div style={{ color: '#4f46e5', fontWeight: 700, marginBottom: 12, fontSize: 15 }}>Parsed Results - Review & Apply</div>
 
                     {/* Section 1: People on the lease */}
                     <div style={{ marginBottom: 16 }}>
@@ -429,9 +429,9 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
                         const existingTenant = (data.tenants || []).find(t => t.name?.toLowerCase() === name.toLowerCase())
                         return (
                           <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, cursor: 'pointer' }}>
-                            <input type="checkbox" checked={approvedTenants[name] || false} onChange={() => setApprovedTenants(prev => ({ ...prev, [name]: !prev[name] }))} style={{ accentColor: '#d97706' }} />
+                            <input type="checkbox" checked={approvedTenants[name] || false} onChange={() => setApprovedTenants(prev => ({ ...prev, [name]: !prev[name] }))} style={{ accentColor: '#4f46e5' }} />
                             <span style={{ color: '#f1f5f9' }}>{name}</span>
-                            <span style={{ color: existingTenant ? '#22c55e' : '#f59e0b', fontSize: 11, fontWeight: 600 }}>
+                            <span style={{ color: existingTenant ? '#22c55e' : '#818cf8', fontSize: 11, fontWeight: 600 }}>
                               {existingTenant ? 'matches existing tenant' : 'will create new profile'}
                             </span>
                           </label>
@@ -448,7 +448,7 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
                         { key: 'rent_amount', label: 'Monthly Rent', fmt: v => `$${v}` },
                       ].map(({ key, label, fmt }) => (
                         <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, cursor: 'pointer', opacity: parsedResult.extracted[key] == null ? 0.4 : 1 }}>
-                          <input type="checkbox" checked={approvedFields[key] || false} onChange={() => setApprovedFields(prev => ({ ...prev, [key]: !prev[key] }))} disabled={parsedResult.extracted[key] == null} style={{ accentColor: '#d97706' }} />
+                          <input type="checkbox" checked={approvedFields[key] || false} onChange={() => setApprovedFields(prev => ({ ...prev, [key]: !prev[key] }))} disabled={parsedResult.extracted[key] == null} style={{ accentColor: '#4f46e5' }} />
                           <span style={{ color: '#94a3b8', width: 120, flexShrink: 0 }}>{label}</span>
                           <span style={{ color: '#f1f5f9' }}>{parsedResult.extracted[key] != null ? (fmt ? fmt(parsedResult.extracted[key]) : String(parsedResult.extracted[key])) : '—'}</span>
                         </label>
@@ -466,7 +466,7 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
                         { key: 'has_cosigner', label: 'Has Cosigner', fmt: v => v ? 'Yes' : 'No' },
                       ].map(({ key, label, fmt }) => (
                         <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, cursor: 'pointer', opacity: parsedResult.extracted[key] == null ? 0.4 : 1 }}>
-                          <input type="checkbox" checked={approvedFields[key] || false} onChange={() => setApprovedFields(prev => ({ ...prev, [key]: !prev[key] }))} disabled={parsedResult.extracted[key] == null} style={{ accentColor: '#d97706' }} />
+                          <input type="checkbox" checked={approvedFields[key] || false} onChange={() => setApprovedFields(prev => ({ ...prev, [key]: !prev[key] }))} disabled={parsedResult.extracted[key] == null} style={{ accentColor: '#4f46e5' }} />
                           <span style={{ color: '#94a3b8', width: 120, flexShrink: 0 }}>{label}</span>
                           <span style={{ color: '#f1f5f9' }}>{parsedResult.extracted[key] != null ? (fmt ? fmt(parsedResult.extracted[key]) : String(parsedResult.extracted[key])) : '—'}</span>
                         </label>
@@ -497,7 +497,7 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
                           handleProcessLease()
                         }}
                         disabled={leaseProcessing || !leasePropertyId}
-                        style={{ background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: leaseProcessing || !leasePropertyId ? 'not-allowed' : 'pointer', opacity: leaseProcessing || !leasePropertyId ? 0.7 : 1 }}>
+                        style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: leaseProcessing || !leasePropertyId ? 'not-allowed' : 'pointer', opacity: leaseProcessing || !leasePropertyId ? 0.7 : 1 }}>
                         {leaseProcessing ? 'Applying...' : 'Apply Selected'}
                       </button>
                       <button
@@ -561,7 +561,7 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
               <option value="other">Other</option>
             </select>
           </div>
-          <button onClick={handleUpload} disabled={uploading || !uploadFile} style={{ width: '100%', padding: 12, background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: uploading || !uploadFile ? 'not-allowed' : 'pointer', opacity: uploading || !uploadFile ? 0.7 : 1 }}>
+          <button onClick={handleUpload} disabled={uploading || !uploadFile} style={{ width: '100%', padding: 12, background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: uploading || !uploadFile ? 'not-allowed' : 'pointer', opacity: uploading || !uploadFile ? 0.7 : 1 }}>
             {uploading ? 'Uploading...' : 'Upload'}
           </button>
         </Modal>
@@ -723,7 +723,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
     if (signedData?.signedUrl) window.open(signedData.signedUrl, '_blank')
   }
 
-  const docTypeBadgeColor = { application: '#0ea5e9', lease: '#d97706', other: '#64748b' }
+  const docTypeBadgeColor = { application: '#0ea5e9', lease: '#4f46e5', other: '#64748b' }
   const displayRent = linkedUnit?.monthlyRent || tenant.monthlyRent
 
   return (
@@ -742,7 +742,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
           Back
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
+          <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
             {tenant.name.charAt(0)}
           </div>
           <div>
@@ -761,7 +761,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
               <button onClick={() => { setEditing(false); setSaveError(""); }} style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, padding: "9px 18px", color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
                 Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} style={{ background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+              <button onClick={handleSave} disabled={saving} style={{ background: "linear-gradient(135deg,#4f46e5,#4338ca)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
                 {saving ? "Saving…" : "Save Changes"}
               </button>
             </>
@@ -859,7 +859,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
               <InfoRow label="Property">
                 {property ? (
                   <button onClick={() => onNavigateToProperty && onNavigateToProperty(property.id)}
-                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#d97706", fontSize: 14, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}
+                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#4f46e5", fontSize: 14, fontWeight: 600, fontFamily: "inherit", textAlign: "left" }}
                     onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
                     onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                   >
@@ -875,7 +875,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
               <InfoRow label="Move-in Date" value={tenant.moveInDate} />
               <InfoRow label="Move-out Date" value={tenant.moveOutDate} />
               <InfoRow label="Monthly Rent">
-                <span style={{ fontSize: 15, fontWeight: 700, color: displayRent ? "#d97706" : "#475569" }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: displayRent ? "#4f46e5" : "#475569" }}>
                   {displayRent ? fmt2(displayRent) + "/mo" : "—"}
                 </span>
               </InfoRow>
@@ -972,7 +972,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
             {selectedDocId && !showImportPreview && (
               <button
                 onClick={() => setShowImportPreview(true)}
-                style={{ background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ background: "linear-gradient(135deg,#4f46e5,#4338ca)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
               >
                 Preview &amp; Apply
               </button>
@@ -980,7 +980,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
             {showImportPreview && selectedParsedDoc && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ background: "#0f172a", borderRadius: 10, padding: 14, marginBottom: 14, border: "1px solid #334155" }}>
-                  <div style={{ color: "#d97706", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Extracted Fields</div>
+                  <div style={{ color: "#4f46e5", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Extracted Fields</div>
                   <pre style={{ margin: 0, fontSize: 12, color: "#94a3b8", whiteSpace: "pre-wrap", wordBreak: "break-all", maxHeight: 200, overflow: "auto" }}>
                     {JSON.stringify(selectedParsedDoc.aiExtracted, null, 2)}
                   </pre>
@@ -989,7 +989,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
                   <button
                     onClick={() => handleApplyExtracted(selectedParsedDoc.aiExtracted)}
                     disabled={saving}
-                    style={{ background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}
+                    style={{ background: "linear-gradient(135deg,#4f46e5,#4338ca)", color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}
                   >
                     {saving ? "Applying…" : "Apply to Profile"}
                   </button>

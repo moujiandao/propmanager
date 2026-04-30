@@ -147,7 +147,7 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { month: "sho
 
 const statusColors = {
   completed: { bg: "#dcfce7", text: "#166534", dot: "#22c55e" },
-  pending:   { bg: "#fef9c3", text: "#854d0e", dot: "#eab308" },
+  pending:   { bg: "#e0e7ff", text: "#312e81", dot: "#6366f1" },
   overdue:   { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
   failed:    { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
   active:    { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
@@ -155,7 +155,7 @@ const statusColors = {
   "future tenant":   { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   "previous tenant": { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
   open:      { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
-  "in-progress": { bg: "#fef9c3", text: "#854d0e", dot: "#eab308" },
+  "in-progress": { bg: "#e0e7ff", text: "#312e81", dot: "#6366f1" },
   resolved:  { bg: "#dcfce7", text: "#166534", dot: "#22c55e" },
   occupied:  { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   vacant:    { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
@@ -173,7 +173,7 @@ export const Badge = ({ status, t }) => {
 };
 
 const Toggle = ({ value, onChange }) => (
-  <button onClick={() => onChange(!value)} style={{ width: 48, height: 26, borderRadius: 13, background: value ? "#d97706" : "#d1d5db", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", padding: 0, flexShrink: 0 }}>
+  <button onClick={() => onChange(!value)} style={{ width: 48, height: 26, borderRadius: 13, background: value ? "#4f46e5" : "#d1d5db", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", padding: 0, flexShrink: 0 }}>
     <span style={{ position: "absolute", top: 3, left: value ? 25 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
   </button>
 );
@@ -209,7 +209,7 @@ export const Sel = ({ label, value, onChange, options }) => (
 );
 
 export const Btn = ({ children, onClick, variant = "primary", size = "md", icon }) => {
-  const s = { primary: { background: "linear-gradient(135deg,#d97706,#b45309)", color: "#fff", border: "none" }, secondary: { background: "#f8fafc", color: "#374151", border: "1.5px solid #e2e8f0" }, ghost: { background: "transparent", color: "#64748b", border: "none" } };
+  const s = { primary: { background: "linear-gradient(135deg,#4f46e5,#4338ca)", color: "#fff", border: "none" }, secondary: { background: "#f8fafc", color: "#374151", border: "1.5px solid #e2e8f0" }, ghost: { background: "transparent", color: "#64748b", border: "none" } };
   const sz = { sm: { padding: "6px 14px", fontSize: 13 }, md: { padding: "10px 20px", fontSize: 14 } };
   return (
     <button onClick={onClick} style={{ ...s[variant], ...sz[size], borderRadius: 9, cursor: "pointer", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "inherit", transition: "opacity .15s" }}
@@ -298,7 +298,7 @@ const LoginPage = ({ onLogin }) => {
       </div>
       <div style={{ width: "100%", maxWidth: 420, padding: 24 }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,#d97706,#92400e)", borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Icon name="home" size={28} /></div>
+          <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,#4f46e5,#3730a3)", borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Icon name="home" size={28} /></div>
           <h1 style={{ color: "#f8fafc", fontSize: 22, fontWeight: 700, margin: "0 0 6px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>2703 Ridge Rd Berkeley CA</h1>
           <p style={{ color: "#94a3b8", margin: 0, fontSize: 15, fontWeight: 300 }}>Property management, simplified.</p>
         </div>
@@ -326,13 +326,13 @@ const LoginPage = ({ onLogin }) => {
               ))}
               {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
               <button onClick={handleLogin} disabled={loading}
-                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#4f46e5,#4338ca)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
                 {loading ? "Signing in…" : "Sign In"}
               </button>
               {tab === "landlord" && (
                 <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 13, color: "#64748b" }}>
                   Don&apos;t have an account?{" "}
-                  <button onClick={() => { reset(); setMode("signup"); }} style={{ background: "none", border: "none", color: "#d97706", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Create one</button>
+                  <button onClick={() => { reset(); setMode("signup"); }} style={{ background: "none", border: "none", color: "#4f46e5", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Create one</button>
                 </p>
               )}
               {tab === "tenant" && (
@@ -354,12 +354,12 @@ const LoginPage = ({ onLogin }) => {
               ))}
               {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
               <button onClick={handleSignup} disabled={loading}
-                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#4f46e5,#4338ca)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
                 {loading ? "Creating account…" : "Create Account"}
               </button>
               <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 13, color: "#64748b" }}>
                 Already have an account?{" "}
-                <button onClick={() => { reset(); setMode("login"); }} style={{ background: "none", border: "none", color: "#d97706", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Sign in</button>
+                <button onClick={() => { reset(); setMode("login"); }} style={{ background: "none", border: "none", color: "#4f46e5", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Sign in</button>
               </p>
             </>
           )}
@@ -394,7 +394,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
     <div style={{ width: 240, background: "#0f172a", minHeight: "100vh", display: "flex", flexDirection: "column", position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 100, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
       <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 38, height: 38, background: "linear-gradient(135deg,#d97706,#92400e)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#fff" }}><Icon name="building" size={20} /></div>
+          <div style={{ width: 38, height: 38, background: "linear-gradient(135deg,#4f46e5,#3730a3)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#fff" }}><Icon name="building" size={20} /></div>
           <div>
             <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 16, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.appName}</div>
             <div style={{ color: "#475569", fontSize: 11, textTransform: "uppercase", letterSpacing: ".7px" }}>{user.role === "landlord" ? t.landlord : t.tenant}</div>
@@ -411,9 +411,9 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
           return (
             <button key={item.id} onClick={() => onNavigate(item.id)}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", marginBottom: 3, textAlign: "left", fontFamily: "inherit", transition: "all .15s",
-                background: active ? "rgba(217,119,6,.15)" : "transparent", color: active ? "#fbbf24" : "#94a3b8", fontWeight: active ? 600 : 400, fontSize: 14 }}>
+                background: active ? "rgba(217,119,6,.15)" : "transparent", color: active ? "#a5b4fc" : "#94a3b8", fontWeight: active ? 600 : 400, fontSize: 14 }}>
               <Icon name={item.icon} size={17} />{item.label}
-              {active && <span style={{ marginLeft: "auto", width: 4, height: 4, background: "#d97706", borderRadius: "50%" }} />}
+              {active && <span style={{ marginLeft: "auto", width: 4, height: 4, background: "#4f46e5", borderRadius: "50%" }} />}
             </button>
           );
         })}
@@ -443,7 +443,7 @@ export const PageHeader = ({ title, subtitle, action }) => (
   </div>
 );
 
-const StatCard = ({ label, value, sub, icon, color = "#d97706" }) => (
+const StatCard = ({ label, value, sub, icon, color = "#4f46e5" }) => (
   <div style={{ background: "#fff", borderRadius: 14, padding: "20px 22px", border: "1px solid #f1f5f9", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
       <div>
@@ -496,7 +496,7 @@ const LandlordDashboard = ({ data, t }) => {
         <StatCard label={t.statProperties} value={properties.length} sub={`${occupied} ${t.statOccupied}`} icon="building" />
         <StatCard label={t.statRevenue} value={fmt(contracts.reduce((s,c) => s+c.rentAmount, 0))} sub={t.statActiveLeases} icon="trending" color="#22c55e" />
         <StatCard label={t.statPending} value={pendingPayments.length} sub={t.statRequireAttention} icon="clock" color="#ef4444" />
-        <StatCard label={t.statOpenMaint} value={openMaint.length} sub={t.statRequests} icon="wrench" color="#f59e0b" />
+        <StatCard label={t.statOpenMaint} value={openMaint.length} sub={t.statRequests} icon="wrench" color="#818cf8" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
@@ -511,7 +511,7 @@ const LandlordDashboard = ({ data, t }) => {
             return (
               <div key={ten.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{ten.name}</div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit} · {prop?.address}</div>
@@ -598,7 +598,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
               onMouseEnter={e => { if (setSelectedPropertyId) e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.10)"; }}
               onMouseLeave={e => { if (setSelectedPropertyId) e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.04)"; }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                <div style={{ width: 44, height: 44, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "#d97706" }}><Icon name="home" size={22} /></div>
+                <div style={{ width: 44, height: 44, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}><Icon name="home" size={22} /></div>
                 <Badge status={p.status} t={t} />
               </div>
               <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{p.address}</h3>
@@ -720,8 +720,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                 <tr key={ten.id} style={{ borderTop: "1px solid #f8fafc" }}>
                   <td style={{ padding: "14px 20px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ten.name.charAt(0)}</div>
-                      <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: setPage ? "#d97706" : "#0f172a", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{ten.name}</button>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ten.name.charAt(0)}</div>
+                      <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{ten.name}</button>
                     </div>
                   </td>
                   <td style={{ padding: "14px 20px" }}>
@@ -1073,7 +1073,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
       {payError && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontSize: 13, color: "#dc2626" }}>{payError}</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <button onClick={saveChanges} disabled={saving || !hasChanges}
-          style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: hasChanges ? "#d97706" : "#e2e8f0", color: hasChanges ? "#fff" : "#94a3b8", fontSize: 14, fontWeight: 600, cursor: (saving || !hasChanges) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+          style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: hasChanges ? "#4f46e5" : "#e2e8f0", color: hasChanges ? "#fff" : "#94a3b8", fontSize: 14, fontWeight: 600, cursor: (saving || !hasChanges) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
           {saving ? "Saving..." : "Save Changes"}
         </button>
         {hasChanges && (
@@ -1111,7 +1111,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                     <tr key={tenant.id} style={{ borderTop: "1px solid #f1f5f9", background: hasMovingOut ? "#f0fdf4" : "transparent" }}>
                       <td style={{ padding: "13px 18px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>{(tenant.name || "?").charAt(0)}</div>
+                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>{(tenant.name || "?").charAt(0)}</div>
                           {setPage && setSelectedTenantId ? (
                             <span onClick={() => { setSelectedTenantId(tenant.id); setPage("tenant-detail"); }}
                               style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}>
@@ -1136,12 +1136,12 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                         const isChecked = !!checked[mapKey];
                         const isDirty = !!checked[mapKey] !== !!saved[mapKey];
                         return (
-                          <td key={month.key} style={{ padding: "13px 10px", textAlign: "center", background: isDirty ? "#fffbeb" : "transparent" }}>
+                          <td key={month.key} style={{ padding: "13px 10px", textAlign: "center", background: isDirty ? "#eef2ff" : "transparent" }}>
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => toggle(tenant.id, month.key)}
-                              style={{ width: 17, height: 17, cursor: "pointer", accentColor: "#d97706" }}
+                              style={{ width: 17, height: 17, cursor: "pointer", accentColor: "#4f46e5" }}
                             />
                           </td>
                         );
@@ -1175,7 +1175,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
 
 // ─── MAINTENANCE PAGE ─────────────────────────────────────────────────────────
 const MaintenancePage = ({ data, setData, t, refresh }) => {
-  const pColors = { high: "#ef4444", medium: "#f59e0b", low: "#3b82f6" };
+  const pColors = { high: "#ef4444", medium: "#818cf8", low: "#3b82f6" };
   const pLabels = { high: t.priorityHigh, medium: t.priorityMedium, low: t.priorityLow };
   const updateStatus = async (id, status) => {
     // Optimistic update for instant UI feedback
@@ -1251,7 +1251,7 @@ const EmailPage = ({ data, setData, t, refresh }) => {
         {reminders.map(r => (
           <div key={r.key} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 11, background: s[r.key]?"rgba(217,119,6,.1)":"#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: s[r.key]?"#d97706":"#94a3b8" }}><Icon name="mail" size={19} /></div>
+              <div style={{ width: 42, height: 42, borderRadius: 11, background: s[r.key]?"rgba(217,119,6,.1)":"#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: s[r.key]?"#4f46e5":"#94a3b8" }}><Icon name="mail" size={19} /></div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#0f172a" }}>{r.label}</div>
                 <div style={{ fontSize: 13, color: "#64748b" }}>{r.desc}</div>
@@ -1266,7 +1266,7 @@ const EmailPage = ({ data, setData, t, refresh }) => {
           </div>
         ))}
         {editing && (
-          <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1.5px solid #d97706" }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1.5px solid #4f46e5" }}>
             <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{t.editTemplateLabel} {reminders.find(r => r.key===editing)?.label}</h4>
               <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.variablesNote}</span>
@@ -1302,7 +1302,7 @@ const TenantDashboard = ({ data, user }) => {
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Your Unit</h3>
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <div style={{ width: 50, height: 50, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", color: "#d97706", flexShrink: 0 }}><Icon name="home" size={24} /></div>
+            <div style={{ width: 50, height: 50, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5", flexShrink: 0 }}><Icon name="home" size={24} /></div>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{property?.address}</div>
               <div style={{ fontSize: 13, color: "#64748b" }}>{property?.city}, {property?.state} {property?.zip}</div>
@@ -1413,11 +1413,11 @@ const PaymentPortal = ({ data, setData, user, refresh }) => {
           <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
               <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ width: 42, height: 42, borderRadius: 11, background: tenant.recurringPayment?"rgba(217,119,6,.1)":"#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: tenant.recurringPayment?"#d97706":"#94a3b8" }}><Icon name="refresh" size={19} /></div>
+                <div style={{ width: 42, height: 42, borderRadius: 11, background: tenant.recurringPayment?"rgba(217,119,6,.1)":"#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: tenant.recurringPayment?"#4f46e5":"#94a3b8" }}><Icon name="refresh" size={19} /></div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Auto-Pay</div>
                   <div style={{ fontSize: 13, color: "#64748b" }}>Pay {fmt(contract.rentAmount)} on the {contract.dueDay}{contract.dueDay===1?"st":"th"}</div>
-                  <div style={{ fontSize: 12, color: tenant.recurringPayment?"#d97706":"#94a3b8", marginTop: 3, fontWeight: 500 }}>{tenant.recurringPayment?"Enabled":"Disabled"}</div>
+                  <div style={{ fontSize: 12, color: tenant.recurringPayment?"#4f46e5":"#94a3b8", marginTop: 3, fontWeight: 500 }}>{tenant.recurringPayment?"Enabled":"Disabled"}</div>
                 </div>
               </div>
               <Toggle value={tenant.recurringPayment} onChange={toggleRecurring} />
@@ -1486,7 +1486,7 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
           <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>My Requests</h3>
           <div style={{ display: "grid", gap: 12 }}>
             {myReqs.map(m => {
-              const pC = { high:"#ef4444",medium:"#f59e0b",low:"#3b82f6" };
+              const pC = { high:"#ef4444",medium:"#818cf8",low:"#3b82f6" };
               return (
                 <div key={m.id} style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", border: "1px solid #f1f5f9", display: "flex", gap: 12 }}>
                   <div style={{ width: 3, borderRadius: 3, background: pC[m.priority], flexShrink: 0 }} />
@@ -1520,7 +1520,7 @@ const TenantLeasePage = ({ data, user }) => {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", gap: 14, marginBottom: 22 }}>
-            <div style={{ width: 52, height: 52, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", color: "#d97706" }}><Icon name="file" size={24} /></div>
+            <div style={{ width: 52, height: 52, background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}><Icon name="file" size={24} /></div>
             <div>
               <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Lease Agreement</div>
               <div style={{ fontSize: 13, color: "#64748b" }}>{property?.address} · {tenant?.unit}</div>
@@ -1631,7 +1631,7 @@ const DocumentsPage = ({ data, refresh }) => {
           {data.properties.map(p => (
             <button key={p.id} onClick={() => setSelectedId(p.id)}
               style={{ width: "100%", padding: "14px 16px", border: "none", borderBottom: "1px solid #f8fafc", background: p.id === selectedId ? "rgba(217,119,6,.08)" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: p.id === selectedId ? "#d97706" : "#0f172a" }}>{p.address}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: p.id === selectedId ? "#4f46e5" : "#0f172a" }}>{p.address}</div>
               <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{p.city} · {p.driveLink ? "✓ Linked" : "No folder"}</div>
             </button>
           ))}
@@ -1647,7 +1647,7 @@ const DocumentsPage = ({ data, refresh }) => {
                 placeholder="https://drive.google.com/drive/folders/..."
                 style={{ flex: 1, padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 13, color: "#0f172a", fontFamily: "inherit", outline: "none" }} />
               <button onClick={save} disabled={saving}
-                style={{ padding: "10px 20px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 9, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+                style={{ padding: "10px 20px", background: "linear-gradient(135deg,#4f46e5,#4338ca)", border: "none", borderRadius: 9, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
                 {saving ? "Saving…" : "Save"}
               </button>
             </div>
