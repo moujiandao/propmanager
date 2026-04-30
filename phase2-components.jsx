@@ -119,71 +119,67 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
           No units yet. Add the first unit for this property.
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 18 }}>
-          {units.map(unit => {
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+          {[...units].sort((a, b) => Number(a.unitNumber) - Number(b.unitNumber)).map(unit => {
             const tenants = (data.tenants || []).filter(t => t.unitId === unit.id)
             const isOccupied = unit.status === 'occupied'
             return (
-              <div key={unit.id} style={{ background: "#1e293b", borderRadius: 14, padding: 22, border: "1px solid rgba(255,255,255,.07)", position: "relative" }}>
-                {/* Edit button */}
+              <div key={unit.id} style={{ background: "#1e293b", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,.07)", position: "relative" }}>
                 <button
                   onClick={() => openEdit(unit)}
-                  style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 7, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8" }}
+                  style={{ position: "absolute", top: 10, right: 10, background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 6, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8" }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.12)"}
                   onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
                 >
-                  <Icon name="edit" size={13} />
+                  <Icon name="edit" size={11} />
                 </button>
 
-                {/* Unit number */}
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ width: 40, height: 40, background: isOccupied ? "rgba(79,70,229,.15)" : "rgba(148,163,184,.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
-                    <Icon name="home" size={18} />
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ width: 32, height: 32, background: isOccupied ? "rgba(79,70,229,.15)" : "rgba(148,163,184,.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
+                    <Icon name="home" size={14} />
                   </div>
-                  <h3 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+                  <h3 style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 700, color: "#f1f5f9", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
                     Unit {unit.unitNumber}
                   </h3>
-                  <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+                  <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>
                     {unit.bedrooms} bed / {unit.bathrooms} bath
                   </p>
                 </div>
 
-                {/* Stats row */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#a5b4fc" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>
                     {unit.monthlyRent ? fmt(unit.monthlyRent) + "/mo" : "—"}
                   </span>
                   <Badge status={unit.status || "vacant"} />
                 </div>
 
-                {/* Tenants + per-tenant rent split */}
                 {isOccupied && tenants.length > 0 ? (
-                  <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 12, fontSize: 13 }}>
-                    <div style={{ color: "#64748b", marginBottom: 6, textTransform: "uppercase", fontSize: 11, letterSpacing: ".5px", fontWeight: 600 }}>
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 10 }}>
+                    <div style={{ color: "#64748b", marginBottom: 5, textTransform: "uppercase", fontSize: 10, letterSpacing: ".5px", fontWeight: 600 }}>
                       {tenants.length === 1 ? "Tenant" : `Tenants (${tenants.length})`}
                     </div>
                     {tenants.map(t => (
-                      <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                      <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
                         <button
                           onClick={() => onNavigateToTenant && onNavigateToTenant(t.id)}
-                          style={{ background: "none", border: "none", color: "#a5b4fc", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13, fontFamily: "inherit", textAlign: "left" }}
+                          style={{ background: "none", border: "none", color: "#a5b4fc", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 12, fontFamily: "inherit", textAlign: "left" }}
                           onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
                           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                         >
                           {t.name}
                         </button>
-                        <span style={{ color: t.monthlyRent ? "#f1f5f9" : "#475569", fontWeight: 600 }}>
+                        <span style={{ fontSize: 12, color: t.monthlyRent ? "#f1f5f9" : "#475569", fontWeight: 600 }}>
                           {t.monthlyRent ? fmt(t.monthlyRent) : "—"}
                         </span>
                       </div>
                     ))}
                   </div>
                 ) : isOccupied ? (
-                  <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 12, fontSize: 13, color: "#475569" }}>
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 10, fontSize: 12, color: "#475569" }}>
                     Occupied — tenant unlinked
                   </div>
                 ) : (
-                  <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 12, fontSize: 13, color: "#475569" }}>
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 10, fontSize: 12, color: "#475569" }}>
                     Vacant
                   </div>
                 )}
