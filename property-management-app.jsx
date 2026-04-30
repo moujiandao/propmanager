@@ -752,8 +752,8 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
             <div key={p.id} onClick={() => { if (setSelectedPropertyId && setPage) { setSelectedPropertyId(p.id); setPage('property-detail'); } }} style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: "1px solid #f1f5f9", boxShadow: "0 1px 3px rgba(0,0,0,.04)", cursor: setSelectedPropertyId ? "pointer" : "default", transition: "box-shadow .15s" }}
               onMouseEnter={e => { if (setSelectedPropertyId) e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.10)"; }}
               onMouseLeave={e => { if (setSelectedPropertyId) e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.04)"; }}>
-              <div style={{ position: "relative", height: 160, background: "#f1f5f9", overflow: "hidden" }}
-                onClick={e => e.stopPropagation()}>
+              <div style={{ position: "relative", height: 160, background: "#f1f5f9", overflow: "hidden", cursor: setSelectedPropertyId ? "pointer" : "default" }}
+                onClick={() => { if (setSelectedPropertyId && setPage) { setSelectedPropertyId(p.id); setPage('property-detail'); } }}>
                 {p.imageUrl
                   ? <img src={p.imageUrl} alt={p.address} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="home" size={40} color="#cbd5e1" /></div>
@@ -764,7 +764,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
                   onChange={e => handleImageUpload(p.id, e.target.files[0])}
                 />
                 <button
-                  onClick={() => { setUploadError(null); fileInputRefs.current[p.id]?.click(); }}
+                  onClick={e => { e.stopPropagation(); setUploadError(null); fileInputRefs.current[p.id]?.click(); }}
                   disabled={uploadingId === p.id}
                   style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(15,23,42,0.7)", color: "#fff", border: "none", borderRadius: 7, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: uploadingId === p.id ? "default" : "pointer", backdropFilter: "blur(4px)" }}>
                   {uploadingId === p.id ? t.uploadingPhoto : p.imageUrl ? t.changePhoto : t.uploadPhoto}
