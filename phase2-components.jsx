@@ -121,7 +121,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
           {[...units].sort((a, b) => Number(a.unitNumber) - Number(b.unitNumber)).map(unit => {
-            const tenants = (data.tenants || []).filter(t => t.unitId === unit.id)
+            const tenants = (data.tenants || []).filter(t => t.unitId === unit.id && t.status === "current tenant")
             const isOccupied = unit.status === 'occupied'
             return (
               <div key={unit.id} style={{ background: "#1e293b", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,.07)", position: "relative" }}>
