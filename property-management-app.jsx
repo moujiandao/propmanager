@@ -527,23 +527,6 @@ const LandlordDashboard = ({ data, t }) => {
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Vacancies — Now & Next 6 Months</h3>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{vacancies.length} unit{vacancies.length === 1 ? "" : "s"}</span>
-          </div>
-          {vacancies.length === 0 ? (
-            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>No vacant units, and no tenants scheduled to move out in the next 6 months.</div>
-          ) : vacancies.map(v => (
-            <div key={v.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Unit {v.unitLabel} · {v.propertyAddress}</div>
-                <div style={{ fontSize: 12, color: "#94a3b8" }}>{v.tenantName ? `${v.tenantName} · ${v.dateLabel}` : v.dateLabel}</div>
-              </div>
-              <Badge status={v.status} t={t} />
-            </div>
-          ))}
-        </div>
-        <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>New Tenants</h3>
             <span style={{ fontSize: 12, color: "#94a3b8" }}>{futureTenants.length} upcoming</span>
           </div>
@@ -567,6 +550,23 @@ const LandlordDashboard = ({ data, t }) => {
               </div>
             );
           })}
+        </div>
+        <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Vacancies — Now & Next 6 Months</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{vacancies.length} unit{vacancies.length === 1 ? "" : "s"}</span>
+          </div>
+          {vacancies.length === 0 ? (
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>No vacant units, and no tenants scheduled to move out in the next 6 months.</div>
+          ) : vacancies.map(v => (
+            <div key={v.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Unit {v.unitLabel} · {v.propertyAddress}</div>
+                <div style={{ fontSize: 12, color: "#94a3b8" }}>{v.tenantName ? `${v.tenantName} · ${v.dateLabel}` : v.dateLabel}</div>
+              </div>
+              <Badge status={v.status} t={t} />
+            </div>
+          ))}
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", gridColumn: "1/-1" }}>
           <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.recentPayments}</h3>
