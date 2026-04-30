@@ -932,11 +932,13 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     setSaving(false);
   };
 
+  const currentTenants = data.tenants.filter(t => t.status?.toLowerCase() === "current tenant");
+
   // Build grouped structure when groupBy === "unit"
   const tenantGroups = (() => {
     if (groupBy === "none") return null;
     const map = {};
-    data.tenants.forEach(ten => {
+    currentTenants.forEach(ten => {
       const prop = data.properties.find(p => p.id === ten.propertyId);
       const key = `${ten.propertyId}::${ten.unit || "—"}`;
       if (!map[key]) map[key] = { prop, unit: ten.unit || "—", tenants: [] };
@@ -972,8 +974,6 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             {ten.monthlyRent ? fmt(ten.monthlyRent) : "—"}
           </span>
         </td>
-        <td style={{ padding: "14px 20px" }}>{ten.bankConnected ? <span style={{ color: "#22c55e", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="check" size={14} />{t.bankConnected}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.bankNotConnected}</span>}</td>
-        <td style={{ padding: "14px 20px" }}>{ten.recurringPayment ? <span style={{ color: "#3b82f6", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="refresh" size={14} />{t.recurringEnabled}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.recurringOff}</span>}</td>
         <td style={{ padding: "14px 20px" }}><Badge status={ten.status} t={t} /></td>
         <td style={{ padding: "14px 20px" }}>
           <div style={{ display: "flex", gap: 6 }}>
@@ -991,7 +991,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   return (
     <div>
-      <PageHeader title={t.tenTitle} subtitle={t.tenSubtitle(data.tenants.filter(x => x.status === "current tenant").length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addTenant}</Btn>} />
+      <PageHeader title={t.tenTitle} subtitle={t.tenSubtitle(currentTenants.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addTenant}</Btn>} />
 
       {/* Display by toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
@@ -1011,18 +1011,18 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ background: "#f8fafc" }}>
             <tr style={{ color: "#64748b", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              {[t.colTenant, t.colContact, t.colProperty, t.colMonthlyRent, t.colBank, t.colRecurring, t.colStatus, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>)}
+              {[t.colTenant, t.colContact, t.colProperty, t.colMonthlyRent, t.colStatus, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
             {groupBy === "none"
-              ? data.tenants.map(ten => renderTenantRow(ten))
+              ? currentTenants.map(ten => renderTenantRow(ten))
               : tenantGroups.map(({ prop, unit, tenants }) => {
                   const totalRent = tenants.reduce((s, t) => s + (t.monthlyRent || 0), 0);
                   return (
                     <Fragment key={`${prop?.id}::${unit}`}>
                       <tr>
-                        <td colSpan={8} style={{ padding: "12px 20px", background: "#1e293b", borderTop: "2px solid #334155" }}>
+                        <td colSpan={6} style={{ padding: "12px 20px", background: "#1e293b", borderTop: "2px solid #334155" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                             <span style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.2px" }}>{prop?.address || "No property"}</span>
                             <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>·</span>
@@ -1280,7 +1280,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
   const grouped = useMemo(() => {
     const unitMap = {};
     const noUnit = [];
-    for (const tenant of data.tenants) {
+    for (const tenant of data.tenants.filter(t => t.status === "current tenant")) {
       if (tenant.unitId) {
         if (!unitMap[tenant.unitId]) {
           unitMap[tenant.unitId] = { unit: data.units.find(u => u.id === tenant.unitId), tenants: [] };
@@ -1392,7 +1392,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
     setSaving(false);
   };
 
-  const colCount = 4 + months.length;
+  const colCount = 3 + months.length;
 
   return (
     <div>
@@ -1417,13 +1417,12 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
               <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.colTenant}</th>
               <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.payZelleName}</th>
               <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.rent}</th>
-              <th style={{ padding: "14px 18px", textAlign: "left", minWidth: 100, whiteSpace: "nowrap" }}>{t.payMoveOutDate}</th>
               {months.map(m => (
                 <th key={m.key} style={{ padding: "14px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{m.label}</th>
               ))}
             </tr>
             <tr style={{ borderTop: "1px solid #e2e8f0", background: "#f1f5f9" }}>
-              <td colSpan={4} />
+              <td colSpan={3} />
               {months.map(m => {
                 const allChecked = allTenants.length > 0 && allTenants.every(t => !!checked[`${t.id}-${m.key}`]);
                 const someChecked = !allChecked && allTenants.some(t => !!checked[`${t.id}-${m.key}`]);
@@ -1452,9 +1451,8 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                 </tr>
                 {tenants.map(tenant => {
                   const rentAmount = getContract(tenant)?.rentAmount || tenant.monthlyRent || null;
-                  const hasMovingOut = !!tenant.moveOutDate;
                   return (
-                    <tr key={tenant.id} style={{ borderTop: "1px solid #f1f5f9", background: hasMovingOut ? "#f0fdf4" : "transparent" }}>
+                    <tr key={tenant.id} style={{ borderTop: "1px solid #f1f5f9", background: "transparent" }}>
                       <td style={{ padding: "13px 18px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                           <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>{(tenant.name || "?").charAt(0)}</div>
@@ -1473,9 +1471,6 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                       </td>
                       <td style={{ padding: "13px 18px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
                         {rentAmount ? fmt(rentAmount) : <span style={{ color: "#d1d5db" }}>-</span>}
-                      </td>
-                      <td style={{ padding: "13px 18px", fontSize: 12, color: hasMovingOut ? "#16a34a" : "#d1d5db", fontWeight: hasMovingOut ? 600 : 400 }}>
-                        {hasMovingOut ? fmtDate(tenant.moveOutDate) : "—"}
                       </td>
                       {months.map(month => {
                         const mapKey = `${tenant.id}-${month.key}`;
