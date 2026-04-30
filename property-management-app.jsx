@@ -377,9 +377,11 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
     { id: "dashboard", label: t.navDashboard, icon: "home" },
     { id: "properties", label: t.navProperties, icon: "building" },
     { id: "tenants", label: t.navTenants, icon: "users" },
-    { id: "contracts", label: t.navLeases, icon: "file" },
     { id: "payments", label: t.navPayments, icon: "dollar" },
     { id: "maintenance", label: t.navMaintenance, icon: "wrench" },
+  ];
+  const landlordBottomNav = [
+    { id: "contracts", label: t.navLeases, icon: "file" },
     { id: "email", label: t.navEmail, icon: "mail" },
     { id: "documents", label: "Documents", icon: "key" },
   ];
@@ -391,6 +393,19 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
     { id: "maintenance-new", label: "Maintenance", icon: "wrench" },
   ];
   const nav = user.role === "landlord" ? landlordNav : tenantNav;
+  const bottomNav = user.role === "landlord" ? landlordBottomNav : [];
+
+  const NavButton = ({ item }) => {
+    const active = currentPage === item.id;
+    return (
+      <button key={item.id} onClick={() => onNavigate(item.id)}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", marginBottom: 3, textAlign: "left", fontFamily: "inherit", transition: "all .15s",
+          background: active ? "rgba(79,70,229,.15)" : "transparent", color: active ? "#a5b4fc" : "#94a3b8", fontWeight: active ? 600 : 400, fontSize: 14 }}>
+        <Icon name={item.icon} size={17} />{item.label}
+        {active && <span style={{ marginLeft: "auto", width: 4, height: 4, background: "#4f46e5", borderRadius: "50%" }} />}
+      </button>
+    );
+  };
 
   return (
     <div style={{ width: 240, background: "#0f172a", minHeight: "100vh", display: "flex", flexDirection: "column", position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 100, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
@@ -407,19 +422,14 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
       <nav style={{ flex: 1, padding: "14px 12px" }}>
         {/* Language toggle — landlord only */}
         {user.role === "landlord" && <LangToggle lang={lang} setLang={setLang} />}
-
-        {nav.map(item => {
-          const active = currentPage === item.id;
-          return (
-            <button key={item.id} onClick={() => onNavigate(item.id)}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, border: "none", cursor: "pointer", marginBottom: 3, textAlign: "left", fontFamily: "inherit", transition: "all .15s",
-                background: active ? "rgba(79,70,229,.15)" : "transparent", color: active ? "#a5b4fc" : "#94a3b8", fontWeight: active ? 600 : 400, fontSize: 14 }}>
-              <Icon name={item.icon} size={17} />{item.label}
-              {active && <span style={{ marginLeft: "auto", width: 4, height: 4, background: "#4f46e5", borderRadius: "50%" }} />}
-            </button>
-          );
-        })}
+        {nav.map(item => <NavButton key={item.id} item={item} />)}
       </nav>
+
+      {bottomNav.length > 0 && (
+        <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,.06)" }}>
+          {bottomNav.map(item => <NavButton key={item.id} item={item} />)}
+        </div>
+      )}
 
       <div style={{ padding: "16px 12px", borderTop: "1px solid rgba(255,255,255,.06)" }}>
         <div style={{ padding: "10px 12px", marginBottom: 4 }}>
