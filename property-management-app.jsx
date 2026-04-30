@@ -550,6 +550,11 @@ const LandlordDashboard = ({ data, t }) => {
   const unpaidTenants = tenants.filter(ten => ten.status === "current tenant" && !paidTenantIds.has(ten.id));
 
   const todayStr = now.toISOString().split("T")[0];
+  const activeContracts = contracts.filter(c =>
+    c.status === "active" &&
+    (!c.startDate || c.startDate <= todayStr) &&
+    (!c.endDate || c.endDate >= todayStr)
+  );
   const sixMo = new Date(now.getFullYear(), now.getMonth() + 6, now.getDate());
   const sixMoStr = sixMo.toISOString().split("T")[0];
   const currentVacancies = units.filter(u => u.status === "vacant").map(u => {
@@ -570,33 +575,27 @@ const LandlordDashboard = ({ data, t }) => {
       <PageHeader title={t.dashTitle} subtitle={t.dashSubtitle} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 28 }}>
         <StatCard label={t.statProperties} value={properties.length} sub={`${occupied} ${t.statOccupied}`} icon="building" />
-        <StatCard label={t.statRevenue} value={fmt(contracts.reduce((s,c) => s+c.rentAmount, 0))} sub={t.statActiveLeases} icon="trending" color="#22c55e" />
+        <StatCard label={t.statRevenue} value={fmt(activeContracts.reduce((s,c) => s+c.rentAmount, 0))} sub={t.statActiveLeases} icon="trending" color="#22c55e" />
         <StatCard label={t.statPending} value={pendingPayments.length} sub={t.statRequireAttention} icon="clock" color="#ef4444" />
         <StatCard label={t.statOpenMaint} value={openMaint.length} sub={t.statRequests} icon="wrench" color="#818cf8" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashUnpaidRent} — {currentMonthLabel}</h3>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashTenantCount(unpaidTenants.length)}</span>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashVacancies}</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(vacancies.length)}</span>
           </div>
-          {unpaidTenants.length === 0 ? (
-            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashUnpaidEmpty}</div>
-          ) : unpaidTenants.map(ten => {
-            const prop = properties.find(p => p.id === ten.propertyId);
-            return (
-              <div key={ten.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenantFullName(ten)}</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit} · {prop?.address}</div>
-                  </div>
-                </div>
-                <Badge status="overdue" t={t} />
+          {vacancies.length === 0 ? (
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashVacanciesEmpty}</div>
+          ) : vacancies.map(v => (
+            <div key={v.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Unit {v.unitLabel} · {v.propertyAddress}</div>
+                <div style={{ fontSize: 12, color: "#94a3b8" }}>{v.tenantName ? `${v.tenantName} · ${v.dateLabel}` : v.dateLabel}</div>
               </div>
-            );
-          })}
+              <Badge status={v.status} t={t} />
+            </div>
+          ))}
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
@@ -626,20 +625,26 @@ const LandlordDashboard = ({ data, t }) => {
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashVacancies}</h3>
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(vacancies.length)}</span>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashUnpaidRent} — {currentMonthLabel}</h3>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashTenantCount(unpaidTenants.length)}</span>
           </div>
-          {vacancies.length === 0 ? (
-            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashVacanciesEmpty}</div>
-          ) : vacancies.map(v => (
-            <div key={v.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Unit {v.unitLabel} · {v.propertyAddress}</div>
-                <div style={{ fontSize: 12, color: "#94a3b8" }}>{v.tenantName ? `${v.tenantName} · ${v.dateLabel}` : v.dateLabel}</div>
+          {unpaidTenants.length === 0 ? (
+            <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashUnpaidEmpty}</div>
+          ) : unpaidTenants.map(ten => {
+            const prop = properties.find(p => p.id === ten.propertyId);
+            return (
+              <div key={ten.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: "1px solid #f8fafc" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenantFullName(ten)}</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit} · {prop?.address}</div>
+                  </div>
+                </div>
+                <Badge status="overdue" t={t} />
               </div>
-              <Badge status={v.status} t={t} />
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
           <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.recentPayments}</h3>
@@ -730,12 +735,16 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
     if (!error) { await refresh(); setConfirmDelete(null); }
   };
 
+  const propTodayStr = new Date().toISOString().split("T")[0];
+
   return (
     <div>
       <PageHeader title={t.propTitle} subtitle={t.propSubtitle(data.properties.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addProperty}</Btn>} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 18 }}>
         {data.properties.map(p => {
-          const rev = data.contracts.filter(c => c.propertyId === p.id).reduce((s,c) => s+c.rentAmount, 0);
+          const rev = data.contracts
+            .filter(c => c.propertyId === p.id && c.status === "active" && (!c.startDate || c.startDate <= propTodayStr) && (!c.endDate || c.endDate >= propTodayStr))
+            .reduce((s,c) => s+c.rentAmount, 0);
           const propertyUnits = (data.units || []).filter(u => u.propertyId === p.id);
           const occupiedUnits = propertyUnits.filter(u => u.status === 'occupied').length;
           const totalUnits = propertyUnits.length;
