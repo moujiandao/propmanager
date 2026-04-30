@@ -1851,14 +1851,11 @@ export default function App() {
         const today = new Date().toISOString().split("T")[0];
         const units = (unitRes.data || []).map(mapUnit).map(unit => {
           const tenantsInUnit = (tenRes.data || []).filter(t => t.unit_id === unit.id);
-          const hasActiveLease = tenantsInUnit.some(t =>
-            (conRes.data || []).some(c =>
-              c.tenant_id === t.id &&
-              (c.status === "active" || !c.status) &&
-              (!c.end_date || c.end_date >= today)
-            )
-          );
-          return { ...unit, status: hasActiveLease ? "occupied" : "vacant" };
+          const isOccupied = tenantsInUnit.some(t => {
+            const status = t.status === "active" ? "current tenant" : t.status;
+            return status === "current tenant";
+          });
+          return { ...unit, status: isOccupied ? "occupied" : "vacant" };
         });
         setData({
           properties:    (propRes.data  || []).map(mapProperty),
