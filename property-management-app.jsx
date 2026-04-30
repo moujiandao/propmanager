@@ -654,6 +654,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   const [editError, setEditError] = useState("");
 
+  const [groupBy, setGroupBy] = useState("none");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const confirmDelete = async () => {
@@ -714,9 +715,81 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     setSaving(false);
   };
 
+  // Build grouped structure when groupBy === "unit"
+  const tenantGroups = (() => {
+    if (groupBy === "none") return null;
+    const map = {};
+    data.tenants.forEach(ten => {
+      const prop = data.properties.find(p => p.id === ten.propertyId);
+      const key = `${ten.propertyId}::${ten.unit || "—"}`;
+      if (!map[key]) map[key] = { prop, unit: ten.unit || "—", tenants: [] };
+      map[key].tenants.push(ten);
+    });
+    return Object.values(map).sort((a, b) => {
+      const pa = a.prop?.address || ""; const pb = b.prop?.address || "";
+      if (pa !== pb) return pa.localeCompare(pb);
+      return String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
+    });
+  })();
+
+  const TenantRow = ({ ten }) => {
+    const prop = data.properties.find(p => p.id === ten.propertyId);
+    return (
+      <tr key={ten.id} style={{ borderTop: "1px solid #f8fafc" }}>
+        <td style={{ padding: "14px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ten.name.charAt(0)}</div>
+            <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{ten.name}</button>
+          </div>
+        </td>
+        <td style={{ padding: "14px 20px" }}>
+          <div style={{ fontSize: 13, color: "#374151" }}>{ten.email}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.phone}</div>
+        </td>
+        <td style={{ padding: "14px 20px" }}>
+          <div style={{ fontSize: 13, color: "#374151" }}>{prop?.address || "—"}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit}</div>
+        </td>
+        <td style={{ padding: "14px 20px" }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: ten.monthlyRent ? "#0f172a" : "#94a3b8" }}>
+            {ten.monthlyRent ? fmt(ten.monthlyRent) : "—"}
+          </span>
+        </td>
+        <td style={{ padding: "14px 20px" }}>{ten.bankConnected ? <span style={{ color: "#22c55e", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="check" size={14} />{t.bankConnected}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.bankNotConnected}</span>}</td>
+        <td style={{ padding: "14px 20px" }}>{ten.recurringPayment ? <span style={{ color: "#3b82f6", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="refresh" size={14} />{t.recurringEnabled}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.recurringOff}</span>}</td>
+        <td style={{ padding: "14px 20px" }}><Badge status={ten.status} t={t} /></td>
+        <td style={{ padding: "14px 20px" }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => openEdit(ten)} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+              <Icon name="edit" size={13} /> Edit
+            </button>
+            <button onClick={() => setDeleteTarget(ten)} style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" }}>
+              <Icon name="trash" size={13} />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <div>
       <PageHeader title={t.tenTitle} subtitle={t.tenSubtitle(data.tenants.filter(x => x.status === "current tenant").length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addTenant}</Btn>} />
+
+      {/* Display by toggle */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px" }}>Display by</span>
+        {[["none", "All"], ["unit", "Property + Unit"]].map(([val, label]) => (
+          <button key={val} onClick={() => setGroupBy(val)}
+            style={{ padding: "5px 12px", borderRadius: 7, border: "1.5px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s",
+              borderColor: groupBy === val ? "#4f46e5" : "#e2e8f0",
+              background: groupBy === val ? "#eef2ff" : "#fff",
+              color: groupBy === val ? "#4f46e5" : "#64748b" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ background: "#f8fafc" }}>
@@ -725,45 +798,27 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             </tr>
           </thead>
           <tbody>
-            {data.tenants.map(ten => {
-              const prop = data.properties.find(p => p.id === ten.propertyId);
-              return (
-                <tr key={ten.id} style={{ borderTop: "1px solid #f8fafc" }}>
-                  <td style={{ padding: "14px 20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#4f46e5,#3730a3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ten.name.charAt(0)}</div>
-                      <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: setPage ? "#4f46e5" : "#0f172a", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{ten.name}</button>
-                    </div>
-                  </td>
-                  <td style={{ padding: "14px 20px" }}>
-                    <div style={{ fontSize: 13, color: "#374151" }}>{ten.email}</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.phone}</div>
-                  </td>
-                  <td style={{ padding: "14px 20px" }}>
-                    <div style={{ fontSize: 13, color: "#374151" }}>{prop?.address || "—"}</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit}</div>
-                  </td>
-                  <td style={{ padding: "14px 20px" }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: ten.monthlyRent ? "#0f172a" : "#94a3b8" }}>
-                      {ten.monthlyRent ? fmt(ten.monthlyRent) : "—"}
-                    </span>
-                  </td>
-                  <td style={{ padding: "14px 20px" }}>{ten.bankConnected ? <span style={{ color: "#22c55e", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="check" size={14} />{t.bankConnected}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.bankNotConnected}</span>}</td>
-                  <td style={{ padding: "14px 20px" }}>{ten.recurringPayment ? <span style={{ color: "#3b82f6", display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}><Icon name="refresh" size={14} />{t.recurringEnabled}</span> : <span style={{ color: "#94a3b8", fontSize: 13 }}>{t.recurringOff}</span>}</td>
-                  <td style={{ padding: "14px 20px" }}><Badge status={ten.status} t={t} /></td>
-                  <td style={{ padding: "14px 20px" }}>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => openEdit(ten)} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
-                        <Icon name="edit" size={13} /> Edit
-                      </button>
-                      <button onClick={() => setDeleteTarget(ten)} style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" }}>
-                        <Icon name="trash" size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+            {groupBy === "none"
+              ? data.tenants.map(ten => <TenantRow key={ten.id} ten={ten} />)
+              : tenantGroups.map(({ prop, unit, tenants }) => {
+                  const totalRent = tenants.reduce((s, t) => s + (t.monthlyRent || 0), 0);
+                  return (
+                    <React.Fragment key={`${prop?.id}::${unit}`}>
+                      <tr>
+                        <td colSpan={8} style={{ padding: "10px 20px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{prop?.address || "No property"}</span>
+                            <span style={{ fontSize: 12, color: "#64748b" }}>· Unit {unit}</span>
+                            <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>{tenants.length} tenant{tenants.length !== 1 ? "s" : ""}</span>
+                            {totalRent > 0 && <span style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{fmt(totalRent)}/mo</span>}
+                          </div>
+                        </td>
+                      </tr>
+                      {tenants.map(ten => <TenantRow key={ten.id} ten={ten} />)}
+                    </React.Fragment>
+                  );
+                })
+            }
           </tbody>
         </table>
       </div>

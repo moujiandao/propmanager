@@ -150,7 +150,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
 
                 {/* Stats row */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#4f46e5" }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#a5b4fc" }}>
                     {unit.monthlyRent ? fmt(unit.monthlyRent) + "/mo" : "—"}
                   </span>
                   <Badge status={unit.status || "vacant"} />
@@ -166,7 +166,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
                       <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
                         <button
                           onClick={() => onNavigateToTenant && onNavigateToTenant(t.id)}
-                          style={{ background: "none", border: "none", color: "#4f46e5", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13, fontFamily: "inherit", textAlign: "left" }}
+                          style={{ background: "none", border: "none", color: "#a5b4fc", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13, fontFamily: "inherit", textAlign: "left" }}
                           onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
                           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                         >
@@ -875,7 +875,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
               <InfoRow label="Move-in Date" value={tenant.moveInDate} />
               <InfoRow label="Move-out Date" value={tenant.moveOutDate} />
               <InfoRow label="Monthly Rent">
-                <span style={{ fontSize: 15, fontWeight: 700, color: displayRent ? "#4f46e5" : "#475569" }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: displayRent ? "#a5b4fc" : "#475569" }}>
                   {displayRent ? fmt2(displayRent) + "/mo" : "—"}
                 </span>
               </InfoRow>
