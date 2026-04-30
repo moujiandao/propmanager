@@ -1015,9 +1015,17 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             </tr>
           </thead>
           <tbody>
-            {groupBy === "none"
-              ? currentTenants.map(ten => renderTenantRow(ten))
-              : tenantGroups.map(({ prop, unit, tenants }) => {
+            {groupBy === "none" ? (
+              <>
+                {currentTenants.map(ten => renderTenantRow(ten))}
+                {futureTenants.length > 0 && <>
+                  <tr><td colSpan={6} style={{ padding: "8px 20px", background: "#f8fafc", borderTop: "2px solid #e2e8f0", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".6px" }}>{t.statusFutureTenant}</td></tr>
+                  {futureTenants.map(ten => renderTenantRow(ten))}
+                </>}
+              </>
+            ) : (
+              <>
+                {tenantGroups.map(({ prop, unit, tenants }) => {
                   const totalRent = tenants.reduce((s, t) => s + (t.monthlyRent || 0), 0);
                   return (
                     <Fragment key={`${prop?.id}::${unit}`}>
@@ -1035,8 +1043,24 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                       {tenants.map(ten => renderTenantRow(ten))}
                     </Fragment>
                   );
-                })
-            }
+                })}
+                {futureGroups.length > 0 && futureGroups.map(({ prop, unit, tenants }) => (
+                  <Fragment key={`future-${prop?.id}::${unit}`}>
+                    <tr>
+                      <td colSpan={6} style={{ padding: "12px 20px", background: "#334155", borderTop: "2px solid #475569" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <span style={{ fontSize: 15, fontWeight: 800, color: "#cbd5e1", letterSpacing: "-0.2px" }}>{prop?.address || "No property"}</span>
+                          <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>·</span>
+                          <span style={{ fontSize: 14, color: "#94a3b8", fontWeight: 600 }}>Unit {unit}</span>
+                          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".4px" }}>{t.statusFutureTenant}</span>
+                        </div>
+                      </td>
+                    </tr>
+                    {tenants.map(ten => renderTenantRow(ten))}
+                  </Fragment>
+                ))}
+              </>
+            )}
           </tbody>
         </table>
       </div>
