@@ -2004,13 +2004,22 @@ const DocumentsPage = ({ data, refresh }) => {
 };
 
 // ─── ADMIN USERS PAGE ─────────────────────────────────────────────────────────
-const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
+const AdminUsersPage = ({ t, user: currentUser, refresh }) => {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
+
+  const loadUsers = async () => {
+    const res = await fetch("/api/auth/list-users");
+    const json = await res.json();
+    if (json.users) setAllUsers(json.users.map(u => ({ ...u, displayName: u.name || u.email })).sort((a, b) => a.displayName.localeCompare(b.displayName)));
+  };
+
+  useEffect(() => { loadUsers(); }, []);
 
   const handleSubmit = async () => {
     setMsg(null);
@@ -2027,6 +2036,7 @@ const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
     if (json.error) { setMsg({ text: json.error, error: true }); return; }
     setMsg({ text: t.adminSuccess, error: false });
     setForm({ name: "", email: "", password: "" });
+    loadUsers();
     if (refresh) refresh();
   };
 
@@ -2040,20 +2050,21 @@ const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
     });
     const json = await res.json();
     if (!res.ok) { setDeleteError(json.error || "Delete failed"); setDeleting(false); return; }
+    loadUsers();
     if (refresh) await refresh();
     setConfirmDelete(null);
     setDeleting(false);
   };
 
-  const allUsers = (data?.landlords || []).map(l => ({ ...l, role: "admin", displayName: l.name || l.email })).sort((a, b) => a.displayName.localeCompare(b.displayName));
-
-  const RoleBadge = ({ role }) => (
-    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase", letterSpacing: ".5px",
-      background: role === "admin" ? "rgba(79,70,229,.12)" : "rgba(34,197,94,.12)",
-      color: role === "admin" ? "#4f46e5" : "#16a34a" }}>
-      {role === "admin" ? "Admin" : "Tenant"}
-    </span>
-  );
+  const RoleBadge = ({ role }) => {
+    const styles = {
+      admin:      { bg: "rgba(79,70,229,.12)",  color: "#4f46e5", label: "Admin" },
+      tenant:     { bg: "rgba(34,197,94,.12)",  color: "#16a34a", label: "Tenant" },
+      unassigned: { bg: "rgba(148,163,184,.15)", color: "#64748b", label: "Unassigned" },
+    };
+    const s = styles[role] || styles.unassigned;
+    return <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, textTransform: "uppercase", letterSpacing: ".5px", background: s.bg, color: s.color }}>{s.label}</span>;
+  };
 
   return (
     <div>
@@ -2064,7 +2075,7 @@ const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f8fafc" }}>
-              {["Name", "Email", ""].map(h => (
+              {["Name", "Email", "Role", ""].map(h => (
                 <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px" }}>{h}</th>
               ))}
             </tr>
@@ -2074,6 +2085,7 @@ const AdminUsersPage = ({ t, data, user: currentUser, refresh }) => {
               <tr key={u.id} style={{ borderTop: "1px solid #f8fafc" }}>
                 <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{u.displayName}</td>
                 <td style={{ padding: "14px 20px", fontSize: 13, color: "#64748b" }}>{u.email || "—"}</td>
+                <td style={{ padding: "14px 20px" }}><RoleBadge role={u.role} /></td>
                 <td style={{ padding: "14px 20px", textAlign: "right" }}>
                   {u.id !== currentUser?.id && (
                     <button onClick={() => { setDeleteError(null); setConfirmDelete(u); }}
