@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-04-29]
+
+### Added
+- `data/tenants-upload.csv` template and `scripts/import-tenants.mjs` for bulk tenant onboarding (creates auth user + profile, recomputes unit occupancy)
+- Add Tenant modal: `Status` dropdown with picklist values `Current Tenant`, `Future Tenant`, `Previous Tenant`
+- Add Tenant modal: `Create portal login` toggle making email/password optional (placeholder email used when the tenant has no portal account)
+
+### Changed
+- `PaymentsPage` table now has 4 fixed columns: Tenant (clickable → tenant detail), Zelle Name, Rent, Move-out date (green when populated, green row tint); followed by 12 monthly checkboxes
+- `PaymentsPage` adds a bold "Total" row after each unit group showing summed rent
+- `mapTenant` normalizes legacy `active` → `current tenant` and `inactive` → `previous tenant` so old records render with the new picklist
+- `app/api/auth/create-tenant/route.js` accepts `status` from the client and defaults to `current tenant`
+
 ## [2026-04-17]
 
 ### Changed

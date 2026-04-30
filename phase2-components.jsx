@@ -589,7 +589,7 @@ const TenantCard = ({ title, children }) => (
 )
 
 const EMPTY_TENANT_FORM = {
-  name: "", phone: "", propertyId: "", unit: "", status: "active", monthlyRent: "",
+  name: "", phone: "", propertyId: "", unit: "", status: "current tenant", monthlyRent: "",
   moveInDate: "", moveOutDate: "", hasCosigner: false, studentStatus: "", studentYear: "",
   zelleName: "", homeAddress: "", age: "", unitId: "",
 }
@@ -613,7 +613,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
         phone: tenant.phone || "",
         propertyId: tenant.propertyId || "",
         unit: tenant.unit || "",
-        status: tenant.status || "active",
+        status: tenant.status || "current tenant",
         monthlyRent: tenant.monthlyRent ? String(tenant.monthlyRent) : "",
         moveInDate: tenant.moveInDate || "",
         moveOutDate: tenant.moveOutDate || "",

@@ -57,6 +57,7 @@ const T = {
     reminder7Day: "7 Days Overdue", reminder7DayDesc: "Final notice before action",
     st_completed: "Completed", st_pending: "Pending", st_overdue: "Overdue", st_failed: "Failed",
     st_active: "Active", st_open: "Open", "st_in-progress": "In Progress", st_resolved: "Resolved",
+    "st_current tenant": "Current Tenant", "st_future tenant": "Future Tenant", "st_previous tenant": "Previous Tenant",
     st_occupied: "Occupied", st_vacant: "Vacant",
   },
   zh: {
@@ -150,6 +151,9 @@ const statusColors = {
   overdue:   { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
   failed:    { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
   active:    { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
+  "current tenant":  { bg: "#dcfce7", text: "#166534", dot: "#22c55e" },
+  "future tenant":   { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
+  "previous tenant": { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
   open:      { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
   "in-progress": { bg: "#fef9c3", text: "#854d0e", dot: "#eab308" },
   resolved:  { bg: "#dcfce7", text: "#166534", dot: "#22c55e" },
@@ -467,7 +471,7 @@ const LandlordDashboard = ({ data, t }) => {
       .filter(p => p.status === "completed" && p.dueDate && p.dueDate.startsWith(currentMonthKey))
       .map(p => p.tenantId)
   );
-  const unpaidTenants = tenants.filter(ten => ten.status === "active" && !paidTenantIds.has(ten.id));
+  const unpaidTenants = tenants.filter(ten => ten.status === "current tenant" && !paidTenantIds.has(ten.id));
 
   const todayStr = now.toISOString().split("T")[0];
   const sixMo = new Date(now.getFullYear(), now.getMonth() + 6, now.getDate());
@@ -639,7 +643,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
 const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTenantId }) => {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", createLogin: false });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
   const [editTenant, setEditTenant] = useState(null);
@@ -652,7 +656,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status, monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "" });
+    setEditForm({ name: ten.name, phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "" });
   };
 
   const saveEdit = async () => {
@@ -688,12 +692,14 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: form.name, email: form.email, phone: form.phone,
-        password: form.password, propertyId: form.propertyId, unit: form.unit,
-        zelleName: form.zelleName, landlordId: user.id,
+        name: form.name, phone: form.phone,
+        email: form.createLogin ? form.email : null,
+        password: form.createLogin ? form.password : null,
+        propertyId: form.propertyId, unit: form.unit,
+        zelleName: form.zelleName, status: form.status, landlordId: user.id,
       }),
     });
-    if (res.ok) { await refresh(); setShow(false); }
+    if (res.ok) { await refresh(); setShow(false); setForm({ name: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", createLogin: false }); }
     setSaving(false);
   };
 
@@ -751,17 +757,28 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <Modal title={t.addTenantTitle} onClose={() => setShow(false)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Inp label={t.fullName} value={form.name} onChange={v => setF("name",v)} placeholder="Jane Smith" />
-            <Inp label={`${t.email} (optional)`} value={form.email} onChange={v => setF("email",v)} type="email" />
             <Inp label={t.phone} value={form.phone} onChange={v => setF("phone",v)} />
-            <Inp label={t.loginPassword} value={form.password} onChange={v => setF("password",v)} type="text" placeholder={t.tempPassword} />
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
             <Inp label="Zelle Name" value={form.zelleName} onChange={v => setF("zelleName",v)} placeholder="Name or phone on Zelle" />
+            <Sel label="Status" value={form.status} onChange={v => setF("status",v)} options={[{value:"current tenant",label:"Current Tenant"},{value:"future tenant",label:"Future Tenant"},{value:"previous tenant",label:"Previous Tenant"}]} />
           </div>
-          <div style={{ background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 9, padding: 12, marginBottom: 16, fontSize: 13, color: "#92400e" }}><strong>{t.note}:</strong> Email is optional. If provided, a welcome email will be sent and the tenant can log in to their portal.</div>
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 14px", background: "#f8fafc", borderRadius: 9, border: "1px solid #e2e8f0" }}>
+            <Toggle value={form.createLogin} onChange={v => setF("createLogin", v)} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Create tenant portal login</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>Optional — only needed if the tenant will log in to pay rent or submit maintenance requests</div>
+            </div>
+          </div>
+          {form.createLogin && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+              <Inp label={t.email} value={form.email} onChange={v => setF("email",v)} type="email" placeholder="tenant@email.com" />
+              <Inp label={t.loginPassword} value={form.password} onChange={v => setF("password",v)} type="text" placeholder={t.tempPassword} />
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
             <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
-            <Btn onClick={add}>{saving ? "Creating…" : t.createTenantAccount}</Btn>
+            <Btn onClick={add}>{saving ? "Creating…" : "Add Tenant"}</Btn>
           </div>
         </Modal>
       )}
@@ -811,7 +828,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
               })()}
             </div>
             <Inp label="Monthly Payment ($)" value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
-            <Sel label="Status" value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"active",label:"Active"},{value:"inactive",label:"Inactive"}]} />
+            <Sel label="Status" value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"current tenant",label:"Current Tenant"},{value:"future tenant",label:"Future Tenant"},{value:"previous tenant",label:"Previous Tenant"}]} />
             <Inp label="Zelle Name" value={editForm.zelleName} onChange={v => setEF("zelleName",v)} placeholder="Name or phone on Zelle" />
           </div>
           <div style={{ marginTop: 4, marginBottom: 4 }}>
@@ -903,7 +920,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
 };
 
 // ─── PAYMENTS PAGE ────────────────────────────────────────────────────────────
-const PaymentsPage = ({ data, t }) => {
+const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
   // Last 12 months, oldest first
   const months = useMemo(() => {
     const result = [];
@@ -1048,7 +1065,7 @@ const PaymentsPage = ({ data, t }) => {
     setSaving(false);
   };
 
-  const colCount = 3 + months.length;
+  const colCount = 4 + months.length;
 
   return (
     <div>
@@ -1073,6 +1090,7 @@ const PaymentsPage = ({ data, t }) => {
               <th style={{ padding: "14px 18px", textAlign: "left" }}>Tenant</th>
               <th style={{ padding: "14px 18px", textAlign: "left" }}>Zelle Name</th>
               <th style={{ padding: "14px 18px", textAlign: "left" }}>Rent</th>
+              <th style={{ padding: "14px 18px", textAlign: "left", minWidth: 100 }}>Move-out</th>
               {months.map(m => (
                 <th key={m.key} style={{ padding: "14px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{m.label}</th>
               ))}
@@ -1088,12 +1106,20 @@ const PaymentsPage = ({ data, t }) => {
                 </tr>
                 {tenants.map(tenant => {
                   const rentAmount = getContract(tenant)?.rentAmount || null;
+                  const hasMovingOut = !!tenant.moveOutDate;
                   return (
-                    <tr key={tenant.id} style={{ borderTop: "1px solid #f1f5f9" }}>
+                    <tr key={tenant.id} style={{ borderTop: "1px solid #f1f5f9", background: hasMovingOut ? "#f0fdf4" : "transparent" }}>
                       <td style={{ padding: "13px 18px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>{tenant.name.charAt(0)}</div>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenant.name}</span>
+                          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#d97706,#92400e)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>{(tenant.name || "?").charAt(0)}</div>
+                          {setPage && setSelectedTenantId ? (
+                            <span onClick={() => { setSelectedTenantId(tenant.id); setPage("tenant-detail"); }}
+                              style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}>
+                              {tenant.name}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenant.name}</span>
+                          )}
                         </div>
                       </td>
                       <td style={{ padding: "13px 18px", fontSize: 13, color: "#64748b" }}>
@@ -1101,6 +1127,9 @@ const PaymentsPage = ({ data, t }) => {
                       </td>
                       <td style={{ padding: "13px 18px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
                         {rentAmount ? fmt(rentAmount) : <span style={{ color: "#d1d5db" }}>-</span>}
+                      </td>
+                      <td style={{ padding: "13px 18px", fontSize: 12, color: hasMovingOut ? "#16a34a" : "#d1d5db", fontWeight: hasMovingOut ? 600 : 400 }}>
+                        {hasMovingOut ? fmtDate(tenant.moveOutDate) : "—"}
                       </td>
                       {months.map(month => {
                         const mapKey = `${tenant.id}-${month.key}`;
@@ -1120,6 +1149,16 @@ const PaymentsPage = ({ data, t }) => {
                     </tr>
                   );
                 })}
+                {(() => {
+                  const unitTotal = tenants.reduce((s, t) => s + (getContract(t)?.rentAmount || 0), 0);
+                  return unitTotal > 0 ? (
+                    <tr style={{ borderTop: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                      <td colSpan={3} style={{ padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#64748b" }}>Total</td>
+                      <td style={{ padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{fmt(unitTotal)}</td>
+                      <td colSpan={months.length} />
+                    </tr>
+                  ) : null;
+                })()}
               </Fragment>
             ))}
             {data.tenants.length === 0 && (
@@ -1780,7 +1819,7 @@ export default function App() {
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "" });
-  const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status || "active", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
+  const mapTenant    = (t) => ({ id: t.id, name: t.name, email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
   const mapContract  = (c) => ({ id: c.id, tenantId: c.tenant_id, propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
@@ -1878,7 +1917,7 @@ export default function App() {
         case "tenants":          return <TenantsPage {...props} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
         case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={fetchAllData} user={user} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
         case "contracts":        return <ContractsPage {...props} />;
-        case "payments":         return <PaymentsPage data={data} t={t} />;
+        case "payments":         return <PaymentsPage data={data} t={t} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
         case "maintenance":      return <MaintenancePage {...props} />;
         case "email":            return <EmailPage {...props} />;
         case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={fetchAllData} user={user} />;

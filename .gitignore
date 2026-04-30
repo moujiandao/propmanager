@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# local-only data (contains tenant PII)
+/data/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
