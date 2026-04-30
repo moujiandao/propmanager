@@ -1,4 +1,4 @@
-import { createClient } from '../../../../lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request) {
   const { tenantId, name, lastName, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId } = await request.json()
@@ -7,7 +7,11 @@ export async function POST(request) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 
   // Capture the tenant's previous unit_id and status so we can recompute occupancy when either changes
   const { data: prevTenant } = await supabase
