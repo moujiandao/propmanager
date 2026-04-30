@@ -1,0 +1,64 @@
+import { createClient } from '../../../../lib/supabase/server'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const ALLOWED_EXT = new Set(['jpg', 'jpeg', 'png', 'webp'])
+
+export async function POST(request) {
+  const supabase = await createClient()
+  const formData = await request.formData()
+  const file = formData.get('file')
+  const propertyId = formData.get('propertyId')
+  const landlordId = formData.get('landlordId')
+
+  if (!file || !propertyId || !landlordId) {
+    return Response.json({ error: 'file, propertyId, and landlordId are required' }, { status: 400 })
+  }
+
+  if (!UUID_RE.test(propertyId) || !UUID_RE.test(landlordId)) {
+    return Response.json({ error: 'Invalid id' }, { status: 400 })
+  }
+
+  const ext = file.name.split('.').pop().toLowerCase()
+  if (!ALLOWED_EXT.has(ext)) {
+    return Response.json({ error: 'Only jpg, jpeg, png, and webp files are allowed' }, { status: 400 })
+  }
+
+  // Confirm the property belongs to this landlord
+  const { data: property } = await supabase
+    .from('properties')
+    .select('id')
+    .eq('id', propertyId)
+    .eq('landlord_id', landlordId)
+    .maybeSingle()
+
+  if (!property) {
+    return Response.json({ error: 'Property not found' }, { status: 404 })
+  }
+
+  const path = `${propertyId}.${ext}`
+  const bytes = await file.arrayBuffer()
+
+  // upsert: true overwrites same extension; switching extensions leaves the old file in storage
+  const { error: uploadError } = await supabase.storage
+    .from('property-images')
+    .upload(path, bytes, { contentType: file.type, upsert: true })
+
+  if (uploadError) {
+    return Response.json({ error: uploadError.message }, { status: 400 })
+  }
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('property-images')
+    .getPublicUrl(path)
+
+  const { error: dbError } = await supabase
+    .from('properties')
+    .update({ image_url: publicUrl })
+    .eq('id', propertyId)
+
+  if (dbError) {
+    return Response.json({ error: dbError.message }, { status: 400 })
+  }
+
+  return Response.json({ url: publicUrl })
+}

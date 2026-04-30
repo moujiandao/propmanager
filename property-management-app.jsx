@@ -684,17 +684,25 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
     if (!file) return;
     setUploadingId(propertyId);
     setUploadError(null);
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("propertyId", propertyId);
-    const res = await fetch("/api/properties/upload-image", { method: "POST", body: fd });
-    const json = await res.json();
-    if (!res.ok) {
-      setUploadError(json.error || "Upload failed");
-    } else {
-      await refresh();
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("propertyId", propertyId);
+      fd.append("landlordId", user.id);
+      const res = await fetch("/api/properties/upload-image", { method: "POST", body: fd });
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { json = { error: text || "Upload failed" }; }
+      if (!res.ok) {
+        setUploadError(json.error || "Upload failed");
+      } else {
+        await refresh();
+      }
+    } catch (err) {
+      setUploadError(err.message || "Upload failed");
+    } finally {
+      setUploadingId(null);
     }
-    setUploadingId(null);
   };
   const add = async () => {
     if (!form.address) return;
