@@ -2654,10 +2654,37 @@ export default function App() {
           });
           return { ...unit, status: isOccupied ? "occupied" : "vacant" };
         });
+
+        // Fetch contract_tenants via service-role route — RLS blocks the
+        // client-side join so contract_tenants(tenant_id) comes back empty.
+        let linkMap = new Map();
+        const contractIds = (conRes.data || []).map(c => c.id);
+        if (contractIds.length > 0) {
+          try {
+            const linkRes = await fetch(`/api/contracts/tenant-links`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contractIds }),
+            });
+            if (linkRes.ok) {
+              const { links } = await linkRes.json();
+              for (const l of links || []) {
+                if (!linkMap.has(l.contract_id)) linkMap.set(l.contract_id, []);
+                linkMap.get(l.contract_id).push(l.tenant_id);
+              }
+            }
+          } catch (_) { /* fall back to client-side join */ }
+        }
+
+        const mappedContracts = (conRes.data || []).map(mapContract).map(c => {
+          const fromApi = linkMap.get(c.id);
+          return fromApi && fromApi.length > 0 ? { ...c, tenantIds: fromApi } : c;
+        });
+
         setData({
           properties:    (propRes.data  || []).map(mapProperty),
           tenants:       (tenRes.data   || []).map(mapTenant),
-          contracts:     (conRes.data   || []).map(mapContract),
+          contracts:     mappedContracts,
           payments:      (payRes.data   || []).map(mapPayment),
           maintenance:   (maintRes.data || []).map(mapMaintenance),
           emailSettings: mapEmailSettings(emailRes.data),
