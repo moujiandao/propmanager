@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request) {
-  const { tenantId, name, lastName, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId } = await request.json()
+  const { tenantId, name, lastName, email, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId } = await request.json()
 
   if (!tenantId) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
@@ -31,30 +31,47 @@ export async function POST(request) {
   }
 
   // Update profile fields
+  const profileUpdate = {
+    name,
+    last_name: lastName !== undefined ? (lastName || null) : undefined,
+    phone,
+    property_id: propertyId || null,
+    unit,
+    status,
+    monthly_rent: monthlyRent ? +monthlyRent : null,
+    move_in_date: moveInDate || null,
+    move_out_date: moveOutDate || null,
+    has_cosigner: hasCosigner || false,
+    student_status: studentStatus || null,
+    student_year: studentYear || null,
+    zelle_name: zelleName || null,
+    home_address: homeAddress || null,
+    age: age || null,
+    unit_id: unitId || null,
+  }
+  const trimmedEmail = typeof email === 'string' ? email.trim() : undefined
+  if (trimmedEmail !== undefined && trimmedEmail !== '') {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return Response.json({ error: 'Invalid email format.' }, { status: 400 })
+    }
+    profileUpdate.email = trimmedEmail
+  }
+
   const { error: profileError } = await supabase
     .from('tenant_profiles')
-    .update({
-      name,
-      last_name: lastName !== undefined ? (lastName || null) : undefined,
-      phone,
-      property_id: propertyId || null,
-      unit,
-      status,
-      monthly_rent: monthlyRent ? +monthlyRent : null,
-      move_in_date: moveInDate || null,
-      move_out_date: moveOutDate || null,
-      has_cosigner: hasCosigner || false,
-      student_status: studentStatus || null,
-      student_year: studentYear || null,
-      zelle_name: zelleName || null,
-      home_address: homeAddress || null,
-      age: age || null,
-      unit_id: unitId || null,
-    })
+    .update(profileUpdate)
     .eq('id', tenantId)
 
   if (profileError) {
     return Response.json({ error: profileError.message }, { status: 400 })
+  }
+
+  // Mirror email change to the auth user so the tenant can still log in
+  if (profileUpdate.email) {
+    const { error: authEmailError } = await supabase.auth.admin.updateUserById(tenantId, { email: profileUpdate.email })
+    if (authEmailError) {
+      return Response.json({ error: `Profile updated but auth email change failed: ${authEmailError.message}` }, { status: 400 })
+    }
   }
 
   // Update password if provided

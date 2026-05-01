@@ -86,6 +86,7 @@ const T = {
     monthlyPaymentLabel: "Monthly Payment ($)", passwordReset: "Password Reset",
     newPasswordLabel: "New Password (leave blank to keep current)", minCharsPlaceholder: "Min. 8 characters",
     emailReadOnly: "Email address cannot be changed here. To update a tenant's email, do so from Supabase Auth.",
+    emailLoginNote: "This email is the tenant's login. Changing it will update the address used for login and notifications.",
     deleteTenant: "Delete Tenant", deleteWarning: "This will permanently remove their account and all associated data. This cannot be undone.",
     deleting: "Deleting…", langLabel: "Language", navDocuments: "Documents", navAdminUsers: "Admin Users",
     adminUsersTitle: "Admin Users", adminUsersSubtitle: "Create additional landlord accounts",
@@ -174,6 +175,7 @@ const T = {
     monthlyPaymentLabel: "月租金（$）", passwordReset: "密码重置",
     newPasswordLabel: "新密码（留空则保持原密码）", minCharsPlaceholder: "至少8位字符",
     emailReadOnly: "此处无法修改电子邮件。如需更新租客邮箱，请在Supabase Auth中操作。",
+    emailLoginNote: "此邮箱为租客登录账号，修改后将同步更新登录及通知所用的邮箱。",
     deleteTenant: "删除租客", deleteWarning: "这将永久删除其账号及所有相关数据，此操作无法撤销。",
     deleting: "删除中…", langLabel: "语言", navDocuments: "文件", navAdminUsers: "管理员用户",
     adminUsersTitle: "管理员用户", adminUsersSubtitle: "创建额外的房东账号",
@@ -1009,7 +1011,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, lastName: ten.lastName || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "" });
+    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "" });
   };
 
   const saveEdit = async () => {
@@ -1022,6 +1024,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         tenantId: editTenant.id,
         name: editForm.name,
         lastName: editForm.lastName || null,
+        email: (editForm.email || "").trim() !== (editTenant.email || "").trim() ? (editForm.email || "").trim() : undefined,
         phone: editForm.phone,
         propertyId: editForm.propertyId || null,
         unit: editForm.unit,
@@ -1274,15 +1277,16 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Inp label={t.zelleNameLabel} value={editForm.zelleName} onChange={v => setEF("zelleName",v)} placeholder={t.zelleNamePlaceholder} />
             <Inp label={t.moveInDate} value={editForm.moveInDate} onChange={v => setEF("moveInDate",v)} type="date" />
             <Inp label={t.moveOutDate} value={editForm.moveOutDate} onChange={v => setEF("moveOutDate",v)} type="date" />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Inp label={t.email} value={editForm.email} onChange={v => setEF("email",v)} type="email" placeholder="tenant@email.com" />
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: -8, marginBottom: 4 }}>{t.emailLoginNote}</div>
+            </div>
           </div>
           <div style={{ marginTop: 4, marginBottom: 4 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>{t.passwordReset}</div>
             <Inp label={t.newPasswordLabel} value={editForm.password} onChange={v => setEF("password",v)} type="password" placeholder={t.minCharsPlaceholder} />
           </div>
           {editError && <p style={{ color: "#ef4444", fontSize: 13, margin: "0 0 12px" }}>{editError}</p>}
-          <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 9, padding: 12, marginBottom: 16, fontSize: 13, color: "#0369a1" }}>
-            {t.emailReadOnly}
-          </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setEditTenant(null)}>{t.cancel}</Btn>
             <Btn onClick={saveEdit}>{editSaving ? t.saving : t.saveChanges}</Btn>
