@@ -1333,25 +1333,31 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
     setEditContract(c);
     setEditForm({ tenantIds: c.tenantIds || [], propertyId: c.propertyId || "", unit: c.unit || "", startDate: c.startDate || "", endDate: c.endDate || "", rentAmount: c.rentAmount ? String(c.rentAmount) : "", dueDay: c.dueDay ? String(c.dueDay) : "1" });
   };
+  const [editError, setEditError] = useState(null);
   const save = async () => {
-    if (!editForm.rentAmount || !editForm.tenantIds.length) return;
-    const { error } = await supabase.from("contracts").update({
-      property_id: editForm.propertyId, unit: editForm.unit,
-      start_date: editForm.startDate, end_date: editForm.endDate,
-      rent_amount: +editForm.rentAmount, due_day: +editForm.dueDay,
-    }).eq("id", editContract.id);
-    if (error) return;
-    const { error: delError } = await supabase.from("contract_tenants").delete().eq("contract_id", editContract.id);
-    if (delError) return;
-    const ctResults = await Promise.all(editForm.tenantIds.map(tid =>
-      supabase.from("contract_tenants").insert({ contract_id: editContract.id, tenant_id: tid })
-    ));
-    if (ctResults.some(r => r.error)) return;
-    const newTenants = editForm.tenantIds.filter(tid => !editContract.tenantIds.includes(tid));
-    if (editForm.startDate && newTenants.length) {
-      await Promise.all(newTenants.map(tid =>
-        supabase.from("tenant_profiles").update({ move_in_date: editForm.startDate }).eq("id", tid)
-      ));
+    setEditError(null);
+    if (!editForm.rentAmount) {
+      setEditError("Rent amount is required.");
+      return;
+    }
+    const res = await fetch("/api/contracts/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contractId: editContract.id,
+        propertyId: editForm.propertyId,
+        unit: editForm.unit,
+        startDate: editForm.startDate,
+        endDate: editForm.endDate,
+        rentAmount: editForm.rentAmount,
+        dueDay: editForm.dueDay,
+        tenantIds: editForm.tenantIds,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setEditError(json.error || "Failed to save lease.");
+      return;
     }
     setEditContract(null);
     await refresh();
@@ -1627,12 +1633,22 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
 
     const newSaved = { ...saved };
 
-    // Batch delete
+    // Batch delete (server-side route to bypass RLS DELETE restriction)
     if (toDelete.length > 0) {
       const ids = toDelete.map(d => d.id);
-      const { error } = await supabase.from("payments").delete().in("id", ids);
-      if (error) {
-        setPayError(`Failed to delete: ${error.message}`);
+      const res = await fetch("/api/payments/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setPayError(`Failed to delete: ${json.error || "unknown error"}`);
+        setSaving(false);
+        return;
+      }
+      if (json.deletedCount !== ids.length) {
+        setPayError(`Delete partially failed: ${json.deletedCount}/${ids.length} rows removed.`);
         setSaving(false);
         return;
       }
