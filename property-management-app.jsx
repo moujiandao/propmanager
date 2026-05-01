@@ -1754,7 +1754,9 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
               ))}
             </tr>
             <tr style={{ borderTop: "1px solid #e2e8f0", background: "#f1f5f9" }}>
-              <td colSpan={3} />
+              <td colSpan={3} style={{ padding: "5px 18px", fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px", textAlign: "right" }}>
+                Select All
+              </td>
               {months.map(m => {
                 const allChecked = allTenants.length > 0 && allTenants.every(t => !!checked[`${t.id}-${m.key}`]);
                 const someChecked = !allChecked && allTenants.some(t => !!checked[`${t.id}-${m.key}`]);
