@@ -70,6 +70,7 @@ const T = {
     dashMovingOut: "Moving out", dashMovingIn: "Moving in",
     dashGap: (mo, d) => mo > 0 && d > 0 ? `Gap ${mo}mo ${d}d` : mo > 0 ? `Gap ${mo}mo` : `Gap ${d}d`,
     dashGapUnresolved: "Unresolved",
+    dashCleanBefore: (date) => `Clean unit before ${date}`,
     dashVacantNow: "Vacant now", dashNoOutgoing: "No outgoing tenant", dashNoIncoming: "New tenants needed", dashAvailableNow: "Available now",
     paySubtitleTracker: "Monthly rent tracker by unit", payZelleName: "Zelle Name", payMoveOutDate: "Move-out Date", paySelectAll: "Select All",
     payUnitLabel: (n) => `Unit ${n}`, payUnassigned: "Unassigned",
@@ -159,6 +160,7 @@ const T = {
     dashMovingOut: "搬出", dashMovingIn: "搬入",
     dashGap: (mo, d) => mo > 0 && d > 0 ? `空档 ${mo} 个月 ${d} 天` : mo > 0 ? `空档 ${mo} 个月` : `空档 ${d} 天`,
     dashGapUnresolved: "未确定",
+    dashCleanBefore: (date) => `请于 ${date} 前打扫单元`,
     dashVacantNow: "目前空置", dashNoOutgoing: "无搬出租客", dashNoIncoming: "需招新租客", dashAvailableNow: "目前可用",
     paySubtitleTracker: "按单元的月租追踪", payZelleName: "Zelle姓名", payMoveOutDate: "退租日期", paySelectAll: "全选",
     payUnitLabel: (n) => `单元 ${n}`, payUnassigned: "未分配单元",
@@ -639,7 +641,17 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
           }
         }
       }
-      return { ...row, gapMonths, gapDays };
+      // Are ALL current tenants of this unit in the outgoing list? Compare the
+      // outgoing count against every current tenant matching the same
+      // property+unit (or property+unitId).
+      const currentOnUnit = tenants.filter(t => {
+        if (t.status !== "current tenant") return false;
+        if (t.propertyId !== row.propertyId) return false;
+        if (row.unitId) return t.unitId === row.unitId;
+        return String(t.unit || "").trim() === String(row.unitLabel || "").trim();
+      });
+      const allCurrentMovingOut = row.outgoing.length > 0 && currentOnUnit.length === row.outgoing.length;
+      return { ...row, gapMonths, gapDays, allCurrentMovingOut, earliestIncomingDate: earliestIn };
     }).sort((a, b) => {
       if (a.propertyAddress !== b.propertyAddress)
         return a.propertyAddress.localeCompare(b.propertyAddress);
@@ -667,7 +679,7 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
           const showUnresolvedBadge = !showGapBadge && (row.outgoing.length > 0 || row.vacantNow) && row.incoming.length === 0;
           return (
             <div key={row.key} style={{ padding: "14px 0", borderBottom: "1px solid #f8fafc" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
                 <div
                   style={{ fontSize: 16, fontWeight: 700, color: row.propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: row.propertyId && setPage ? "pointer" : "default" }}
                   onClick={() => { if (row.propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(row.propertyId); setPage("property-detail"); } }}
@@ -676,16 +688,23 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
                 >
                   Unit {row.unitLabel} · {row.propertyAddress}
                 </div>
-                {showGapBadge && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "4px 10px", borderRadius: 6, letterSpacing: ".3px" }}>
-                    {t.dashGap(row.gapMonths, row.gapDays)}
-                  </span>
-                )}
-                {showUnresolvedBadge && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#991b1b", background: "#fee2e2", padding: "4px 10px", borderRadius: 6, letterSpacing: ".3px" }}>
-                    {t.dashGapUnresolved}
-                  </span>
-                )}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  {showGapBadge && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "4px 10px", borderRadius: 6, letterSpacing: ".3px" }}>
+                      {t.dashGap(row.gapMonths, row.gapDays)}
+                    </span>
+                  )}
+                  {showUnresolvedBadge && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#991b1b", background: "#fee2e2", padding: "4px 10px", borderRadius: 6, letterSpacing: ".3px" }}>
+                      {t.dashGapUnresolved}
+                    </span>
+                  )}
+                  {row.allCurrentMovingOut && row.incoming.length > 0 && row.earliestIncomingDate && (
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#0369a1" }}>
+                      {t.dashCleanBefore(fmtDate(row.earliestIncomingDate))}
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div>
