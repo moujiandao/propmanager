@@ -647,7 +647,7 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
       <PageHeader title={t.dashTitle} subtitle={t.dashSubtitle} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 28 }}>
         <StatCard label={t.statProperties} value={properties.length} sub={`${occupied} ${t.statOccupied}`} icon="building" />
-        <StatCard label={t.statRevenue} value={fmt(activeContracts.reduce((s,c) => s+c.rentAmount, 0))} sub={t.statActiveLeases} icon="trending" color="#22c55e" />
+        <StatCard label={t.statRevenue} value={fmt(tenants.filter(t => t.status === "current tenant").reduce((s, t) => s + (t.monthlyRent || 0), 0))} sub={t.statActiveLeases} icon="trending" color="#22c55e" />
         <StatCard label={t.statPending} value={pendingPayments.length} sub={t.statRequireAttention} icon="clock" color="#ef4444" />
         <StatCard label={t.statOpenMaint} value={openMaint.length} sub={t.statRequests} icon="wrench" color="#818cf8" />
       </div>
@@ -1329,6 +1329,28 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
   const [editContract, setEditContract] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const setEF = (k,v) => setEditForm(f => ({...f,[k]:v}));
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteSaving(true);
+    setDeleteError(null);
+    const res = await fetch("/api/contracts/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contractId: deleteTarget.id }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setDeleteError(json.error || "Failed to delete lease.");
+      setDeleteSaving(false);
+      return;
+    }
+    setDeleteTarget(null);
+    setDeleteSaving(false);
+    await refresh();
+  };
   const openEdit = (c) => {
     setEditContract(c);
     setEditForm({ tenantIds: c.tenantIds || [], propertyId: c.propertyId || "", unit: c.unit || "", startDate: c.startDate || "", endDate: c.endDate || "", rentAmount: c.rentAmount ? String(c.rentAmount) : "", dueDay: c.dueDay ? String(c.dueDay) : "1" });
@@ -1385,7 +1407,12 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
     <div>
       <PageHeader title={t.conTitle} subtitle={t.conSubtitle(data.contracts.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addLease}</Btn>} />
       <div style={{ display: "grid", gap: 14 }}>
-        {data.contracts.map(c => {
+        {[...data.contracts].sort((a, b) => {
+          const pa = data.properties.find(p => p.id === a.propertyId)?.address || "";
+          const pb = data.properties.find(p => p.id === b.propertyId)?.address || "";
+          if (pa !== pb) return pa.localeCompare(pb);
+          return String(a.unit || "").localeCompare(String(b.unit || ""), undefined, { numeric: true });
+        }).map(c => {
           const prop = data.properties.find(p => p.id === c.propertyId);
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -1430,7 +1457,16 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
                 <Badge status={c.status} t={t} />
-                <Btn variant="secondary" size="sm" icon="edit" onClick={() => openEdit(c)}>{t.editBtn}</Btn>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Btn variant="secondary" size="sm" icon="edit" onClick={() => openEdit(c)}>{t.editBtn}</Btn>
+                  <button
+                    onClick={() => setDeleteTarget(c)}
+                    style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" }}
+                    aria-label="Delete lease"
+                  >
+                    <Icon name="trash" size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -1461,6 +1497,27 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
             <Btn variant="secondary" onClick={() => setEditContract(null)}>{t.cancel}</Btn>
             <Btn onClick={save}>{t.saveChanges}</Btn>
+          </div>
+        </Modal>
+      )}
+      {deleteTarget && (
+        <Modal title="Delete Lease" onClose={() => { if (!deleteSaving) { setDeleteTarget(null); setDeleteError(null); } }}>
+          <p style={{ margin: "0 0 12px", fontSize: 14, color: "#0f172a" }}>
+            Are you sure you want to delete the lease for <strong>{data.properties.find(p => p.id === deleteTarget.propertyId)?.address || ""} · Unit {deleteTarget.unit}</strong>?
+          </p>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>
+            This will remove the lease record and unlink any payments tied to it. Tenant profiles will not be deleted. This cannot be undone.
+          </p>
+          {deleteError && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#ef4444" }}>{deleteError}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => { setDeleteTarget(null); setDeleteError(null); }} disabled={deleteSaving}>Cancel</Btn>
+            <button
+              onClick={confirmDelete}
+              disabled={deleteSaving}
+              style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", cursor: deleteSaving ? "wait" : "pointer", fontSize: 14, fontWeight: 600, fontFamily: "inherit", opacity: deleteSaving ? 0.7 : 1 }}
+            >
+              {deleteSaving ? "Deleting..." : "Delete Lease"}
+            </button>
           </div>
         </Modal>
       )}
