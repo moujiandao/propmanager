@@ -564,7 +564,10 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
       .filter(p => p.status === "completed" && p.dueDate && p.dueDate.startsWith(currentMonthKey))
       .map(p => p.tenantId)
   );
-  const unpaidTenants = tenants.filter(ten => ten.status === "current tenant" && !paidTenantIds.has(ten.id));
+  // Only flag rent as unpaid once we're at the 5th of the month or later — gives tenants a grace window through the 4th.
+  const unpaidTenants = now.getDate() < 5
+    ? []
+    : tenants.filter(ten => ten.status === "current tenant" && !paidTenantIds.has(ten.id));
 
   const todayStr = now.toISOString().split("T")[0];
   const activeContracts = contracts.filter(c =>
