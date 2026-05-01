@@ -1422,12 +1422,10 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colDaysRemaining}</div>
                 {notStartedYet ? (
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#4f46e5", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.leaseUpcoming}</div>
-                ) : !endDate ? (
+                ) : !endDate || daysLeft <= 0 ? (
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Month to Month</div>
-                ) : daysLeft > 0 ? (
-                  <div style={{ fontSize: 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft} {t.daysRemaining}</div>
                 ) : (
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#ef4444", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.expired}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft} {t.daysRemaining}</div>
                 )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
