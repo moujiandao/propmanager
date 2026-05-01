@@ -1,9 +1,75 @@
 'use client'
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader } from './property-management-app'
 
+const PdfViewer = dynamic(() => import('./components/pdf-viewer'), {
+  ssr: false,
+  loading: () => <p style={{ color: '#94a3b8', padding: '24px', fontSize: 14 }}>Loading PDF…</p>,
+})
+
 const supabase = createClient()
+
+// ─── toEmbedUrl — converts Google Drive share URL to an embeddable URL ────────
+const toEmbedUrlDrive = (link) => {
+  if (!link) return null
+  const folderMatch = link.match(/\/folders\/([a-zA-Z0-9_-]+)/)
+  if (folderMatch) return `https://drive.google.com/embeddedfolderview?id=${folderMatch[1]}#list`
+  const fileMatch = link.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (fileMatch) return `https://drive.google.com/file/d/${fileMatch[1]}/preview`
+  return link
+}
+
+// ─── DocViewer — renders a document inline (PDF or Drive link) ────────────────
+export const DocViewer = ({ doc, onClose }) => {
+  const [signedUrl, setSignedUrl] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!doc.driveLink && doc.filePath) {
+      setLoading(true)
+      supabase.storage.from('documents').createSignedUrl(doc.filePath, 300)
+        .then(({ data }) => { setSignedUrl(data?.signedUrl || null) })
+        .catch(() => {})
+        .finally(() => setLoading(false))
+    }
+  }, [doc.id])
+
+  const embedUrl = doc.driveLink ? toEmbedUrlDrive(doc.driveLink) : null
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 40 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ background: '#fff', borderRadius: 14, width: '90vw', maxWidth: 900, maxHeight: '85vh', overflow: 'auto', boxShadow: '0 25px 60px rgba(0,0,0,0.3)', position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid #f1f5f9', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', fontFamily: "'Inter',system-ui,-apple-system,sans-serif", maxWidth: '80%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {doc.fileName || doc.driveLink || 'Document'}
+          </span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#64748b', lineHeight: 1, padding: '0 4px' }}>×</button>
+        </div>
+        <div style={{ padding: 16 }}>
+          {embedUrl ? (
+            <iframe
+              src={embedUrl}
+              style={{ width: '100%', height: '70vh', border: 'none', borderRadius: 8 }}
+              allow="autoplay"
+              title="Document"
+            />
+          ) : loading ? (
+            <p style={{ color: '#94a3b8', padding: 24, fontSize: 14 }}>Loading…</p>
+          ) : signedUrl ? (
+            <PdfViewer url={signedUrl} />
+          ) : (
+            <p style={{ color: '#ef4444', padding: 24, fontSize: 14 }}>Could not load document.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const fmt = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n)
 
@@ -269,6 +335,9 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
   const [uploadPropertyId, setUploadPropertyId] = useState('')
   const [uploadDocType, setUploadDocType] = useState('other')
 
+  // Inline viewer state
+  const [viewingDoc, setViewingDoc] = useState(null)
+
   const handleUpload = async () => {
     if (!uploadFile) return
     setUploading(true)
@@ -327,11 +396,7 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
     }
   }
 
-  const handleView = async (doc) => {
-    const supabaseClient = createClient()
-    const { data: signedData } = await supabaseClient.storage.from('documents').createSignedUrl(doc.filePath, 60)
-    if (signedData?.signedUrl) window.open(signedData.signedUrl, '_blank')
-  }
+  const handleView = (doc) => setViewingDoc(doc)
 
   const handleProcessLease = async () => {
     setLeaseProcessing(true)
@@ -364,6 +429,7 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
 
   return (
     <div style={{ padding: '24px 32px' }}>
+      {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ color: '#f1f5f9', fontSize: 24, fontWeight: 700, margin: 0 }}>Documents</h1>
@@ -597,6 +663,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
   const [saveError, setSaveError] = useState("")
   const [selectedDocId, setSelectedDocId] = useState("")
   const [showImportPreview, setShowImportPreview] = useState(false)
+  const [viewingDoc, setViewingDoc] = useState(null)
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -629,6 +696,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
   if (!tenant) {
     return (
       <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+        {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
         <button onClick={onBack} style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, padding: "8px 14px", color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 24 }}>
           ← Back
         </button>
@@ -713,17 +781,14 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
     setSelectedDocId("")
   }
 
-  const handleViewDoc = async (doc) => {
-    const client = createClient()
-    const { data: signedData } = await client.storage.from('documents').createSignedUrl(doc.filePath, 60)
-    if (signedData?.signedUrl) window.open(signedData.signedUrl, '_blank')
-  }
+  const handleViewDoc = (doc) => setViewingDoc(doc)
 
   const docTypeBadgeColor = { application: '#0ea5e9', lease: '#4f46e5', other: '#64748b' }
   const displayRent = linkedUnit?.monthlyRent || tenant.monthlyRent
 
   return (
     <div style={{ background: "#0f172a", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+      {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
         <button

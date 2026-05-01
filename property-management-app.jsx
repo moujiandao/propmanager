@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createClient } from '@/lib/supabase/client';
-import { PropertyDetailPage, DocumentsPageV2, TenantContactPage } from './phase2-components';
+import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 
 const supabase = createClient();
 
@@ -97,6 +97,9 @@ const T = {
     adminErrFields: "All fields are required.", adminErrPassword: "Password must be at least 8 characters.",
     navPaymentPortal: "Payment Portal", navPaymentHistory: "Payment History", navMyProfile: "My Profile",
     statusCurrentTenant: "Current Tenant", statusFutureTenant: "Future Tenant", statusPreviousTenant: "Previous Tenant",
+    docSectionTitle: "Documents", docUploadPdf: "Upload PDF", docAddDriveLink: "Add Drive Link",
+    docView: "View", docNoDocuments: "No documents attached", docDriveLinkPlaceholder: "Paste Google Drive share URL",
+    docAttach: "Attach", docRemove: "Remove",
   },
   zh: {
     appName: "房产管理", landlord: "房东", tenant: "租客", signIn: "登录",
@@ -187,6 +190,9 @@ const T = {
     adminErrFields: "所有字段均为必填项。", adminErrPassword: "密码至少需要8位字符。",
     navPaymentPortal: "付款门户", navPaymentHistory: "付款记录", navMyProfile: "我的资料",
     statusCurrentTenant: "现租客", statusFutureTenant: "待入住租客", statusPreviousTenant: "前租客",
+    docSectionTitle: "文件", docUploadPdf: "上传 PDF", docAddDriveLink: "添加 Drive 链接",
+    docView: "查看", docNoDocuments: "暂无附件", docDriveLinkPlaceholder: "粘贴 Google Drive 分享链接",
+    docAttach: "附加", docRemove: "删除",
   }
 };
 
@@ -1346,6 +1352,13 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  // Document attachment state (for Edit Lease modal)
+  const [viewingDoc, setViewingDoc] = useState(null);
+  const [showDriveLinkInput, setShowDriveLinkInput] = useState(false);
+  const [driveLinkInput, setDriveLinkInput] = useState("");
+  const [docUploading, setDocUploading] = useState(false);
+  const [docError, setDocError] = useState(null);
+  const docFileRef = useRef(null);
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setDeleteSaving(true);
@@ -1365,9 +1378,14 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
     setDeleteSaving(false);
     await refresh();
   };
+  const closeEdit = () => { setEditContract(null); setViewingDoc(null); setShowDriveLinkInput(false); setDriveLinkInput(""); setDocError(null); };
   const openEdit = (c) => {
     setEditContract(c);
     setEditForm({ tenantIds: c.tenantIds || [], propertyId: c.propertyId || "", unit: c.unit || "", startDate: c.startDate || "", endDate: c.endDate || "", rentAmount: c.rentAmount ? String(c.rentAmount) : "", dueDay: c.dueDay ? String(c.dueDay) : "1" });
+    setViewingDoc(null);
+    setShowDriveLinkInput(false);
+    setDriveLinkInput("");
+    setDocError(null);
   };
   const [editError, setEditError] = useState(null);
   const save = async () => {
@@ -1395,7 +1413,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
       setEditError(json.error || "Failed to save lease.");
       return;
     }
-    setEditContract(null);
+    closeEdit();
     await refresh();
   };
   const add = async () => {
@@ -1487,7 +1505,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
         })}
       </div>
       {editContract && (
-        <Modal title={t.editLeaseTitle} onClose={() => setEditContract(null)} wide>
+        <Modal title={t.editLeaseTitle} onClose={closeEdit} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div style={{ gridColumn: "1 / -1" }}>
               <div style={{ fontSize: 13, color: "#374151", fontWeight: 600, marginBottom: 6 }}>{t.colTenants}</div>
@@ -1508,8 +1526,98 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
             <Inp label={t.endDate} value={editForm.endDate} onChange={v => setEF("endDate",v)} type="date" />
             <Inp label={t.dueDayLabel} value={editForm.dueDay} onChange={v => setEF("dueDay",v)} type="number" />
           </div>
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-            <Btn variant="secondary" onClick={() => setEditContract(null)}>{t.cancel}</Btn>
+          {/* Documents section */}
+          <div style={{ marginTop: 20, borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{t.docSectionTitle}</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  ref={docFileRef}
+                  type="file"
+                  accept="application/pdf"
+                  style={{ display: "none" }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !editContract) return;
+                    setDocUploading(true);
+                    setDocError(null);
+                    const fd = new FormData();
+                    fd.append("file", file);
+                    fd.append("landlordId", user.id);
+                    fd.append("contractId", editContract.id);
+                    fd.append("documentType", "lease");
+                    const res = await fetch("/api/documents/upload", { method: "POST", body: fd });
+                    const json = await res.json().catch(() => ({}));
+                    setDocUploading(false);
+                    if (!res.ok) { setDocError(json.error || "Upload failed."); return; }
+                    e.target.value = "";
+                    await refresh();
+                  }}
+                />
+                <Btn variant="secondary" size="sm" onClick={() => docFileRef.current?.click()} disabled={docUploading}>
+                  {docUploading ? "Uploading…" : t.docUploadPdf}
+                </Btn>
+                <Btn variant="secondary" size="sm" onClick={() => { setShowDriveLinkInput(v => !v); setDriveLinkInput(""); setDocError(null); }}>
+                  {t.docAddDriveLink}
+                </Btn>
+              </div>
+            </div>
+            {showDriveLinkInput && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <input
+                  type="url"
+                  placeholder={t.docDriveLinkPlaceholder}
+                  value={driveLinkInput}
+                  onChange={e => setDriveLinkInput(e.target.value)}
+                  style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                />
+                <Btn size="sm" onClick={async () => {
+                  if (!driveLinkInput.trim() || !editContract) return;
+                  setDocError(null);
+                  const res = await fetch("/api/documents/add-drive-link", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contractId: editContract.id, driveLink: driveLinkInput.trim(), landlordId: user.id, documentType: "lease" }),
+                  });
+                  const json = await res.json().catch(() => ({}));
+                  if (!res.ok) { setDocError(json.error || "Failed to save link."); return; }
+                  setShowDriveLinkInput(false);
+                  setDriveLinkInput("");
+                  await refresh();
+                }}>{t.docAttach}</Btn>
+              </div>
+            )}
+            {docError && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 8 }}>{docError}</div>}
+            {(() => {
+              const contractDocs = (data.documents || []).filter(d => d.contractId === editContract?.id);
+              if (contractDocs.length === 0) return (
+                <div style={{ fontSize: 13, color: "#94a3b8", fontStyle: "italic", padding: "4px 0" }}>{t.docNoDocuments}</div>
+              );
+              return contractDocs.map(doc => (
+                <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid #f8fafc" }}>
+                  <span style={{ fontSize: 16 }}>{doc.driveLink ? "🔗" : "📄"}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {doc.driveLink ? (doc.driveLink.length > 50 ? doc.driveLink.slice(0, 50) + "…" : doc.driveLink) : doc.fileName}
+                  </span>
+                  <button
+                    onClick={() => setViewingDoc(doc)}
+                    style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 7, padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+                  >{t.docView}</button>
+                  <button
+                    onClick={async () => {
+                      const res = await fetch("/api/documents/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: doc.id }) });
+                      if (res.ok) await refresh();
+                    }}
+                    style={{ background: "none", border: "1px solid #fca5a5", borderRadius: 7, padding: "5px 10px", fontSize: 12, color: "#ef4444", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+                  >{t.docRemove}</button>
+                </div>
+              ));
+            })()}
+          </div>
+          {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
+          {editError && <div style={{ fontSize: 13, color: "#ef4444", marginTop: 8 }}>{editError}</div>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 12 }}>
+            <Btn variant="secondary" onClick={closeEdit}>{t.cancel}</Btn>
             <Btn onClick={save}>{t.saveChanges}</Btn>
           </div>
         </Modal>
@@ -2695,7 +2803,7 @@ export default function App() {
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
   const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
-  const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at })
+  const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, contractId: d.contract_id || null, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at, driveLink: d.drive_link || null })
   const mapEmailSettings = (e) => !e ? EMPTY_EMAIL_SETTINGS : ({
     fiveDayReminder: e.five_day_reminder || false, dayOfReminder: e.day_of_reminder || false,
     oneDayOverdue: e.one_day_overdue || false, threeDayOverdue: e.three_day_overdue || false,

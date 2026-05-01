@@ -1,8 +1,12 @@
-import { createClient } from '../../../../lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  const supabase = await createClient()
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
   const formData = await request.formData()
 
   const file = formData.get('file')
@@ -10,6 +14,7 @@ export async function POST(request) {
   const tenantId = formData.get('tenantId') || null
   const propertyId = formData.get('propertyId') || null
   const unitId = formData.get('unitId') || null
+  const contractId = formData.get('contractId') || null
   const documentType = formData.get('documentType') || 'other'
 
   if (!file || !landlordId) {
@@ -38,6 +43,7 @@ export async function POST(request) {
       tenant_id: tenantId,
       property_id: propertyId,
       unit_id: unitId,
+      contract_id: contractId,
       file_name: file.name,
       file_path: filePath,
       file_type: file.type,
