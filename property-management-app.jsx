@@ -1672,7 +1672,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
         const row = {
           landlord_id: user.id,
           tenant_id: tenantId,
-          amount: contract?.rentAmount || tenant?.monthlyRent || 0,
+          amount: tenant?.monthlyRent || 0,
           due_date: `${monthKey}-01`,
           paid_date: new Date().toISOString().split("T")[0],
           status: "completed",
@@ -1791,7 +1791,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                   </td>
                 </tr>
                 {tenants.map(tenant => {
-                  const rentAmount = getContract(tenant)?.rentAmount || tenant.monthlyRent || null;
+                  const rentAmount = tenant.monthlyRent || null;
                   return (
                     <tr key={tenant.id} style={{ borderTop: "1px solid #f1f5f9", background: "transparent" }}>
                       <td style={{ padding: "13px 18px" }}>
@@ -1832,7 +1832,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                   );
                 })}
                 {(() => {
-                  const unitTotal = tenants.reduce((s, t) => s + (getContract(t)?.rentAmount || 0), 0);
+                  const unitTotal = tenants.reduce((s, t) => s + (t.monthlyRent || 0), 0);
                   return unitTotal > 0 ? (
                     <tr style={{ borderTop: "1px solid #e2e8f0", background: "#f8fafc" }}>
                       <td colSpan={3} style={{ padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#64748b" }}>Total</td>
