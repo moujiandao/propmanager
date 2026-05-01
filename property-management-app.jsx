@@ -71,7 +71,7 @@ const T = {
     dashGap: (mo, d) => mo > 0 && d > 0 ? `Gap ${mo}mo ${d}d` : mo > 0 ? `Gap ${mo}mo` : `Gap ${d}d`,
     dashGapUnresolved: "Unresolved",
     dashVacantNow: "Vacant now", dashNoOutgoing: "No outgoing tenant", dashNoIncoming: "New tenants needed", dashAvailableNow: "Available now",
-    paySubtitleTracker: "Monthly rent tracker by unit", payZelleName: "Zelle Name", payMoveOutDate: "Move-out Date",
+    paySubtitleTracker: "Monthly rent tracker by unit", payZelleName: "Zelle Name", payMoveOutDate: "Move-out Date", paySelectAll: "Select All",
     payUnitLabel: (n) => `Unit ${n}`, payUnassigned: "Unassigned",
     saveChanges: "Save Changes", saving: "Saving...", discard: "Discard",
     displayBy: "Display by", displayAll: "All", displayByUnit: "Property + Unit",
@@ -159,7 +159,7 @@ const T = {
     dashGap: (mo, d) => mo > 0 && d > 0 ? `空档 ${mo} 个月 ${d} 天` : mo > 0 ? `空档 ${mo} 个月` : `空档 ${d} 天`,
     dashGapUnresolved: "未确定",
     dashVacantNow: "目前空置", dashNoOutgoing: "无搬出租客", dashNoIncoming: "需招新租客", dashAvailableNow: "目前可用",
-    paySubtitleTracker: "按单元的月租追踪", payZelleName: "Zelle姓名", payMoveOutDate: "退租日期",
+    paySubtitleTracker: "按单元的月租追踪", payZelleName: "Zelle姓名", payMoveOutDate: "退租日期", paySelectAll: "全选",
     payUnitLabel: (n) => `单元 ${n}`, payUnassigned: "未分配单元",
     saveChanges: "保存更改", saving: "保存中…", discard: "撤销更改",
     displayBy: "分组方式", displayAll: "全部", displayByUnit: "房产 + 单元",
@@ -1755,7 +1755,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
             </tr>
             <tr style={{ borderTop: "1px solid #e2e8f0", background: "#f1f5f9" }}>
               <td colSpan={3} style={{ padding: "5px 18px", fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px", textAlign: "right" }}>
-                Select All
+                {t.paySelectAll}
               </td>
               {months.map(m => {
                 const allChecked = allTenants.length > 0 && allTenants.every(t => !!checked[`${t.id}-${m.key}`]);

@@ -32,7 +32,7 @@ A property management web application built with Next.js and Supabase. Provides 
 - Data mappers convert snake_case (Supabase) to camelCase (UI) in `property-management-app.jsx`
 - Reusable UI components: Modal, Inp, Sel, Btn, Badge, Icon, PageHeader, StatCard, Toggle
 - Bilingual support: English and Chinese via T object (landlord UI only)
-- **Translation rule**: Every user-facing string in landlord UI JSX must be added to both `T.en` and `T.zh` in the T object at the top of `property-management-app.jsx` before use. Reference it as `t.keyName` — never hardcode visible text directly in JSX. When adding a new page or feature, add all its strings to both language blocks as the first step.
+- **Translation rule**: Every user-facing string in landlord UI JSX must be added to both `T.en` and `T.zh` in the T object at the top of `property-management-app.jsx` before use. Reference it as `t.keyName` — never hardcode visible text directly in JSX. When adding a new page or feature, add all its strings to both language blocks as the first step. This applies to **every** visible string the landlord can see: page titles, table headers, button labels, modal titles and bodies, confirmation prompts, empty-state messages, error/toast messages, badge text, placeholders, and tooltips. The only exceptions are dynamic data values from the database, brand names, and currency/date output already shaped by `fmt` / `fmtDate`.
 - Run dev server: `npm run dev` (localhost:3000)
 
 ## Non-Obvious Decisions
@@ -51,4 +51,4 @@ A property management web application built with Next.js and Supabase. Provides 
 - Do not create separate Next.js page files for app views - use the state-driven navigation pattern in the monolith
 - Do not use the anon key in server-side API routes that need admin access (use service role key via `lib/supabase/server.js`)
 - Do not drop existing `unit` text columns when adding `unit_id` foreign keys - keep both for backward compatibility
-- Do not hardcode visible strings in JSX - always add to T.en and T.zh first, then reference via `t.keyName`
+- Do not hardcode visible strings in JSX - always add to T.en and T.zh first, then reference via `t.keyName`. Before reporting any landlord-UI change complete, grep your diff for hardcoded English strings (quoted text inside JSX, including `title=`, `placeholder=`, modal copy, error messages, and confirm dialogs). If you find any, add matching entries to both `T.en` and `T.zh` and replace the literals with `t.keyName`.
