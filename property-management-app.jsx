@@ -872,16 +872,14 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
     if (!error) { await refresh(); setConfirmDelete(null); }
   };
 
-  const propTodayStr = new Date().toISOString().split("T")[0];
-
   return (
     <div>
       <PageHeader title={t.propTitle} subtitle={t.propSubtitle(data.properties.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addProperty}</Btn>} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 18 }}>
         {data.properties.map(p => {
-          const rev = data.contracts
-            .filter(c => c.propertyId === p.id && c.status === "active" && (!c.startDate || c.startDate <= propTodayStr) && (!c.endDate || c.endDate >= propTodayStr))
-            .reduce((s,c) => s+c.rentAmount, 0);
+          const rev = data.tenants
+            .filter(ten => ten.propertyId === p.id && ten.status === "current tenant")
+            .reduce((s, ten) => s + (ten.monthlyRent || 0), 0);
           const propertyUnits = (data.units || []).filter(u => u.propertyId === p.id);
           const occupiedUnits = propertyUnits.filter(u => u.status === 'occupied').length;
           const totalUnits = propertyUnits.length;
