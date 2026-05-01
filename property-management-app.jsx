@@ -39,7 +39,7 @@ const T = {
     addLease: "Add Lease", addLeaseTitle: "Add New Lease", editLeaseTitle: "Edit Lease",
     selectTenant: "Select tenant", monthlyRent: "Monthly Rent ($)",
     startDate: "Start Date", endDate: "End Date", dueDayLabel: "Due Day (1-28)",
-    dueOf: "Due:", ofMonth: "of month", expired: "Expired", daysRemaining: "days", rent: "Rent", term: "Term",
+    dueOf: "Due:", ofMonth: "of month", expired: "Expired", daysRemaining: "days", leaseUpcoming: "Upcoming", rent: "Rent", term: "Term",
     createLease: "Create Lease",
     payTitle: "Payments", paySubtitle: "ACH payment tracking across all tenants",
     filterAll: "All", typeRecurring: "Recurring", typeOneTime: "One-time", naLabel: "N/A",
@@ -127,7 +127,7 @@ const T = {
     addLease: "添加租约", addLeaseTitle: "添加新租约", editLeaseTitle: "编辑租约",
     selectTenant: "选择租客", monthlyRent: "月租金（$）",
     startDate: "开始日期", endDate: "结束日期", dueDayLabel: "到期日（1-28日）",
-    dueOf: "到期日：每月", ofMonth: "日", expired: "已到期", daysRemaining: "天", rent: "租金", term: "期限",
+    dueOf: "到期日：每月", ofMonth: "日", expired: "已到期", daysRemaining: "天", leaseUpcoming: "即将开始", rent: "租金", term: "期限",
     createLease: "创建租约",
     payTitle: "付款管理", paySubtitle: "所有租客的ACH付款追踪",
     filterAll: "全部", typeRecurring: "自动续费", typeOneTime: "单次付款", naLabel: "不适用",
@@ -1381,7 +1381,13 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
       <div style={{ display: "grid", gap: 14 }}>
         {data.contracts.map(c => {
           const prop = data.properties.find(p => p.id === c.propertyId);
-          const daysLeft = Math.ceil((new Date(c.endDate)-new Date())/86400000);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const startDate = c.startDate ? new Date(`${c.startDate}T00:00:00`) : null;
+          const endDate = c.endDate ? new Date(`${c.endDate}T00:00:00`) : null;
+          const notStartedYet = startDate && startDate > today;
+          const daysUntilStart = notStartedYet ? Math.ceil((startDate - today) / 86400000) : 0;
+          const daysLeft = endDate ? Math.ceil((endDate - today) / 86400000) : NaN;
           return (
             <div key={c.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: 16, alignItems: "center" }}>
               <div>
@@ -1408,7 +1414,15 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colDaysRemaining}</div>
-                <div style={{ fontSize: daysLeft <= 0 ? 14 : 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft > 0 ? `${daysLeft} ${t.daysRemaining}` : "Month to Month"}</div>
+                {notStartedYet ? (
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#4f46e5", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.leaseUpcoming}</div>
+                ) : !endDate ? (
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Month to Month</div>
+                ) : daysLeft > 0 ? (
+                  <div style={{ fontSize: 20, fontWeight: 700, color: daysLeft < 60 ? "#ef4444" : "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft} {t.daysRemaining}</div>
+                ) : (
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#ef4444", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.expired}</div>
+                )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
                 <Badge status={c.status} t={t} />
@@ -2110,7 +2124,13 @@ const TenantLeasePage = ({ data, user }) => {
   const tenant = data.tenants.find(t => t.id === user.id);
   const property = data.properties.find(p => p.id === tenant?.propertyId);
   if (!contract) return <div style={{ padding:32,color:"#64748b" }}>No active lease found.</div>;
-  const daysLeft = Math.ceil((new Date(contract.endDate)-new Date())/86400000);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startDate = contract.startDate ? new Date(`${contract.startDate}T00:00:00`) : null;
+  const endDate = contract.endDate ? new Date(`${contract.endDate}T00:00:00`) : null;
+  const notStartedYet = startDate && startDate > today;
+  const daysUntilStart = notStartedYet ? Math.ceil((startDate - today) / 86400000) : 0;
+  const daysLeft = endDate ? Math.ceil((endDate - today) / 86400000) : 0;
   return (
     <div>
       <PageHeader title="My Lease" subtitle="Current lease agreement details" />
@@ -2131,10 +2151,19 @@ const TenantLeasePage = ({ data, user }) => {
           ))}
         </div>
         <div>
-          <div style={{ background: daysLeft<60?"#fef2f2":"#f0fdf4", borderRadius: 14, padding: 24, border: `1px solid ${daysLeft<60?"#fca5a5":"#86efac"}`, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: daysLeft<60?"#991b1b":"#166534", fontWeight: 600, marginBottom: 6 }}>LEASE EXPIRY</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: daysLeft<60?"#ef4444":"#22c55e", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft} days</div>
-            <div style={{ fontSize: 14, color: daysLeft<60?"#991b1b":"#166534" }}>Expires {fmtDate(contract.endDate)}</div>
+          <div style={{ background: notStartedYet ? "#eef2ff" : daysLeft<60?"#fef2f2":"#f0fdf4", borderRadius: 14, padding: 24, border: `1px solid ${notStartedYet ? "#a5b4fc" : daysLeft<60?"#fca5a5":"#86efac"}`, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: notStartedYet ? "#3730a3" : daysLeft<60?"#991b1b":"#166534", fontWeight: 600, marginBottom: 6 }}>LEASE EXPIRY</div>
+            {notStartedYet ? (
+              <>
+                <div style={{ fontSize: 32, fontWeight: 800, color: "#4f46e5", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>Upcoming</div>
+                <div style={{ fontSize: 14, color: "#3730a3" }}>Starts {fmtDate(contract.startDate)}</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 36, fontWeight: 800, color: daysLeft<60?"#ef4444":"#22c55e", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{daysLeft} days</div>
+                <div style={{ fontSize: 14, color: daysLeft<60?"#991b1b":"#166534" }}>Expires {fmtDate(contract.endDate)}</div>
+              </>
+            )}
           </div>
           <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9" }}>
             <h4 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Landlord Contact</h4>
