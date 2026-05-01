@@ -648,9 +648,8 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
   return (
     <div>
       <PageHeader title={t.dashTitle} subtitle={t.dashSubtitle} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 28 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 28 }}>
         <StatCard label={t.statProperties} value={properties.length} sub={`${occupied} ${t.statOccupied}`} icon="building" />
-        <StatCard label={t.statRevenue} value={fmt(tenants.filter(t => t.status === "current tenant").reduce((s, t) => s + (t.monthlyRent || 0), 0))} sub={t.statActiveLeases} icon="trending" color="#22c55e" />
         <StatCard label={t.statPending} value={pendingPayments.length} sub={t.statRequireAttention} icon="clock" color="#ef4444" />
         <StatCard label={t.statOpenMaint} value={openMaint.length} sub={t.statRequests} icon="wrench" color="#818cf8" />
       </div>
@@ -880,9 +879,6 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
       <PageHeader title={t.propTitle} subtitle={t.propSubtitle(data.properties.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addProperty}</Btn>} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 18 }}>
         {data.properties.map(p => {
-          const rev = data.tenants
-            .filter(ten => ten.propertyId === p.id && ten.status === "current tenant")
-            .reduce((s, ten) => s + (ten.monthlyRent || 0), 0);
           const propertyUnits = (data.units || []).filter(u => u.propertyId === p.id);
           const occupiedUnits = propertyUnits.filter(u => u.status === 'occupied').length;
           const totalUnits = propertyUnits.length;
@@ -927,15 +923,9 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
                   </div>
                 </div>
                 <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>{p.city}, {p.state} {p.zip} · {p.type}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>Occupied Units</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{occupiedUnits}<span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 400 }}>/{totalUnits}</span></div>
-                  </div>
-                  <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>{t.revenue}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{fmt(rev)}</div>
-                  </div>
+                <div style={{ background: "#f8fafc", borderRadius: 9, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 2, textTransform: "uppercase", letterSpacing: ".5px" }}>Occupied Units</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{occupiedUnits}<span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 400 }}>/{totalUnits}</span></div>
                 </div>
               </div>
             </div>
