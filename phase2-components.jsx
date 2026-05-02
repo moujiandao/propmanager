@@ -495,6 +495,11 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
               Could not match: {syncResult.unmatched.join(', ')}
             </div>
           )}
+          {syncResult.failed?.length > 0 && (
+            <div style={{ marginTop: 6, color: '#991b1b' }}>
+              Failed to insert: {syncResult.failed.map(f => `${f.name} (${f.error})`).join(', ')}
+            </div>
+          )}
           {syncResult.message && <div style={{ marginTop: 4, color: '#64748b' }}>{syncResult.message}</div>}
         </div>
       )}

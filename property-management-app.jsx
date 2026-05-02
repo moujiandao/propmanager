@@ -1468,8 +1468,12 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
           const notStartedYet = startDate && startDate > today;
           const daysUntilStart = notStartedYet ? Math.ceil((startDate - today) / 86400000) : 0;
           const daysLeft = endDate ? Math.ceil((endDate - today) / 86400000) : NaN;
+          const firstDoc = (data.documents || []).find(d => d.contractId === c.id);
           return (
-            <div key={c.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: 16, alignItems: "center" }}>
+            <div
+              key={c.id}
+              onClick={firstDoc ? () => setViewingDoc(firstDoc) : undefined}
+              style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: 16, alignItems: "center", cursor: firstDoc ? "pointer" : "default" }}>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colTenant}</div>
                 {(c.tenantIds || []).map(tid => {
@@ -1505,9 +1509,9 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
                 <Badge status={c.status} t={t} />
                 <div style={{ display: "flex", gap: 6 }}>
-                  <Btn variant="secondary" size="sm" icon="edit" onClick={() => openEdit(c)}>{t.editBtn}</Btn>
+                  <Btn variant="secondary" size="sm" icon="edit" onClick={(e) => { e.stopPropagation(); openEdit(c); }}>{t.editBtn}</Btn>
                   <button
-                    onClick={() => setDeleteTarget(c)}
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
                     style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" }}
                     aria-label="Delete lease"
                   >
@@ -1629,7 +1633,6 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
               ));
             })()}
           </div>
-          {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
           {editError && <div style={{ fontSize: 13, color: "#ef4444", marginTop: 8 }}>{editError}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 12 }}>
             <Btn variant="secondary" onClick={closeEdit}>{t.cancel}</Btn>
@@ -1637,6 +1640,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
           </div>
         </Modal>
       )}
+      {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
       {deleteTarget && (
         <Modal title="Delete Lease" onClose={() => { if (!deleteSaving) { setDeleteTarget(null); setDeleteError(null); } }}>
           <p style={{ margin: "0 0 12px", fontSize: 14, color: "#0f172a" }}>

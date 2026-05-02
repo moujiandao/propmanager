@@ -145,6 +145,7 @@ Return format: [{"fileIndex": 0, "contractId": "uuid-or-null", "confidence": "hi
 
   let linked = 0
   const unmatched = []
+  const failed = []
 
   for (const match of matches) {
     const file = files[match.fileIndex]
@@ -156,7 +157,7 @@ Return format: [{"fileIndex": 0, "contractId": "uuid-or-null", "confidence": "hi
     }
     if (existingLinks.has(file.webViewLink)) continue
 
-    await supabase.from('documents').insert({
+    const { error: insertErr } = await supabase.from('documents').insert({
       landlord_id: landlordId,
       property_id: propertyId,
       contract_id: match.contractId,
@@ -164,7 +165,12 @@ Return format: [{"fileIndex": 0, "contractId": "uuid-or-null", "confidence": "hi
       file_name: file.name,
       document_type: 'lease',
     })
-    linked++
+
+    if (insertErr) {
+      failed.push({ name: file.name, error: insertErr.message })
+    } else {
+      linked++
+    }
   }
 
   // Collect filenames with no match attempt at all
@@ -173,5 +179,5 @@ Return format: [{"fileIndex": 0, "contractId": "uuid-or-null", "confidence": "hi
     if (!matchedIndexes.has(i)) unmatched.push(files[i].name)
   }
 
-  return Response.json({ linked, total: files.length, unmatched })
+  return Response.json({ linked, total: files.length, unmatched, failed })
 }
