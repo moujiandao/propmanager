@@ -42,5 +42,16 @@ export async function POST(request) {
     return Response.json({ error: profileError.message }, { status: 400 })
   }
 
+  // Self-membership so the new landlord can authenticate via landlord_members lookup
+  const { error: memberError } = await supabase
+    .from('landlord_members')
+    .insert({ auth_user_id: authData.user.id, landlord_id: authData.user.id, role: 'owner' })
+
+  if (memberError) {
+    await supabase.from('landlord_profiles').delete().eq('id', authData.user.id)
+    await supabase.auth.admin.deleteUser(authData.user.id)
+    return Response.json({ error: memberError.message }, { status: 400 })
+  }
+
   return Response.json({ success: true })
 }

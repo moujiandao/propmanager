@@ -353,8 +353,11 @@ const LoginPage = ({ onLogin }) => {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) { setError("Invalid email or password."); setLoading(false); return; }
 
-    const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", authData.user.id).single();
-    if (landlord) { onLogin({ id: landlord.id, authId: authData.user.id, role: "landlord", email, name: landlord.name || email.split("@")[0] }); return; }
+    const { data: membership } = await supabase.from("landlord_members").select("landlord_id").eq("auth_user_id", authData.user.id).maybeSingle();
+    if (membership) {
+      const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", membership.landlord_id).single();
+      if (landlord) { onLogin({ id: landlord.id, authId: authData.user.id, role: "landlord", email, name: landlord.name || email.split("@")[0] }); return; }
+    }
 
     const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", authData.user.id).single();
     if (tenant) { onLogin({ id: tenant.id, authId: authData.user.id, role: "tenant", email, name: tenant.name || email.split("@")[0] }); return; }
@@ -2831,8 +2834,11 @@ export default function App() {
   useEffect(() => {
     const resolveUser = async (authUser) => {
       if (!authUser) { setUser(null); setAuthLoading(false); return; }
-      const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", authUser.id).single();
-      if (landlord) { setUser({ id: landlord.id, authId: authUser.id, role: "landlord", email: authUser.email, name: landlord.name || authUser.email?.split("@")[0] }); setAuthLoading(false); return; }
+      const { data: membership } = await supabase.from("landlord_members").select("landlord_id").eq("auth_user_id", authUser.id).maybeSingle();
+      if (membership) {
+        const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", membership.landlord_id).single();
+        if (landlord) { setUser({ id: landlord.id, authId: authUser.id, role: "landlord", email: authUser.email, name: landlord.name || authUser.email?.split("@")[0] }); setAuthLoading(false); return; }
+      }
       const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", authUser.id).single();
       if (tenant) { setUser({ id: tenant.id, authId: authUser.id, role: "tenant", email: authUser.email, name: tenant.name || authUser.email?.split("@")[0] }); }
       setAuthLoading(false);

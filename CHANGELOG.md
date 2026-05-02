@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-05-02]
+
+### Added
+- `landlord_members` table: maps `auth.users` rows to a shared `landlord_id`, enabling multiple auth users to manage the same team's properties, tenants, leases, and payments
+- `is_team_member(uuid)` SQL helper used by RLS policies in place of `auth.uid() = landlord_id` checks
+- `scripts/migrate-team-landlords.sql`: collapses three landlord_profiles into one canonical team id, repoints all data, and rewrites RLS policies to be membership-based
+- `scripts/backup-tables.mjs`, `scripts/inventory-landlords.mjs`, `scripts/check-email.mjs`: pre-migration snapshot + diagnostic helpers
+- `app/api/auth/register-landlord` now also inserts a self-membership row so newly-registered landlords can authenticate via the new lookup path
+
+### Changed
+- Login + session restore (`property-management-app.jsx`) resolve the landlord profile via `landlord_members` instead of looking up `landlord_profiles` directly by `auth.uid()`. This is what lets the secondary team auth users (techservices97, waynemar92) sign in and see the canonical landlord's data.
+
 ## [2026-05-01]
 
 ### Added

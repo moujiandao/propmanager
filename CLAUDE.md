@@ -16,7 +16,8 @@ A property management web application built with Next.js and Supabase. Provides 
 - **Auth callback**: `app/auth/callback/route.js` handles Supabase recovery/magic link flows
 
 ## Database Tables
-- `landlord_profiles` - landlord accounts
+- `landlord_profiles` - landlord accounts; one row per **team**, not per auth user
+- `landlord_members` - maps `auth.users` to a `landlord_id` (a team). Multiple auth users can be members of the same team. Login resolves the active landlord_id via this table; **do not** assume `auth.uid() === landlord_id`. Use the SQL helper `is_team_member(landlord_id)` in RLS policies.
 - `tenant_profiles` - tenant accounts linked to landlords, properties, and units
 - `properties` - rental properties with address, type, unit count, Google Drive link
 - `contracts` - lease agreements between tenants and properties
@@ -40,6 +41,7 @@ A property management web application built with Next.js and Supabase. Provides 
 - `lib/supabase/server.js` uses the service role key (not anon key) for admin operations like creating/updating auth users.
 - Google Drive links are stored per-property in `properties.drive_link` and embedded as iframes. Phase 2 adds Supabase Storage for direct file uploads.
 - Tenant accounts are created by landlords via API (not self-service signup).
+- **Landlord teams**: `user.id` in the client app is the **team's `landlord_id`**, not the auth user's id. `user.authId` holds the actual `auth.uid()`. Login resolves the team via `landlord_members`. Inserts that set `landlord_id` should always use `user.id`, never `user.authId`. RLS uses `is_team_member(landlord_id)`.
 
 ## Common Tasks
 - **Run locally**: `npm install && npm run dev`
