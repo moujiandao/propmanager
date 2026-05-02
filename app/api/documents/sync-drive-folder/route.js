@@ -33,10 +33,18 @@ export async function POST(request) {
   const folderId = folderMatch[1]
 
   // Authenticate with Google using service account
+  let serviceAccountCredentials
+  try {
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || ''
+    serviceAccountCredentials = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'))
+  } catch {
+    return Response.json({ error: 'GOOGLE_SERVICE_ACCOUNT_JSON env var is missing or invalid.' }, { status: 500 })
+  }
+
   const auth = new GoogleAuth({
     credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+      client_email: serviceAccountCredentials.client_email,
+      private_key: serviceAccountCredentials.private_key,
     },
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
   })
