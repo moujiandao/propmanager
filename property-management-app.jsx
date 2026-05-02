@@ -100,6 +100,7 @@ const T = {
     docSectionTitle: "Documents", docUploadPdf: "Upload PDF", docAddDriveLink: "Add Drive Link",
     docView: "View", docNoDocuments: "No documents attached", docDriveLinkPlaceholder: "Paste Google Drive share URL",
     docAttach: "Attach", docRemove: "Remove",
+    editProperty: "Edit Property", driveFolderUrl: "Google Drive Folder URL",
   },
   zh: {
     appName: "房产管理", landlord: "房东", tenant: "租客", signIn: "登录",
@@ -193,6 +194,7 @@ const T = {
     docSectionTitle: "文件", docUploadPdf: "上传 PDF", docAddDriveLink: "添加 Drive 链接",
     docView: "查看", docNoDocuments: "暂无附件", docDriveLinkPlaceholder: "粘贴 Google Drive 分享链接",
     docAttach: "附加", docRemove: "删除",
+    editProperty: "编辑房产", driveFolderUrl: "Google Drive 文件夹链接",
   }
 };
 
@@ -887,12 +889,13 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
   const openEdit = (p, e) => {
     e.stopPropagation();
     setEditing(p);
-    setEditForm({ address: p.address, city: p.city, state: p.state, zip: p.zip, units: String(p.units || ""), type: p.type || "Single Family", status: p.status || "vacant" });
+    setEditForm({ address: p.address, city: p.city, state: p.state, zip: p.zip, units: String(p.units || ""), type: p.type || "Single Family", status: p.status || "vacant", driveLink: p.driveLink || "" });
   };
   const saveEdit = async () => {
     const { error } = await supabase.from("properties").update({
       address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip,
       units: +editForm.units, type: editForm.type, status: editForm.status,
+      drive_link: editForm.driveLink.trim() || null,
     }).eq("id", editing.id);
     if (!error) { await refresh(); setEditing(null); }
   };
@@ -978,7 +981,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
         </Modal>
       )}
       {editing && (
-        <Modal title="Edit Property" onClose={() => setEditing(null)}>
+        <Modal title={t.editProperty} onClose={() => setEditing(null)}>
           <Inp label={t.streetAddress} value={editForm.address} onChange={v => setEF("address",v)} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Inp label={t.city} value={editForm.city} onChange={v => setEF("city",v)} />
@@ -989,9 +992,10 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
             <Inp label={t.units} value={editForm.units} onChange={v => setEF("units",v)} type="number" />
             <Sel label={t.status} value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"vacant",label:t.st_vacant},{value:"occupied",label:t.st_occupied}]} />
           </div>
+          <Inp label={t.driveFolderUrl} value={editForm.driveLink} onChange={v => setEF("driveLink",v)} placeholder="https://drive.google.com/drive/folders/..." />
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
             <Btn variant="secondary" onClick={() => setEditing(null)}>{t.cancel}</Btn>
-            <Btn onClick={saveEdit}>Save Changes</Btn>
+            <Btn onClick={saveEdit}>{t.saveChanges}</Btn>
           </div>
         </Modal>
       )}
