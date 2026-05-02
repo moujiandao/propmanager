@@ -1092,7 +1092,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name, lastName: form.lastName || null, phone: form.phone,
-        email: form.createLogin ? form.email : null,
+        email: form.email?.trim() || null,
         password: form.createLogin ? form.password : null,
         propertyId: form.propertyId, unit: form.unit,
         zelleName: form.zelleName, status: form.status, landlordId: user.id,
@@ -1239,6 +1239,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Inp label={t.firstName} value={form.name} onChange={v => setF("name",v)} placeholder="Jane" />
             <Inp label={t.lastName} value={form.lastName||""} onChange={v => setF("lastName",v)} placeholder="Smith" />
+            <Inp label={t.email} value={form.email} onChange={v => setF("email",v)} type="email" placeholder="tenant@email.com" />
             <Inp label={t.phone} value={form.phone} onChange={v => setF("phone",v)} />
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
@@ -1255,8 +1256,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             </div>
           </div>
           {form.createLogin && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-              <Inp label={t.email} value={form.email} onChange={v => setF("email",v)} type="email" placeholder="tenant@email.com" />
+            <div style={{ marginTop: 12 }}>
               <Inp label={t.loginPassword} value={form.password} onChange={v => setF("password",v)} type="text" placeholder={t.tempPassword} />
             </div>
           )}
