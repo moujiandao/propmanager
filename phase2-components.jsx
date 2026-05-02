@@ -338,6 +338,11 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
   // Inline viewer state
   const [viewingDoc, setViewingDoc] = useState(null)
 
+  // Drive sync state
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
+  const [syncError, setSyncError] = useState(null)
+
   const handleUpload = async () => {
     if (!uploadFile) return
     setUploading(true)
@@ -437,8 +442,8 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        <select value={filterProperty} onChange={e => setFilterProperty(e.target.value)} style={{ background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select value={filterProperty} onChange={e => { setFilterProperty(e.target.value); setSyncResult(null); setSyncError(null); }} style={{ background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
           <option value="">All Properties</option>
           {(data.properties || []).map(p => <option key={p.id} value={p.id}>{p.address}</option>)}
         </select>
@@ -452,7 +457,52 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
           <option value="lease">Lease</option>
           <option value="other">Other</option>
         </select>
+        {filterProperty && (() => {
+          const prop = (data.properties || []).find(p => p.id === filterProperty)
+          if (!prop?.driveLink) return null
+          return (
+            <button
+              onClick={async () => {
+                setSyncing(true)
+                setSyncResult(null)
+                setSyncError(null)
+                const res = await fetch('/api/documents/sync-drive-folder', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ propertyId: filterProperty, landlordId: user.id }),
+                })
+                const json = await res.json().catch(() => ({}))
+                setSyncing(false)
+                if (!res.ok) { setSyncError(json.error || 'Sync failed.'); return }
+                setSyncResult(json)
+                if (json.linked > 0) refresh()
+              }}
+              disabled={syncing}
+              style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: syncing ? 'wait' : 'pointer', opacity: syncing ? 0.7 : 1, fontFamily: 'inherit' }}
+            >
+              {syncing ? 'Syncing…' : '⟳ Sync from Drive'}
+            </button>
+          )
+        })()}
       </div>
+
+      {/* Sync result banner */}
+      {syncResult && (
+        <div style={{ background: syncResult.linked > 0 ? '#f0fdf4' : '#f8fafc', border: `1px solid ${syncResult.linked > 0 ? '#86efac' : '#e2e8f0'}`, borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#0f172a' }}>
+          <strong>{syncResult.linked > 0 ? `✓ Linked ${syncResult.linked} of ${syncResult.total} files` : `No new files linked (${syncResult.total} files scanned)`}</strong>
+          {syncResult.unmatched?.length > 0 && (
+            <div style={{ marginTop: 6, color: '#64748b' }}>
+              Could not match: {syncResult.unmatched.join(', ')}
+            </div>
+          )}
+          {syncResult.message && <div style={{ marginTop: 4, color: '#64748b' }}>{syncResult.message}</div>}
+        </div>
+      )}
+      {syncError && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#991b1b' }}>
+          {syncError}
+        </div>
+      )}
 
       {/* Document list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
