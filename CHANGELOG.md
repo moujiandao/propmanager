@@ -8,6 +8,7 @@
 ### Fixed
 - Add Lease modal: "Create Lease" silently failed because the browser-side `supabase.from("contracts").insert` was rejected by tightened RLS; now routes through the new API and surfaces inline errors
 - Add Tenant modal: failures from `/api/auth/create-tenant` were silently swallowed; the modal now surfaces the server's error message inline
+- `/api/auth/create-tenant` recovers from orphaned auth users left by prior failed attempts: if Supabase Auth says the email is already registered and that user has no `tenant_profiles` or `landlord_profiles` row, the orphan's auth id is reused for the new profile (password is updated if one was provided). On profile-insert failure for a freshly created auth user, that auth user is now deleted to prevent new orphans.
 
 ## [2026-04-30]
 

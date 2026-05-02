@@ -21,9 +21,46 @@ export async function POST(request) {
   }
   if (password) createPayload.password = password
 
+  let authUserId
+  let createdAuthUser = false
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser(createPayload)
 
-  if (authError) return Response.json({ error: authError.message }, { status: 400 })
+  if (authError) {
+    // Recover from orphaned auth users left behind by prior failures: if an auth row
+    // exists for this email but no profile references it, reuse its id.
+    const alreadyRegistered = /already.*registered|already.*been.*registered/i.test(authError.message || '')
+    if (!alreadyRegistered || !email?.trim()) {
+      return Response.json({ error: authError.message }, { status: 400 })
+    }
+
+    const lowerEmail = email.trim().toLowerCase()
+    const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    if (listError) return Response.json({ error: authError.message }, { status: 400 })
+    const existing = list?.users?.find(u => u.email?.toLowerCase() === lowerEmail)
+    if (!existing) return Response.json({ error: authError.message }, { status: 400 })
+
+    const [tenantCheck, landlordCheck] = await Promise.all([
+      supabaseAdmin.from('tenant_profiles').select('id').eq('id', existing.id).maybeSingle(),
+      supabaseAdmin.from('landlord_profiles').select('id').eq('id', existing.id).maybeSingle(),
+    ])
+    // Refuse to reuse the auth id if we can't confirm it's an orphan: a transient query
+    // error must not be treated the same as "no profile found".
+    if (tenantCheck.error || landlordCheck.error) {
+      return Response.json({ error: authError.message }, { status: 400 })
+    }
+    if (tenantCheck.data || landlordCheck.data) {
+      return Response.json({ error: 'This email is already registered to another account.' }, { status: 400 })
+    }
+
+    authUserId = existing.id
+    if (password) {
+      const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(existing.id, { password })
+      if (pwError) return Response.json({ error: pwError.message }, { status: 400 })
+    }
+  } else {
+    authUserId = authData.user.id
+    createdAuthUser = true
+  }
 
   // Resolve unit_id: prefer the explicit unitId from the client; otherwise look it up by
   // (property_id, unit_number) so the unit dropdown stays in sync with the text field.
@@ -43,7 +80,7 @@ export async function POST(request) {
   const { error: profileError } = await supabaseAdmin
     .from('tenant_profiles')
     .insert({
-      id: authData.user.id,
+      id: authUserId,
       landlord_id: landlordId,
       name,
       last_name: lastName || null,
@@ -58,7 +95,13 @@ export async function POST(request) {
       move_out_date: moveOutDate || null,
     })
 
-  if (profileError) return Response.json({ error: profileError.message }, { status: 400 })
+  if (profileError) {
+    // Don't leave an orphan: clean up the auth user we just created so a retry isn't blocked.
+    if (createdAuthUser) {
+      await supabaseAdmin.auth.admin.deleteUser(authUserId)
+    }
+    return Response.json({ error: profileError.message }, { status: 400 })
+  }
 
   // If the new tenant occupies a unit, recompute occupancy for the entire property
   if (resolvedUnitId && tenantStatus === 'current tenant' && propertyId) {
@@ -129,5 +172,5 @@ export async function POST(request) {
     })
   }
 
-  return Response.json({ success: true, tenantId: authData.user.id })
+  return Response.json({ success: true, tenantId: authUserId })
 }
