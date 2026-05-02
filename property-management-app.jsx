@@ -849,6 +849,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const setEF = (k,v) => setEditForm(f => ({...f,[k]:v}));
+  const [editError, setEditError] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
   const [uploadError, setUploadError] = useState(null);
@@ -892,12 +893,21 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
     setEditForm({ address: p.address, city: p.city, state: p.state, zip: p.zip, units: String(p.units || ""), type: p.type || "Single Family", status: p.status || "vacant", driveLink: p.driveLink || "" });
   };
   const saveEdit = async () => {
-    const { error } = await supabase.from("properties").update({
-      address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip,
-      units: +editForm.units, type: editForm.type, status: editForm.status,
-      drive_link: editForm.driveLink.trim() || null,
-    }).eq("id", editing.id);
-    if (!error) { await refresh(); setEditing(null); }
+    setEditError(null);
+    const res = await fetch("/api/properties/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: editing.id,
+        address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip,
+        units: editForm.units, type: editForm.type, status: editForm.status,
+        driveLink: editForm.driveLink || "",
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { setEditError(json.error || "Failed to save."); return; }
+    await refresh();
+    setEditing(null);
   };
   const deleteProperty = async () => {
     const { error } = await supabase.from("properties").delete().eq("id", confirmDelete.id);
@@ -993,8 +1003,9 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
             <Sel label={t.status} value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"vacant",label:t.st_vacant},{value:"occupied",label:t.st_occupied}]} />
           </div>
           <Inp label={t.driveFolderUrl} value={editForm.driveLink} onChange={v => setEF("driveLink",v)} placeholder="https://drive.google.com/drive/folders/..." />
+          {editError && <div style={{ fontSize: 13, color: "#ef4444", marginTop: 4 }}>{editError}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-            <Btn variant="secondary" onClick={() => setEditing(null)}>{t.cancel}</Btn>
+            <Btn variant="secondary" onClick={() => { setEditing(null); setEditError(null); }}>{t.cancel}</Btn>
             <Btn onClick={saveEdit}>{t.saveChanges}</Btn>
           </div>
         </Modal>
