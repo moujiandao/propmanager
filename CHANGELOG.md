@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-05-01]
+
+### Added
+- `app/api/contracts/create/route.js` — service-role POST that inserts a contract plus its `contract_tenants` links, replacing the browser-side insert that RLS now blocks
+
+### Fixed
+- Add Lease modal: "Create Lease" silently failed because the browser-side `supabase.from("contracts").insert` was rejected by tightened RLS; now routes through the new API and surfaces inline errors
+- Add Tenant modal: failures from `/api/auth/create-tenant` were silently swallowed; the modal now surfaces the server's error message inline
+
 ## [2026-04-30]
 
 ### Added

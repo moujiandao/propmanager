@@ -101,6 +101,7 @@ const T = {
     docView: "View", docNoDocuments: "No documents attached", docDriveLinkPlaceholder: "Paste Google Drive share URL",
     docAttach: "Attach", docRemove: "Remove",
     editProperty: "Edit Property", driveFolderUrl: "Google Drive Folder URL",
+    failedCreateLease: "Failed to create lease.", failedCreateTenant: "Failed to create tenant.",
   },
   zh: {
     appName: "房产管理", landlord: "房东", tenant: "租客", signIn: "登录",
@@ -195,6 +196,7 @@ const T = {
     docView: "查看", docNoDocuments: "暂无附件", docDriveLinkPlaceholder: "粘贴 Google Drive 分享链接",
     docAttach: "附加", docRemove: "删除",
     editProperty: "编辑房产", driveFolderUrl: "Google Drive 文件夹链接",
+    failedCreateLease: "创建租约失败。", failedCreateTenant: "创建租客失败。",
   }
 };
 
@@ -302,12 +304,12 @@ export const Sel = ({ label, value, onChange, options }) => (
   </div>
 );
 
-export const Btn = ({ children, onClick, variant = "primary", size = "md", icon }) => {
+export const Btn = ({ children, onClick, variant = "primary", size = "md", icon, disabled = false }) => {
   const s = { primary: { background: "linear-gradient(135deg,#4f46e5,#4338ca)", color: "#fff", border: "none" }, secondary: { background: "#f8fafc", color: "#374151", border: "1.5px solid #e2e8f0" }, ghost: { background: "transparent", color: "#64748b", border: "none" } };
   const sz = { sm: { padding: "6px 14px", fontSize: 13 }, md: { padding: "10px 20px", fontSize: 14 } };
   return (
-    <button onClick={onClick} style={{ ...s[variant], ...sz[size], borderRadius: 9, cursor: "pointer", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "inherit", transition: "opacity .15s" }}
-      onMouseEnter={e => e.currentTarget.style.opacity = ".85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+    <button onClick={onClick} disabled={disabled} style={{ ...s[variant], ...sz[size], borderRadius: 9, cursor: disabled ? "not-allowed" : "pointer", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "inherit", transition: "opacity .15s", opacity: disabled ? 0.6 : 1 }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.opacity = ".85"; }} onMouseLeave={e => { e.currentTarget.style.opacity = disabled ? "0.6" : "1"; }}>
       {icon && <Icon name={icon} size={15} />}{children}
     </button>
   );
@@ -1027,6 +1029,7 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
 const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTenantId }) => {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [addError, setAddError] = useState("");
   const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
@@ -1086,6 +1089,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   const add = async () => {
     if (!form.name || !form.moveInDate) return;
+    setAddError("");
     setSaving(true);
     const res = await fetch("/api/auth/create-tenant", {
       method: "POST",
@@ -1099,7 +1103,15 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         moveInDate: form.moveInDate, moveOutDate: form.moveOutDate || null,
       }),
     });
-    if (res.ok) { await refresh(); setShow(false); setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false }); }
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setAddError(json.error || t.failedCreateTenant);
+      setSaving(false);
+      return;
+    }
+    await refresh();
+    setShow(false);
+    setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false });
     setSaving(false);
   };
 
@@ -1235,7 +1247,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
       {/* Add Tenant Modal */}
       {show && (
-        <Modal title={t.addTenantTitle} onClose={() => setShow(false)} wide>
+        <Modal title={t.addTenantTitle} onClose={() => { setShow(false); setAddError(""); }} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Inp label={t.firstName} value={form.name} onChange={v => setF("name",v)} placeholder="Jane" />
             <Inp label={t.lastName} value={form.lastName||""} onChange={v => setF("lastName",v)} placeholder="Smith" />
@@ -1260,9 +1272,10 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
               <Inp label={t.loginPassword} value={form.password} onChange={v => setF("password",v)} type="text" placeholder={t.tempPassword} />
             </div>
           )}
+          {addError && <div style={{ fontSize: 13, color: "#ef4444", marginTop: 12 }}>{addError}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-            <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
-            <Btn onClick={add}>{saving ? t.creating : t.addTenant}</Btn>
+            <Btn variant="secondary" onClick={() => { setShow(false); setAddError(""); }}>{t.cancel}</Btn>
+            <Btn onClick={add} disabled={saving}>{saving ? t.creating : t.addTenant}</Btn>
           </div>
         </Modal>
       )}
@@ -1403,6 +1416,8 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
     setDocError(null);
   };
   const [editError, setEditError] = useState(null);
+  const [addError, setAddError] = useState(null);
+  const [adding, setAdding] = useState(false);
   const save = async () => {
     setEditError(null);
     if (!editForm.rentAmount) {
@@ -1433,21 +1448,32 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
   };
   const add = async () => {
     if (!form.tenantIds.length || !form.rentAmount) return;
-    const { data: newContract, error } = await supabase.from("contracts").insert({
-      landlord_id: user.id, property_id: form.propertyId, unit: form.unit,
-      start_date: form.startDate, end_date: form.endDate,
-      rent_amount: +form.rentAmount, due_day: +form.dueDay, status: "active",
-    }).select().single();
-    if (error) return;
-    const ctResults = await Promise.all(
-      form.tenantIds.map(tid =>
-        supabase.from("contract_tenants").insert({ contract_id: newContract.id, tenant_id: tid })
-      )
-    );
-    if (ctResults.some(r => r.error)) return;
+    setAddError(null);
+    setAdding(true);
+    const res = await fetch("/api/contracts/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        landlordId: user.id,
+        propertyId: form.propertyId,
+        unit: form.unit,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        rentAmount: form.rentAmount,
+        dueDay: form.dueDay,
+        tenantIds: form.tenantIds,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setAddError(json.error || t.failedCreateLease);
+      setAdding(false);
+      return;
+    }
     setForm(EMPTY_FORM);
     await refresh();
     setShow(false);
+    setAdding(false);
   };
 
   return (
@@ -1664,7 +1690,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
         </Modal>
       )}
       {show && (
-        <Modal title={t.addLeaseTitle} onClose={() => { setForm(EMPTY_FORM); setShow(false); }} wide>
+        <Modal title={t.addLeaseTitle} onClose={() => { setForm(EMPTY_FORM); setShow(false); setAddError(null); }} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div style={{ gridColumn: "1 / -1" }}>
               <div style={{ fontSize: 13, color: "#374151", fontWeight: 600, marginBottom: 6 }}>{t.colTenant}</div>
@@ -1695,9 +1721,10 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
             <Inp label={t.endDate} value={form.endDate} onChange={v => setF("endDate",v)} type="date" />
             <Inp label={t.dueDayLabel} value={form.dueDay} onChange={v => setF("dueDay",v)} type="number" />
           </div>
+          {addError && <div style={{ fontSize: 13, color: "#ef4444", marginTop: 8 }}>{addError}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-            <Btn variant="secondary" onClick={() => { setForm(EMPTY_FORM); setShow(false); }}>{t.cancel}</Btn>
-            <Btn onClick={add}>{t.createLease}</Btn>
+            <Btn variant="secondary" onClick={() => { setForm(EMPTY_FORM); setShow(false); setAddError(null); }}>{t.cancel}</Btn>
+            <Btn onClick={add} disabled={adding}>{adding ? t.saving : t.createLease}</Btn>
           </div>
         </Modal>
       )}
