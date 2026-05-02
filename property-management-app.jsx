@@ -1475,16 +1475,17 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
               onClick={firstDoc ? () => setViewingDoc(firstDoc) : undefined}
               style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: 16, alignItems: "center", cursor: firstDoc ? "pointer" : "default" }}>
               <div>
-                <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.colTenant}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", marginBottom: 6 }}>
+                  {prop?.address}{c.unit ? ` · ${c.unit}` : ""}
+                </div>
                 {(c.tenantIds || []).map(tid => {
                   const ten = data.tenants.find(t => t.id === tid);
                   return (
-                    <div key={tid} style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
+                    <div key={tid} style={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>
                       {ten ? tenantFullName(ten) : "Unknown Tenant"}
                     </div>
                   );
                 })}
-                <div style={{ fontSize: 12, color: "#64748b" }}>{prop?.address} · {c.unit}</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{t.rent}</div>
