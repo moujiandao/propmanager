@@ -940,7 +940,8 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
                 <input
                   ref={el => { fileInputRefs.current[p.id] = el; }}
                   type="file" accept="image/*" style={{ display: "none" }}
-                  onChange={e => handleImageUpload(p.id, e.target.files[0])}
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => { e.stopPropagation(); handleImageUpload(p.id, e.target.files[0]); }}
                 />
                 <button
                   onClick={e => { e.stopPropagation(); setUploadError(null); fileInputRefs.current[p.id]?.click(); }}
