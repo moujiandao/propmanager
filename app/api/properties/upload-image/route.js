@@ -56,14 +56,16 @@ export async function POST(request) {
     .from('property-images')
     .getPublicUrl(path)
 
+  const versionedUrl = `${publicUrl}?v=${Date.now()}`
+
   const { error: dbError } = await adminClient
     .from('properties')
-    .update({ image_url: publicUrl })
+    .update({ image_url: versionedUrl })
     .eq('id', propertyId)
 
   if (dbError) {
     return Response.json({ error: `DB: ${dbError.message}` }, { status: 400 })
   }
 
-  return Response.json({ url: publicUrl })
+  return Response.json({ url: versionedUrl })
 }
