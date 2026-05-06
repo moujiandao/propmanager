@@ -80,6 +80,8 @@ const T = {
     firstName: "First Name", lastName: "Last Name",
     zelleNameLabel: "Zelle Name", zelleNamePlaceholder: "Name or phone on Zelle",
     moveInDateReq: "Move-in Date *", moveInDate: "Move-in Date", moveOutDate: "Move-out Date",
+    notesLabel: "Notes", notesPlaceholder: "Internal notes about this tenant",
+    securityDepositLabel: "Security Deposit ($)", securityDepositNotReceived: "Security Deposit not received",
     createLoginLabel: "Create tenant portal login",
     createLoginDesc: "Optional — only needed if the tenant will log in to pay rent or submit maintenance requests",
     creating: "Creating…", noPropOption: "— No property —", selectPropFirst: "— Select a property first —",
@@ -175,6 +177,8 @@ const T = {
     firstName: "名", lastName: "姓",
     zelleNameLabel: "Zelle姓名", zelleNamePlaceholder: "Zelle上的姓名或电话",
     moveInDateReq: "入住日期 *", moveInDate: "入住日期", moveOutDate: "退租日期",
+    notesLabel: "备注", notesPlaceholder: "关于此租客的内部备注",
+    securityDepositLabel: "押金（$）", securityDepositNotReceived: "押金未收到",
     createLoginLabel: "创建租客门户账号",
     createLoginDesc: "可选 — 仅在租客需要登录付款或提交维修请求时使用",
     creating: "创建中…", noPropOption: "— 无房产 —", selectPropFirst: "— 请先选择房产 —",
@@ -760,6 +764,9 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                             >{tenantFullName(ten)}</div>
                             <div style={{ fontSize: 13, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
+                            {(!ten.securityDeposit || +ten.securityDeposit <= 0) && (
+                              <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600, marginTop: 2 }}>{t.securityDepositNotReceived}</div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -812,6 +819,9 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{tenantFullName(ten)}</div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>{ten.unit} · {prop?.address}</div>
+                    {ten.notes && (
+                      <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600, marginTop: 4 }}>{ten.notes}</div>
+                    )}
                   </div>
                 </div>
                 <Badge status="overdue" t={t} />
@@ -1034,7 +1044,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addError, setAddError] = useState("");
-  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false });
+  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", createLogin: false });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
   const [editTenant, setEditTenant] = useState(null);
@@ -1058,7 +1068,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "" });
+    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "", notes: ten.notes || "", securityDeposit: ten.securityDeposit || "" });
   };
 
   const saveEdit = async () => {
@@ -1082,6 +1092,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         zelleName: editForm.zelleName || null,
         moveInDate: editForm.moveInDate || null,
         moveOutDate: editForm.moveOutDate || null,
+        notes: editForm.notes || null,
+        securityDeposit: editForm.securityDeposit === "" ? null : editForm.securityDeposit,
       }),
     });
     const json = await res.json();
@@ -1105,6 +1117,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         propertyId: form.propertyId, unit: form.unit,
         zelleName: form.zelleName, status: form.status, landlordId: user.id,
         moveInDate: form.moveInDate, moveOutDate: form.moveOutDate || null,
+        notes: form.notes || null,
+        securityDeposit: form.securityDeposit === "" ? null : form.securityDeposit,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -1115,7 +1129,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     }
     await refresh();
     setShow(false);
-    setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", createLogin: false });
+    setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", createLogin: false });
     setSaving(false);
   };
 
@@ -1263,6 +1277,12 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Sel label={t.colStatus} value={form.status} onChange={v => setF("status",v)} options={[{value:"current tenant",label:t.statusCurrentTenant},{value:"future tenant",label:t.statusFutureTenant},{value:"previous tenant",label:t.statusPreviousTenant}]} />
             <Inp label={t.moveInDateReq} value={form.moveInDate} onChange={v => setF("moveInDate",v)} type="date" />
             <Inp label={t.moveOutDate} value={form.moveOutDate||""} onChange={v => setF("moveOutDate",v)} type="date" />
+            <Inp label={t.securityDepositLabel} value={form.securityDeposit} onChange={v => setF("securityDeposit",v)} type="number" placeholder="0" />
+            <div style={{ gridColumn: "1 / -1", marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.notesLabel}</label>
+              <textarea value={form.notes} onChange={e => setF("notes", e.target.value)} placeholder={t.notesPlaceholder} rows={3}
+                style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 14, color: "#0f172a", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit", resize: "vertical" }} />
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 14px", background: "#f8fafc", borderRadius: 9, border: "1px solid #e2e8f0" }}>
             <Toggle value={form.createLogin} onChange={v => setF("createLogin", v)} />
@@ -1334,9 +1354,15 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Inp label={t.zelleNameLabel} value={editForm.zelleName} onChange={v => setEF("zelleName",v)} placeholder={t.zelleNamePlaceholder} />
             <Inp label={t.moveInDate} value={editForm.moveInDate} onChange={v => setEF("moveInDate",v)} type="date" />
             <Inp label={t.moveOutDate} value={editForm.moveOutDate} onChange={v => setEF("moveOutDate",v)} type="date" />
+            <Inp label={t.securityDepositLabel} value={editForm.securityDeposit} onChange={v => setEF("securityDeposit",v)} type="number" placeholder="0" />
             <div style={{ gridColumn: "1 / -1" }}>
               <Inp label={t.email} value={editForm.email} onChange={v => setEF("email",v)} type="email" placeholder="tenant@email.com" />
               <div style={{ fontSize: 12, color: "#64748b", marginTop: -8, marginBottom: 4 }}>{t.emailLoginNote}</div>
+            </div>
+            <div style={{ gridColumn: "1 / -1", marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.notesLabel}</label>
+              <textarea value={editForm.notes || ""} onChange={e => setEF("notes", e.target.value)} placeholder={t.notesPlaceholder} rows={3}
+                style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 14, color: "#0f172a", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit", resize: "vertical" }} />
             </div>
           </div>
           <div style={{ marginTop: 4, marginBottom: 4 }}>
@@ -2852,7 +2878,7 @@ export default function App() {
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "", imageUrl: p.image_url || null });
-  const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id });
+  const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id, notes: t.notes || "", securityDeposit: t.security_deposit || 0 });
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });

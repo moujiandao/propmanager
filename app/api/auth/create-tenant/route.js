@@ -9,7 +9,7 @@ export async function POST(request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-  const { name, lastName, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, status, moveInDate, moveOutDate } = await request.json()
+  const { name, lastName, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, status, moveInDate, moveOutDate, notes, securityDeposit } = await request.json()
 
   // Use provided email or generate a placeholder so auth user can be created without one
   const authEmail = email?.trim() || `${name.trim().toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@placeholder.local`
@@ -93,6 +93,8 @@ export async function POST(request) {
       status: tenantStatus,
       move_in_date: moveInDate || null,
       move_out_date: moveOutDate || null,
+      notes: notes?.trim() || null,
+      security_deposit: securityDeposit === null || securityDeposit === undefined || securityDeposit === '' ? null : +securityDeposit,
     })
 
   if (profileError) {
