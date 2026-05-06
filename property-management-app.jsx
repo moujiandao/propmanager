@@ -2082,8 +2082,8 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
 
 // ─── MAINTENANCE PAGE ─────────────────────────────────────────────────────────
 const AttachmentChip = ({ att }) => {
-  const [url, setUrl] = React.useState(null);
-  React.useEffect(() => {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
     supabase.storage.from("documents").createSignedUrl(att.filePath, 3600)
       .then(({ data }) => { if (data?.signedUrl) setUrl(data.signedUrl); });
   }, [att.filePath]);
@@ -2111,7 +2111,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const [submitting, setSubmitting] = useState(false);
   const [translateState, setTranslateState] = useState("idle");
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const fileInputRef = React.useRef(null);
+  const fileInputRef = useRef(null);
 
   const selectedTenant = data.tenants.find(ten => ten.id === form.tenantId);
   const selectedUnit = selectedTenant
