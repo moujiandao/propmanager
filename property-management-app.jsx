@@ -2110,6 +2110,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [translateState, setTranslateState] = useState("idle");
+  const [cardTranslating, setCardTranslating] = useState({});
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const fileInputRef = useRef(null);
 
@@ -2225,8 +2226,34 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
                   <div style={{ flex: 1 }}>
-                    <p style={{ margin: "0 0 4px", fontSize: 15, color: "#0f172a", fontWeight: 500 }}>{m.description}</p>
-                    {m.descriptionZh && <p style={{ margin: "0 0 6px", fontSize: 13, color: "#64748b", fontStyle: "italic" }}>{m.descriptionZh}</p>}
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
+                      <p style={{ margin: 0, fontSize: 15, color: "#0f172a", fontWeight: 500, flex: 1 }}>{m.description}</p>
+                      {!m.descriptionZh && (
+                        <button
+                          onClick={async () => {
+                            setCardTranslating(s => ({ ...s, [m.id]: true }));
+                            try {
+                              const res = await fetch("/api/maintenance/translate", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ text: m.description, landlordId: user.id }),
+                              });
+                              const json = await res.json();
+                              if (res.ok && json.translation) {
+                                await supabase.from("maintenance_requests").update({ description_zh: json.translation }).eq("id", m.id);
+                                setData(d => ({ ...d, maintenance: d.maintenance.map(x => x.id === m.id ? { ...x, descriptionZh: json.translation } : x) }));
+                              }
+                            } finally {
+                              setCardTranslating(s => ({ ...s, [m.id]: false }));
+                            }
+                          }}
+                          disabled={cardTranslating[m.id]}
+                          style={{ fontSize: 11, fontWeight: 600, color: cardTranslating[m.id] ? "#94a3b8" : "#4f46e5", background: "none", border: "1px solid #c7d2fe", borderRadius: 6, padding: "3px 9px", cursor: cardTranslating[m.id] ? "not-allowed" : "pointer", whiteSpace: "nowrap", fontFamily: "inherit", flexShrink: 0 }}>
+                          {cardTranslating[m.id] ? t.maintTranslating : t.maintTranslateChinese}
+                        </button>
+                      )}
+                    </div>
+                    {m.descriptionZh && <p style={{ margin: "0 0 6px", fontSize: 13, color: "#4338ca", background: "#eef2ff", borderRadius: 7, padding: "7px 10px" }}>{m.descriptionZh}</p>}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 13, color: "#64748b", marginBottom: attachments.length ? 10 : 0 }}>
                       <span>{ten ? tenantFullName(ten) : "—"}</span>
                       <span>{prop?.address}{m.unit ? ` · ${m.unit}` : ""}</span>
