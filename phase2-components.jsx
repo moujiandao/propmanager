@@ -708,7 +708,7 @@ const TenantCard = ({ title, children }) => (
 const EMPTY_TENANT_FORM = {
   name: "", phone: "", propertyId: "", unit: "", status: "current tenant", monthlyRent: "",
   moveInDate: "", moveOutDate: "", hasCosigner: false, studentStatus: "", studentYear: "",
-  zelleName: "", homeAddress: "", age: "", unitId: "",
+  zelleName: "", homeAddress: "", age: "", unitId: "", notes: "", securityDeposit: "",
 }
 
 export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBack, onNavigateToProperty }) => {
@@ -742,6 +742,8 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
         homeAddress: tenant.homeAddress || "",
         age: tenant.age ? String(tenant.age) : "",
         unitId: tenant.unitId || "",
+        notes: tenant.notes || "",
+        securityDeposit: tenant.securityDeposit ? String(tenant.securityDeposit) : "",
       })
     }
     setEditing(false)
@@ -792,6 +794,8 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
         homeAddress: form.homeAddress || null,
         age: form.age ? Number(form.age) : null,
         unitId: form.unitId || null,
+        notes: form.notes || null,
+        securityDeposit: form.securityDeposit === "" ? null : form.securityDeposit,
       }),
     })
     const json = await res.json()
@@ -822,6 +826,8 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
       homeAddress: extracted.home_address || extracted.homeAddress || tenant.homeAddress || null,
       age: extracted.age ? Number(extracted.age) : (tenant.age || null),
       unitId: tenant.unitId || null,
+      notes: tenant.notes || null,
+      securityDeposit: tenant.securityDeposit || null,
     }
     const res = await fetch("/api/auth/update-tenant", {
       method: "POST",
@@ -969,6 +975,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
                 <Inp label="Move-out Date" value={form.moveOutDate} onChange={v => setF("moveOutDate", v)} type="date" />
               </div>
               <Inp label="Monthly Rent ($)" value={form.monthlyRent} onChange={v => setF("monthlyRent", v)} type="number" placeholder="e.g. 1500" />
+              <Inp label="Security Deposit ($)" value={form.securityDeposit} onChange={v => setF("securityDeposit", v)} type="number" placeholder="e.g. 1500" />
             </>
           ) : (
             <>
@@ -994,6 +1001,13 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
                 <span style={{ fontSize: 15, fontWeight: 700, color: displayRent ? "#a5b4fc" : "#475569" }}>
                   {displayRent ? fmt2(displayRent) + "/mo" : "—"}
                 </span>
+              </InfoRow>
+              <InfoRow label="Security Deposit">
+                {tenant.securityDeposit && +tenant.securityDeposit > 0 ? (
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#a5b4fc" }}>{fmt2(+tenant.securityDeposit)}</span>
+                ) : (
+                  <span style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>Not received</span>
+                )}
               </InfoRow>
             </>
           )}
@@ -1021,6 +1035,25 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
                 <Badge status={tenant.hasCosigner ? "active" : "inactive"} />
               </InfoRow>
             </>
+          )}
+        </TenantCard>
+
+        {/* Notes */}
+        <TenantCard title="Notes">
+          {editing ? (
+            <textarea
+              value={form.notes || ""}
+              onChange={e => setF("notes", e.target.value)}
+              placeholder="Internal notes about this tenant"
+              rows={5}
+              style={{ width: "100%", padding: "10px 14px", border: "1px solid #334155", borderRadius: 8, fontSize: 14, color: "#f1f5f9", background: "#0f172a", boxSizing: "border-box", outline: "none", fontFamily: "inherit", resize: "vertical" }}
+            />
+          ) : (
+            tenant.notes ? (
+              <p style={{ margin: 0, fontSize: 14, color: "#f1f5f9", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{tenant.notes}</p>
+            ) : (
+              <p style={{ color: "#475569", fontSize: 14, margin: 0 }}>No notes</p>
+            )
           )}
         </TenantCard>
 
