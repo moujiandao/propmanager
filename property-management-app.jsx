@@ -81,7 +81,7 @@ const T = {
     zelleNameLabel: "Zelle Name", zelleNamePlaceholder: "Name or phone on Zelle",
     moveInDateReq: "Move-in Date *", moveInDate: "Move-in Date", moveOutDate: "Move-out Date",
     notesLabel: "Notes", notesPlaceholder: "Internal notes about this tenant",
-    securityDepositLabel: "Security Deposit ($)", securityDepositNotReceived: "Security Deposit not received",
+    securityDepositLabel: "Security Deposit ($)", securityDepositNotReceived: "Security Deposit not received", securityDepositReceived: "Security Deposit received",
     createLoginLabel: "Create tenant portal login",
     createLoginDesc: "Optional — only needed if the tenant will log in to pay rent or submit maintenance requests",
     creating: "Creating…", noPropOption: "— No property —", selectPropFirst: "— Select a property first —",
@@ -178,7 +178,7 @@ const T = {
     zelleNameLabel: "Zelle姓名", zelleNamePlaceholder: "Zelle上的姓名或电话",
     moveInDateReq: "入住日期 *", moveInDate: "入住日期", moveOutDate: "退租日期",
     notesLabel: "备注", notesPlaceholder: "关于此租客的内部备注",
-    securityDepositLabel: "押金（$）", securityDepositNotReceived: "押金未收到",
+    securityDepositLabel: "押金（$）", securityDepositNotReceived: "押金未收到", securityDepositReceived: "押金已收到",
     createLoginLabel: "创建租客门户账号",
     createLoginDesc: "可选 — 仅在租客需要登录付款或提交维修请求时使用",
     creating: "创建中…", noPropOption: "— 无房产 —", selectPropFirst: "— 请先选择房产 —",
@@ -764,8 +764,10 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                             >{tenantFullName(ten)}</div>
                             <div style={{ fontSize: 13, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
-                            {(!ten.securityDeposit || +ten.securityDeposit <= 0) && (
+                            {(!ten.securityDeposit || +ten.securityDeposit <= 0) ? (
                               <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600, marginTop: 2 }}>{t.securityDepositNotReceived}</div>
+                            ) : (
+                              <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 2 }}>{t.securityDepositReceived}</div>
                             )}
                           </div>
                         </div>
