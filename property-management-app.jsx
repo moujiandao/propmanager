@@ -44,9 +44,19 @@ const T = {
     payTitle: "Payments", paySubtitle: "ACH payment tracking across all tenants",
     filterAll: "All", typeRecurring: "Recurring", typeOneTime: "One-time", naLabel: "N/A",
     maintTitle: "Maintenance Requests", maintSubtitle: (n) => `${n} open requests`,
+    maintNewRequest: "New Request",
     priorityHigh: "high priority", priorityMedium: "medium priority", priorityLow: "low priority",
     statusOpen: "Open", statusInProgress: "In Progress", statusResolved: "Resolved",
+    statusNew: "New", statusClosed: "Closed",
     noMaintenance: "No maintenance requests",
+    maintTenant: "Tenant", maintSelectTenant: "Select tenant...",
+    maintUnit: "Unit", maintType: "Type", maintTypeSelect: "Select type...",
+    maintAddNewType: "+ Add new type", maintNewTypePlaceholder: "Type name", maintAddTypeSave: "Add",
+    maintDescription: "Description", maintDescriptionPlaceholder: "Describe the issue in detail...",
+    maintTranslateChinese: "Translate to Chinese", maintTranslating: "Translating...",
+    maintTranslatedLabel: "Chinese Translation",
+    maintAttachments: "Attachments", maintAddFiles: "Add Files",
+    maintSubmitting: "Submitting...",
     emailTitle: "Email Automation", emailSubtitle: "Configure automated payment reminder emails",
     editTemplate: "Edit Template", editTemplateLabel: "Edit Template:",
     variablesNote: "Variables: {tenant_name}, {amount}, {due_date}, {landlord_name}",
@@ -57,7 +67,7 @@ const T = {
     reminder3Day: "3 Days Overdue", reminder3DayDesc: "Escalated reminder",
     reminder7Day: "7 Days Overdue", reminder7DayDesc: "Final notice before action",
     st_completed: "Completed", st_pending: "Pending", st_overdue: "Overdue", st_failed: "Failed",
-    st_active: "Active", st_open: "Open", "st_in-progress": "In Progress", st_resolved: "Resolved",
+    st_active: "Active", st_open: "Open", "st_in-progress": "In Progress", st_resolved: "Resolved", st_new: "New", st_closed: "Closed",
     "st_current tenant": "Current Tenant", "st_future tenant": "Future Tenant", "st_previous tenant": "Previous Tenant",
     st_occupied: "Occupied", st_vacant: "Vacant",
     dashUnpaidRent: "Unpaid Rent", dashVacancies: "Vacancies — Now & Next 6 Months", dashNewTenants: "New Tenants",
@@ -141,9 +151,19 @@ const T = {
     payTitle: "付款管理", paySubtitle: "所有租客的ACH付款追踪",
     filterAll: "全部", typeRecurring: "自动续费", typeOneTime: "单次付款", naLabel: "不适用",
     maintTitle: "维修请求", maintSubtitle: (n) => `${n} 个待处理请求`,
+    maintNewRequest: "新建请求",
     priorityHigh: "高优先级", priorityMedium: "中优先级", priorityLow: "低优先级",
     statusOpen: "待处理", statusInProgress: "处理中", statusResolved: "已解决",
+    statusNew: "新建", statusClosed: "已关闭",
     noMaintenance: "暂无维修请求",
+    maintTenant: "租客", maintSelectTenant: "选择租客...",
+    maintUnit: "单元", maintType: "类型", maintTypeSelect: "选择类型...",
+    maintAddNewType: "+ 添加新类型", maintNewTypePlaceholder: "类型名称", maintAddTypeSave: "添加",
+    maintDescription: "描述", maintDescriptionPlaceholder: "详细描述问题...",
+    maintTranslateChinese: "翻译为中文", maintTranslating: "翻译中...",
+    maintTranslatedLabel: "中文翻译",
+    maintAttachments: "附件", maintAddFiles: "添加文件",
+    maintSubmitting: "提交中...",
     emailTitle: "邮件自动化", emailSubtitle: "配置自动付款提醒邮件",
     editTemplate: "编辑模板", editTemplateLabel: "编辑模板：",
     variablesNote: "变量：{tenant_name}，{amount}，{due_date}，{landlord_name}",
@@ -154,7 +174,7 @@ const T = {
     reminder3Day: "逾期3天", reminder3DayDesc: "升级提醒",
     reminder7Day: "逾期7天", reminder7DayDesc: "最终警告",
     st_completed: "已完成", st_pending: "待处理", st_overdue: "已逾期", st_failed: "失败",
-    st_active: "有效", st_open: "待处理", "st_in-progress": "处理中", st_resolved: "已解决",
+    st_active: "有效", st_open: "待处理", "st_in-progress": "处理中", st_resolved: "已解决", st_new: "新建", st_closed: "已关闭",
     "st_current tenant": "现租客", "st_future tenant": "待入住租客", "st_previous tenant": "前租客",
     st_occupied: "已出租", st_vacant: "空置",
     dashUnpaidRent: "未付租金", dashVacancies: "空置情况 — 当前及未来6个月", dashNewTenants: "新租客",
@@ -255,8 +275,10 @@ const statusColors = {
   "future tenant":   { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   "previous tenant": { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
   open:      { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
+  new:       { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
   "in-progress": { bg: "#e0e7ff", text: "#312e81", dot: "#6366f1" },
   resolved:  { bg: "#dcfce7", text: "#166534", dot: "#22c55e" },
+  closed:    { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
   occupied:  { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   vacant:    { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
 };
@@ -575,7 +597,7 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
   const { properties, tenants, payments, maintenance, contracts, units = [] } = data;
   const occupied = properties.filter(p => p.status === "occupied").length;
   const pendingPayments = payments.filter(p => p.status === "pending" || p.status === "overdue");
-  const openMaint = maintenance.filter(m => m.status !== "resolved");
+  const openMaint = maintenance.filter(m => m.status !== "closed" && m.status !== "resolved");
 
   const now = new Date();
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -2059,41 +2081,174 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
 };
 
 // ─── MAINTENANCE PAGE ─────────────────────────────────────────────────────────
-const MaintenancePage = ({ data, setData, t, refresh }) => {
-  const pColors = { high: "#ef4444", medium: "#818cf8", low: "#3b82f6" };
-  const pLabels = { high: t.priorityHigh, medium: t.priorityMedium, low: t.priorityLow };
+const AttachmentChip = ({ att }) => {
+  const [url, setUrl] = React.useState(null);
+  React.useEffect(() => {
+    supabase.storage.from("documents").createSignedUrl(att.filePath, 3600)
+      .then(({ data }) => { if (data?.signedUrl) setUrl(data.signedUrl); });
+  }, [att.filePath]);
+  const isImage = att.fileType?.startsWith("image/");
+  return (
+    <a href={url || "#"} target="_blank" rel="noopener noreferrer"
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: isImage ? 0 : "5px 10px", overflow: "hidden", textDecoration: "none", cursor: url ? "pointer" : "default", opacity: url ? 1 : 0.6 }}>
+      {isImage && url ? (
+        <img src={url} alt={att.fileName} style={{ width: 56, height: 56, objectFit: "cover", display: "block" }} />
+      ) : (
+        <span style={{ fontSize: 12, color: "#374151", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.fileName}</span>
+      )}
+    </a>
+  );
+};
+
+const MaintenancePage = ({ data, setData, t, refresh, user }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ tenantId: "", status: "new", type: "", description: "", descriptionZh: "" });
+  const [files, setFiles] = useState([]);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [showAddType, setShowAddType] = useState(false);
+  const [addingType, setAddingType] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [translateState, setTranslateState] = useState("idle");
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const fileInputRef = React.useRef(null);
+
+  const selectedTenant = data.tenants.find(ten => ten.id === form.tenantId);
+  const selectedUnit = selectedTenant
+    ? (data.units.find(u => u.id === selectedTenant.unitId)?.unitNumber || selectedTenant.unit || "—")
+    : "—";
+
   const updateStatus = async (id, status) => {
-    // Optimistic update for instant UI feedback
-    setData(d => ({...d, maintenance: d.maintenance.map(m => m.id===id?{...m,status}:m)}));
+    setData(d => ({ ...d, maintenance: d.maintenance.map(m => m.id === id ? { ...m, status } : m) }));
     await supabase.from("maintenance_requests").update({ status }).eq("id", id);
   };
 
+  const addType = async () => {
+    if (!newTypeName.trim() || !user?.id) return;
+    setAddingType(true);
+    const { data: newType, error } = await supabase
+      .from("maintenance_types")
+      .insert({ landlord_id: user.id, name: newTypeName.trim() })
+      .select()
+      .single();
+    if (!error && newType) {
+      setData(d => ({ ...d, maintenanceTypes: [...(d.maintenanceTypes || []), { id: newType.id, name: newType.name }].sort((a, b) => a.name.localeCompare(b.name)) }));
+      setF("type", newType.name);
+    }
+    setNewTypeName("");
+    setShowAddType(false);
+    setAddingType(false);
+  };
+
+  const translate = async () => {
+    if (!form.description.trim()) return;
+    setTranslateState("loading");
+    try {
+      const res = await fetch("/api/maintenance/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: form.description, landlordId: user.id }),
+      });
+      const json = await res.json();
+      if (res.ok) { setF("descriptionZh", json.translation); setTranslateState("done"); }
+      else setTranslateState("idle");
+    } catch { setTranslateState("idle"); }
+  };
+
+  const handleFileAdd = (e) => {
+    const newFiles = Array.from(e.target.files).map(f => ({
+      file: f,
+      previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
+    }));
+    setFiles(prev => [...prev, ...newFiles]);
+    e.target.value = "";
+  };
+
+  const removeFile = (idx) => {
+    setFiles(prev => {
+      const copy = [...prev];
+      if (copy[idx].previewUrl) URL.revokeObjectURL(copy[idx].previewUrl);
+      copy.splice(idx, 1);
+      return copy;
+    });
+  };
+
+  const resetModal = () => {
+    setForm({ tenantId: "", status: "new", type: "", description: "", descriptionZh: "" });
+    files.forEach(f => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
+    setFiles([]);
+    setShowAddType(false);
+    setNewTypeName("");
+    setTranslateState("idle");
+    setSubmitError("");
+  };
+
+  const submit = async () => {
+    if (!form.tenantId || !form.description.trim()) return;
+    setSubmitError("");
+    setSubmitting(true);
+    const fd = new FormData();
+    fd.append("tenantId", form.tenantId);
+    fd.append("propertyId", selectedTenant?.propertyId || "");
+    fd.append("unit", selectedUnit !== "—" ? selectedUnit : "");
+    fd.append("status", form.status);
+    fd.append("type", form.type);
+    fd.append("description", form.description);
+    if (form.descriptionZh) fd.append("descriptionZh", form.descriptionZh);
+    fd.append("landlordId", user.id);
+    files.forEach(({ file }) => fd.append("files", file));
+    const res = await fetch("/api/maintenance/create", { method: "POST", body: fd });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { setSubmitError(json.error || "Something went wrong."); setSubmitting(false); return; }
+    await refresh();
+    setShowModal(false);
+    resetModal();
+    setSubmitting(false);
+  };
+
+  const pColors = { high: "#ef4444", medium: "#818cf8", low: "#3b82f6" };
+  const pLabels = { high: t.priorityHigh, medium: t.priorityMedium, low: t.priorityLow };
+
   return (
     <div>
-      <PageHeader title={t.maintTitle} subtitle={t.maintSubtitle(data.maintenance.filter(m => m.status!=="resolved").length)} />
+      <PageHeader title={t.maintTitle} subtitle={t.maintSubtitle(data.maintenance.filter(m => m.status !== "closed" && m.status !== "resolved").length)} action={<Btn icon="plus" onClick={() => { resetModal(); setShowModal(true); }}>{t.maintNewRequest}</Btn>} />
+
+      {/* Request list */}
       <div style={{ display: "grid", gap: 14 }}>
         {data.maintenance.map(m => {
           const ten = data.tenants.find(ten => ten.id === m.tenantId);
           const prop = data.properties.find(p => p.id === m.propertyId);
+          const attachments = (data.maintenanceAttachments || []).filter(a => a.maintenanceRequestId === m.id);
           return (
             <div key={m.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", display: "flex", gap: 18, alignItems: "flex-start" }}>
-              <div style={{ width: 4, borderRadius: 4, alignSelf: "stretch", background: pColors[m.priority]||"#e2e8f0", flexShrink: 0 }} />
+              <div style={{ width: 4, borderRadius: 4, alignSelf: "stretch", background: pColors[m.priority] || "#e2e8f0", flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
                   <div style={{ flex: 1 }}>
-                    <p style={{ margin: "0 0 6px", fontSize: 15, color: "#0f172a", fontWeight: 500 }}>{m.description}</p>
-                    <div style={{ display: "flex", gap: 12, fontSize: 13, color: "#64748b" }}>
-                      <span>{ten ? tenantFullName(ten) : "—"}</span><span>{prop?.address} · {m.unit}</span><span>{fmtDate(m.date)}</span>
-                      <span style={{ color: pColors[m.priority], fontWeight: 600 }}>{pLabels[m.priority]}</span>
+                    <p style={{ margin: "0 0 4px", fontSize: 15, color: "#0f172a", fontWeight: 500 }}>{m.description}</p>
+                    {m.descriptionZh && <p style={{ margin: "0 0 6px", fontSize: 13, color: "#64748b", fontStyle: "italic" }}>{m.descriptionZh}</p>}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 13, color: "#64748b", marginBottom: attachments.length ? 10 : 0 }}>
+                      <span>{ten ? tenantFullName(ten) : "—"}</span>
+                      <span>{prop?.address}{m.unit ? ` · ${m.unit}` : ""}</span>
+                      <span>{fmtDate(m.date)}</span>
+                      {m.priority && <span style={{ color: pColors[m.priority], fontWeight: 600 }}>{pLabels[m.priority]}</span>}
+                      {m.type && <span style={{ background: "#e0e7ff", color: "#312e81", padding: "1px 8px", borderRadius: 99, fontSize: 12, fontWeight: 600 }}>{m.type}</span>}
                     </div>
+                    {attachments.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                        {attachments.map(att => (
+                          <AttachmentChip key={att.id} att={att} />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
                     <Badge status={m.status} t={t} />
                     <select value={m.status} onChange={e => updateStatus(m.id, e.target.value)}
                       style={{ padding: "6px 10px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 12, color: "#374151", cursor: "pointer", fontFamily: "inherit", outline: "none" }}>
-                      <option value="open">{t.statusOpen}</option>
+                      <option value="new">{t.statusNew}</option>
                       <option value="in-progress">{t.statusInProgress}</option>
-                      <option value="resolved">{t.statusResolved}</option>
+                      <option value="closed">{t.statusClosed}</option>
                     </select>
                   </div>
                 </div>
@@ -2103,6 +2258,123 @@ const MaintenancePage = ({ data, setData, t, refresh }) => {
         })}
         {data.maintenance.length === 0 && <div style={{ textAlign: "center", padding: 48, color: "#94a3b8", fontSize: 15 }}>{t.noMaintenance}</div>}
       </div>
+
+      {/* New Request Modal */}
+      {showModal && (
+        <Modal title={t.maintNewRequest} onClose={() => { setShowModal(false); resetModal(); }} wide>
+          {/* Tenant + Unit */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 4 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.maintTenant} *</label>
+              <select value={form.tenantId} onChange={e => setF("tenantId", e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 14, color: "#0f172a", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}>
+                <option value="">{t.maintSelectTenant}</option>
+                {data.tenants.filter(ten => ten.status === "current tenant" || ten.status === "future tenant").map(ten => (
+                  <option key={ten.id} value={ten.id}>{tenantFullName(ten)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.maintUnit}</label>
+              <div style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 14, color: selectedUnit !== "—" ? "#0f172a" : "#94a3b8", background: "#f8fafc" }}>
+                {selectedUnit}
+              </div>
+            </div>
+          </div>
+
+          {/* Status + Type */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 4 }}>
+            <Sel label={`${t.colStatus}`} value={form.status} onChange={v => setF("status", v)} options={[
+              { value: "new", label: t.statusNew },
+              { value: "in-progress", label: t.statusInProgress },
+              { value: "closed", label: t.statusClosed },
+            ]} />
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.maintType}</label>
+              <select value={form.type} onChange={e => { if (e.target.value === "__add__") { setShowAddType(true); } else { setF("type", e.target.value); } }}
+                style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 14, color: "#0f172a", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}>
+                <option value="">{t.maintTypeSelect}</option>
+                {(data.maintenanceTypes || []).map(mt => (
+                  <option key={mt.id} value={mt.name}>{mt.name}</option>
+                ))}
+                <option value="__add__">{t.maintAddNewType}</option>
+              </select>
+              {showAddType && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <input
+                    value={newTypeName}
+                    onChange={e => setNewTypeName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") addType(); if (e.key === "Escape") { setShowAddType(false); setNewTypeName(""); } }}
+                    placeholder={t.maintNewTypePlaceholder}
+                    autoFocus
+                    style={{ flex: 1, padding: "8px 12px", border: "1.5px solid #4f46e5", borderRadius: 8, fontSize: 14, color: "#0f172a", outline: "none", fontFamily: "inherit" }}
+                  />
+                  <button onClick={addType} disabled={addingType || !newTypeName.trim()}
+                    style={{ padding: "8px 14px", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: addingType || !newTypeName.trim() ? "not-allowed" : "pointer", opacity: addingType || !newTypeName.trim() ? 0.6 : 1, fontFamily: "inherit" }}>
+                    {t.maintAddTypeSave}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{t.maintDescription} *</label>
+              <button onClick={translate} disabled={translateState === "loading" || !form.description.trim()}
+                style={{ fontSize: 12, fontWeight: 600, color: translateState === "loading" ? "#94a3b8" : "#4f46e5", background: "none", border: "none", cursor: translateState === "loading" || !form.description.trim() ? "not-allowed" : "pointer", padding: 0, fontFamily: "inherit", opacity: !form.description.trim() ? 0.5 : 1 }}>
+                {translateState === "loading" ? t.maintTranslating : t.maintTranslateChinese}
+              </button>
+            </div>
+            <textarea value={form.description} onChange={e => { setF("description", e.target.value); if (translateState === "done") setTranslateState("idle"); }}
+              placeholder={t.maintDescriptionPlaceholder} rows={4}
+              style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 9, fontSize: 14, color: "#0f172a", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit", resize: "vertical", lineHeight: 1.5 }} />
+          </div>
+
+          {/* Chinese translation */}
+          {(translateState === "done" || form.descriptionZh) && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.maintTranslatedLabel}</label>
+              <textarea value={form.descriptionZh} onChange={e => setF("descriptionZh", e.target.value)} rows={3}
+                style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #c7d2fe", borderRadius: 9, fontSize: 14, color: "#312e81", background: "#eef2ff", boxSizing: "border-box", outline: "none", fontFamily: "inherit", resize: "vertical", lineHeight: 1.5 }} />
+            </div>
+          )}
+
+          {/* Attachments */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{t.maintAttachments}</label>
+              <button onClick={() => fileInputRef.current?.click()}
+                style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", background: "none", border: "1px solid #c7d2fe", borderRadius: 7, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}>
+                + {t.maintAddFiles}
+              </button>
+              <input ref={fileInputRef} type="file" multiple onChange={handleFileAdd} style={{ display: "none" }} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt" />
+            </div>
+            {files.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {files.map((f, idx) => (
+                  <div key={idx} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: f.previewUrl ? 0 : "6px 10px", overflow: "hidden" }}>
+                    {f.previewUrl ? (
+                      <img src={f.previewUrl} alt={f.file.name} style={{ width: 64, height: 64, objectFit: "cover", display: "block" }} />
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#374151", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.file.name}</span>
+                    )}
+                    <button onClick={() => removeFile(idx)}
+                      style={{ position: f.previewUrl ? "absolute" : "static", top: 2, right: 2, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", color: "#fff", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {submitError && <div style={{ fontSize: 13, color: "#ef4444", marginBottom: 12 }}>{submitError}</div>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => { setShowModal(false); resetModal(); }}>{t.cancel}</Btn>
+            <Btn onClick={submit} disabled={submitting || !form.tenantId || !form.description.trim()}>{submitting ? t.maintSubmitting : t.maintNewRequest}</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
@@ -2174,7 +2446,7 @@ const TenantDashboard = ({ data, user }) => {
   const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const property = data.properties.find(p => p.id === tenant?.propertyId);
   const payments = data.payments.filter(p => p.tenantId === user.id).sort((a,b) => new Date(b.dueDate)-new Date(a.dueDate));
-  const openMaint = data.maintenance.filter(m => m.tenantId === user.id && m.status !== "resolved");
+  const openMaint = data.maintenance.filter(m => m.tenantId === user.id && m.status !== "closed" && m.status !== "resolved");
 
   return (
     <div>
@@ -2343,7 +2615,7 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
     if (!form.description) return;
     const { error } = await supabase.from("maintenance_requests").insert({
       tenant_id: user.id, property_id: tenant?.propertyId, unit: tenant?.unit,
-      description: form.description, priority: form.priority, status: "open",
+      description: form.description, priority: form.priority, status: "new",
     });
     if (!error) {
       await refresh();
@@ -2824,7 +3096,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [] });
+  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [] });
   const [loadingData, setLoadingData] = useState(false);
   const [lang, setLang] = useState("en");
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
@@ -2883,7 +3155,9 @@ export default function App() {
   const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id, notes: t.notes || "", securityDeposit: t.security_deposit || 0 });
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
-  const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
+  const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, descriptionZh: m.description_zh || "", type: m.type || "", priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
+  const mapMaintenanceType = (t) => ({ id: t.id, name: t.name });
+  const mapMaintenanceAttachment = (a) => ({ id: a.id, maintenanceRequestId: a.maintenance_request_id, fileName: a.file_name, filePath: a.file_path, fileType: a.file_type || "", fileSize: a.file_size || 0 });
   const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
   const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, contractId: d.contract_id || null, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at, driveLink: d.drive_link || null })
   const mapEmailSettings = (e) => !e ? EMPTY_EMAIL_SETTINGS : ({
@@ -2897,7 +3171,7 @@ export default function App() {
     setLoadingData(true);
     try {
       if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes] = await Promise.all([
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
           supabase.from("contracts").select("*, contract_tenants(tenant_id)"),
@@ -2907,6 +3181,8 @@ export default function App() {
           supabase.from("units").select("*").order("unit_number", { ascending: true }),
           supabase.from("documents").select("*").order("uploaded_at", { ascending: false }),
           supabase.from("landlord_profiles").select("*"),
+          supabase.from("maintenance_types").select("*").order("name", { ascending: true }),
+          supabase.from("maintenance_attachments").select("*").order("created_at", { ascending: true }),
         ]);
         const today = new Date().toISOString().split("T")[0];
         const units = (unitRes.data || []).map(mapUnit).map(unit => {
@@ -2949,11 +3225,13 @@ export default function App() {
           tenants:       (tenRes.data   || []).map(mapTenant),
           contracts:     mappedContracts,
           payments:      (payRes.data   || []).map(mapPayment),
-          maintenance:   (maintRes.data || []).map(mapMaintenance),
-          emailSettings: mapEmailSettings(emailRes.data),
+          maintenance:            (maintRes.data     || []).map(mapMaintenance),
+          emailSettings:          mapEmailSettings(emailRes.data),
           units,
-          documents:     (docRes.data   || []).map(mapDocument),
-          landlords:     (llRes.data    || []),
+          documents:              (docRes.data       || []).map(mapDocument),
+          landlords:              (llRes.data        || []),
+          maintenanceTypes:       (maintTypesRes.data || []).map(mapMaintenanceType),
+          maintenanceAttachments: (maintAttRes.data  || []).map(mapMaintenanceAttachment),
         });
       } else {
         // Tenant: fetch own profile + related data
@@ -3036,7 +3314,7 @@ export default function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setData({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [] });
+    setData({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [] });
     setPage("dashboard");
   };
 
