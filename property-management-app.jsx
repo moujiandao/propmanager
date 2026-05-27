@@ -14,6 +14,9 @@ const T = {
     navDashboard: "Dashboard", navProperties: "Properties", navTenants: "Tenants",
     navLeases: "Leases", navPayments: "Payments", navMaintenance: "Maintenance", navEmail: "Email Automation",
     dashTitle: "Dashboard", dashSubtitle: "Good morning! Here's your portfolio overview.",
+    dashSummaryTitle: "What needs your attention", dashSummaryGenerate: "Generate Summary", dashSummaryRegenerate: "Regenerate",
+    dashSummaryLoading: "Thinking…", dashSummaryEmpty: "Click Generate Summary to get a quick read on what needs your attention this week.",
+    dashSummaryError: "Couldn't generate a summary. Try again in a moment.", dashSummaryGeneratedAt: (when) => `Generated ${when}`,
     statProperties: "Properties", statOccupied: "occupied", statRevenue: "Monthly Revenue",
     statActiveLeases: "active leases", statPending: "Pending Payments", statRequireAttention: "require attention",
     statOpenMaint: "Open Maintenance", statRequests: "requests",
@@ -79,7 +82,7 @@ const T = {
     dashTransitions: "Unit Transitions — Next 6 Months", dashTransitionsEmpty: "No unit transitions in the next 6 months.",
     dashMovingOut: "Moving out", dashMovingIn: "Moving in",
     dashGap: (mo, d) => mo > 0 && d > 0 ? `Gap ${mo}mo ${d}d` : mo > 0 ? `Gap ${mo}mo` : `Gap ${d}d`,
-    dashGapUnresolved: "Unresolved",
+    dashGapUnresolved: "Need to find new tenant(s)",
     dashCleanBefore: (date) => `Clean unit before ${date}`,
     dashVacantNow: "Vacant now", dashNoOutgoing: "No outgoing tenant", dashNoIncoming: "New tenants needed", dashAvailableNow: "Available now",
     paySubtitleTracker: "Monthly rent tracker by unit", payZelleName: "Zelle Name", payMoveOutDate: "Move-out Date", paySelectAll: "Select All",
@@ -121,6 +124,9 @@ const T = {
     navDashboard: "控制台", navProperties: "房产", navTenants: "租客",
     navLeases: "合同", navPayments: "付款", navMaintenance: "维修", navEmail: "邮件自动化",
     dashTitle: "控制台", dashSubtitle: "早上好！以下是您的房产组合概览。",
+    dashSummaryTitle: "需要关注的事项", dashSummaryGenerate: "生成摘要", dashSummaryRegenerate: "重新生成",
+    dashSummaryLoading: "生成中…", dashSummaryEmpty: "点击「生成摘要」快速了解本周需要关注的事项。",
+    dashSummaryError: "摘要生成失败，请稍后再试。", dashSummaryGeneratedAt: (when) => `生成于 ${when}`,
     statProperties: "房产数量", statOccupied: "已出租", statRevenue: "月收入",
     statActiveLeases: "有效合同", statPending: "待处理付款", statRequireAttention: "需要关注",
     statOpenMaint: "待处理维修", statRequests: "个请求",
@@ -186,7 +192,7 @@ const T = {
     dashTransitions: "单元交接 — 未来 6 个月", dashTransitionsEmpty: "未来 6 个月内无单元交接。",
     dashMovingOut: "搬出", dashMovingIn: "搬入",
     dashGap: (mo, d) => mo > 0 && d > 0 ? `空档 ${mo} 个月 ${d} 天` : mo > 0 ? `空档 ${mo} 个月` : `空档 ${d} 天`,
-    dashGapUnresolved: "未确定",
+    dashGapUnresolved: "需要寻找新租客",
     dashCleanBefore: (date) => `请于 ${date} 前打扫单元`,
     dashVacantNow: "目前空置", dashNoOutgoing: "无搬出租客", dashNoIncoming: "需招新租客", dashAvailableNow: "目前可用",
     paySubtitleTracker: "按单元的月租追踪", payZelleName: "Zelle姓名", payMoveOutDate: "退租日期", paySelectAll: "全选",
@@ -250,6 +256,7 @@ export const Icon = ({ name, size = 18 }) => {
     trending: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
     globe: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>,
     trash: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>,
+    sparkles: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 14l.9 2.4L22.3 17l-2.4.9L19 20l-.9-2.4L15.7 17l2.4-.6z"/><path d="M5 17l.6 1.6L7.2 19l-1.6.6L5 21l-.6-1.4L2.8 19l1.6-.4z"/></svg>,
   };
   return icons[name] || null;
 };
@@ -593,8 +600,34 @@ const StatCard = ({ label, value, sub, icon, color = "#4f46e5" }) => (
 );
 
 // ─── LANDLORD DASHBOARD ───────────────────────────────────────────────────────
-const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelectedTenantId }) => {
+const LandlordDashboard = ({ data, t, lang, user, setPage, setSelectedPropertyId, setSelectedTenantId }) => {
   const { properties, tenants, payments, maintenance, contracts, units = [] } = data;
+  const [summary, setSummary] = useState("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
+  const [summaryGeneratedAt, setSummaryGeneratedAt] = useState(null);
+  const [expandedTransitions, setExpandedTransitions] = useState(new Set());
+
+  const generateSummary = async () => {
+    if (!user?.id || summaryLoading) return;
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      const res = await fetch("/api/dashboard/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ landlordId: user.id, lang }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Request failed");
+      setSummary(json.summary || "");
+      setSummaryGeneratedAt(json.generatedAt || new Date().toISOString());
+    } catch (err) {
+      setSummaryError(err.message || "error");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
   const occupied = properties.filter(p => p.status === "occupied").length;
   const pendingPayments = payments.filter(p => p.status === "pending" || p.status === "overdue");
   const openMaint = maintenance.filter(m => m.status !== "closed" && m.status !== "resolved");
@@ -701,6 +734,37 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
   return (
     <div>
       <PageHeader title={t.dashTitle} subtitle={t.dashSubtitle} />
+      <div style={{ background: "linear-gradient(135deg,#eef2ff,#f5f3ff)", borderRadius: 14, padding: 22, border: "1px solid #e0e7ff", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: summary || summaryLoading || summaryError ? 12 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+              <Icon name="sparkles" size={16} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashSummaryTitle}</h3>
+          </div>
+          <button
+            onClick={generateSummary}
+            disabled={summaryLoading || !user?.id}
+            style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#fff", background: summaryLoading ? "#a5b4fc" : "#4f46e5", border: "none", borderRadius: 8, cursor: summaryLoading ? "default" : "pointer" }}
+          >
+            {summaryLoading ? t.dashSummaryLoading : (summary ? t.dashSummaryRegenerate : t.dashSummaryGenerate)}
+          </button>
+        </div>
+        {summaryError ? (
+          <div style={{ fontSize: 14, color: "#b91c1c", lineHeight: 1.55 }}>{t.dashSummaryError}</div>
+        ) : summary ? (
+          <div>
+            <div style={{ fontSize: 15, color: "#1e293b", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{summary}</div>
+            {summaryGeneratedAt && (
+              <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
+                {t.dashSummaryGeneratedAt(new Date(summaryGeneratedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}
+              </div>
+            )}
+          </div>
+        ) : summaryLoading ? null : (
+          <div style={{ fontSize: 13, color: "#64748b" }}>{t.dashSummaryEmpty}</div>
+        )}
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 28 }}>
         <StatCard label={t.statProperties} value={properties.length} sub={`${occupied} ${t.statOccupied}`} icon="building" />
         <StatCard label={t.statPending} value={pendingPayments.length} sub={t.statRequireAttention} icon="clock" color="#ef4444" />
@@ -718,14 +782,20 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
           const showUnresolvedBadge = !showGapBadge && (row.outgoing.length > 0 || row.vacantNow) && row.incoming.length === 0;
           return (
             <div key={row.key} style={{ padding: "14px 0", borderBottom: "1px solid #f8fafc" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-                <div
-                  style={{ fontSize: 16, fontWeight: 700, color: row.propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: row.propertyId && setPage ? "pointer" : "default" }}
-                  onClick={() => { if (row.propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(row.propertyId); setPage("property-detail"); } }}
-                  onMouseEnter={e => { if (row.propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
-                  onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-                >
-                  Unit {row.unitLabel} · {row.propertyAddress}
+              <div
+                style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: expandedTransitions.has(row.key) ? 10 : 0, cursor: "pointer" }}
+                onClick={() => setExpandedTransitions(prev => { const next = new Set(prev); next.has(row.key) ? next.delete(row.key) : next.add(row.key); return next; })}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 13, color: "#94a3b8", userSelect: "none" }}>{expandedTransitions.has(row.key) ? "▾" : "▸"}</span>
+                  <div
+                    style={{ fontSize: 16, fontWeight: 700, color: row.propertyId && setPage ? "#4f46e5" : "#0f172a", cursor: row.propertyId && setPage ? "pointer" : "default" }}
+                    onClick={e => { e.stopPropagation(); if (row.propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(row.propertyId); setPage("property-detail"); } }}
+                    onMouseEnter={e => { if (row.propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                  >
+                    Unit {row.unitLabel} · {row.propertyAddress}
+                  </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   {showGapBadge && (
@@ -745,7 +815,7 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
                   )}
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {expandedTransitions.has(row.key) && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>{t.dashMovingOut}</div>
                   {row.outgoing.length > 0 ? (
@@ -821,7 +891,7 @@ const LandlordDashboard = ({ data, t, setPage, setSelectedPropertyId, setSelecte
                     );
                   })()}
                 </div>
-              </div>
+              </div>}
             </div>
           );
         })}
@@ -3125,7 +3195,9 @@ export default function App() {
   const [page, setPage] = useState("dashboard");
   const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [] });
   const [loadingData, setLoadingData] = useState(false);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState("zh");
+  useEffect(() => { const stored = localStorage.getItem("propmanager_lang"); if (stored) setLang(stored); }, []);
+  useEffect(() => { localStorage.setItem("propmanager_lang", lang); }, [lang]);
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [selectedTenantId, setSelectedTenantId] = useState(null);
   const t = T[lang];
@@ -3309,7 +3381,7 @@ export default function App() {
 
   const renderPage = () => {
     if (user.role === "landlord") {
-      const props = { data, setData, t, refresh, user };
+      const props = { data, setData, t, lang, refresh, user };
       switch (page) {
         case "dashboard":        return <LandlordDashboard {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} setSelectedTenantId={setSelectedTenantId} />;
         case "properties":       return <PropertiesPage {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} />;

@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-05-26]
+
+### Added
+- `app/api/dashboard/summary/route.js` — landlord dashboard AI summary endpoint. Fetches the team's tenants, contracts, payments, maintenance, properties, and units via the service-role Supabase client, derives a structured facts object (move-ins / move-outs in the next 30 days, units needing a tenant within 60 days, previous-month unpaid rent, cleanings to schedule, open maintenance), then calls Claude Haiku for a per-unit shorthand briefing. When the request lang is `zh`, a second Claude pass translates the English briefing into natural mainland-China Mandarin while preserving absolute dates and English tenant/property names.
+- `LandlordDashboard`: new "What needs your attention" card at the top of the dashboard with a Generate/Regenerate button, loading/empty/error states, and a generated-at timestamp. Output is grouped per unit, sorted by earliest upcoming event date.
+- Bilingual T keys for the summary UI chrome (`dashSummaryTitle`, `dashSummaryGenerate`, `dashSummaryRegenerate`, `dashSummaryLoading`, `dashSummaryEmpty`, `dashSummaryError`, `dashSummaryGeneratedAt`) and a `sparkles` icon.
+- Language preference now persists in `localStorage` (`propmanager_lang`) so the chosen UI language survives reloads.
+
+### Changed
+- Unit Transitions section: each row is now collapsible (▸/▾) so the dashboard isn't dominated by transition detail by default.
+- `dashGapUnresolved` label clarified to "Need to find new tenant(s)" / "需要寻找新租客" (was the vaguer "Unresolved" / "未确定").
+
 ## [2026-05-02]
 
 ### Added
