@@ -2,6 +2,10 @@
 
 ## [2026-05-26]
 
+### Changed
+- Dashboard AI summary now caches the last generated text in `localStorage` keyed by user id, along with the active language and a fingerprint of every input field (tenants, payments, maintenance, properties, units, plus today's date). On reload, if the cached language and fingerprint still match, the cached summary is shown immediately and no LLM call fires. Regenerate always bypasses the cache.
+- Auto-gen on dashboard mount is now gated on a new `langReady` flag in `App` so it can't fire with the default "zh" before the user's localStorage lang preference is restored.
+
 ### Added
 - `app/api/dashboard/summary/route.js` — landlord dashboard AI summary endpoint. Fetches the team's tenants, contracts, payments, maintenance, properties, and units via the service-role Supabase client, derives a structured facts object (move-ins / move-outs in the next 30 days, units needing a tenant within 60 days, previous-month unpaid rent, cleanings to schedule, open maintenance), then calls Claude Haiku for a per-unit shorthand briefing. When the request lang is `zh`, a second Claude pass translates the English briefing into natural mainland-China Mandarin while preserving absolute dates and English tenant/property names.
 - `LandlordDashboard`: new "What needs your attention" card at the top of the dashboard with a Generate/Regenerate button, loading/empty/error states, and a generated-at timestamp. Output is grouped per unit, sorted by earliest upcoming event date.
