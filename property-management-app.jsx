@@ -2503,6 +2503,15 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const pColors = { high: "#ef4444", medium: "#818cf8", low: "#3b82f6" };
   const pLabels = { high: t.priorityHigh, medium: t.priorityMedium, low: t.priorityLow };
 
+  const commentViewer = { authorType: "landlord", authorId: user.authId, landlordId: user.id, authorName: user.name };
+  const commentLabels = {
+    heading: t.commentsHeading, show: t.commentsShow, none: t.commentsNone,
+    reply: t.commentReply, post: t.commentPost, posting: t.commentPosting, cancel: t.commentCancel,
+    placeholder: t.commentPlaceholder, replyPlaceholder: t.commentReplyPlaceholder,
+    delete: t.commentDelete, deleteConfirm: t.commentDeleteConfirm, deleted: t.commentDeleted,
+    translate: t.maintTranslateChinese, translating: t.maintTranslating, landlord: t.commentLandlord,
+  };
+
   return (
     <div>
       <PageHeader title={t.maintTitle} subtitle={t.maintSubtitle(data.maintenance.filter(m => m.status !== "closed" && m.status !== "resolved").length)} action={<Btn icon="plus" onClick={() => { resetModal(); setShowModal(true); }}>{t.maintNewRequest}</Btn>} />
@@ -2572,6 +2581,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
                     </select>
                   </div>
                 </div>
+                <CommentThread request={m} comments={data.maintenanceComments || []} viewer={commentViewer} setData={setData} L={commentLabels} />
               </div>
             </div>
           );
@@ -2931,6 +2941,14 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
   const [success, setSuccess] = useState(false);
   const tenant = data.tenants.find(t => t.id === user.id);
   const myReqs = data.maintenance.filter(m => m.tenantId === user.id);
+  const commentViewer = { authorType: "tenant", authorId: user.id, landlordId: tenant?.landlordId || null, authorName: tenant ? tenantFullName(tenant) : (user.name || user.email) };
+  const commentLabels = {
+    heading: "Comments", show: (n) => n === 1 ? "1 comment" : `${n} comments`, none: "No comments yet",
+    reply: "Reply", post: "Post", posting: "Posting...", cancel: "Cancel",
+    placeholder: "Write a comment...", replyPlaceholder: "Write a reply...",
+    delete: "Delete", deleteConfirm: "Delete this comment?", deleted: "[deleted]",
+    translate: "Translate to Chinese", translating: "Translating...", landlord: "Landlord",
+  };
   const submit = async () => {
     if (!form.description) return;
     const { error } = await supabase.from("maintenance_requests").insert({
@@ -2973,6 +2991,7 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
                       <span style={{ fontSize: 12, color: "#94a3b8" }}>{fmtDate(m.date)}</span>
                       <Badge status={m.status} t={T.en} />
                     </div>
+                    <CommentThread request={m} comments={data.maintenanceComments || []} viewer={commentViewer} setData={setData} L={commentLabels} />
                   </div>
                 </div>
               );
