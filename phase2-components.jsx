@@ -232,7 +232,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
                           onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
                           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                         >
-                          {t.name}
+                          {t.lastName ? `${t.name} ${t.lastName}` : t.name}
                         </button>
                         <span style={{ fontSize: 12, color: t.monthlyRent ? "#f1f5f9" : "#475569", fontWeight: 600 }}>
                           {t.monthlyRent ? fmt(t.monthlyRent) : "—"}
