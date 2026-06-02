@@ -58,6 +58,11 @@ const T = {
     maintDescription: "Description", maintDescriptionPlaceholder: "Describe the issue in detail...",
     maintTranslateChinese: "Translate to Chinese", maintTranslating: "Translating...",
     maintTranslatedLabel: "Chinese Translation",
+    commentsHeading: "Comments", commentsShow: (n) => n === 1 ? "1 comment" : `${n} comments`, commentsNone: "No comments yet",
+    commentReply: "Reply", commentPost: "Post", commentPosting: "Posting...", commentCancel: "Cancel",
+    commentPlaceholder: "Write a comment...", commentReplyPlaceholder: "Write a reply...",
+    commentDelete: "Delete", commentDeleteConfirm: "Delete this comment?", commentDeleted: "[deleted]",
+    commentYou: "You", commentLandlord: "Landlord",
     maintAttachments: "Attachments", maintAddFiles: "Add Files",
     maintSubmitting: "Submitting...",
     emailTitle: "Email Automation", emailSubtitle: "Configure automated payment reminder emails",
@@ -168,6 +173,11 @@ const T = {
     maintDescription: "描述", maintDescriptionPlaceholder: "详细描述问题...",
     maintTranslateChinese: "翻译为中文", maintTranslating: "翻译中...",
     maintTranslatedLabel: "中文翻译",
+    commentsHeading: "评论", commentsShow: (n) => `${n} 条评论`, commentsNone: "暂无评论",
+    commentReply: "回复", commentPost: "发布", commentPosting: "发布中...", commentCancel: "取消",
+    commentPlaceholder: "写下评论...", commentReplyPlaceholder: "写下回复...",
+    commentDelete: "删除", commentDeleteConfirm: "确定删除这条评论吗？", commentDeleted: "[已删除]",
+    commentYou: "你", commentLandlord: "房东",
     maintAttachments: "附件", maintAddFiles: "添加文件",
     maintSubmitting: "提交中...",
     emailTitle: "邮件自动化", emailSubtitle: "配置自动付款提醒邮件",
@@ -2227,6 +2237,162 @@ const AttachmentChip = ({ att }) => {
   );
 };
 
+// Shared threaded-comment UI for a single maintenance request. Used by both the
+// landlord MaintenancePage and the tenant TenantMaintenancePage. `viewer` carries
+// the posting identity (author_id must equal auth.uid()); `L` is a localized label
+// bag so the component stays locale-agnostic.
+const CommentThread = ({ request, comments, viewer, setData, L }) => {
+  const [open, setOpen] = useState(false);
+  const [body, setBody] = useState("");
+  const [replyTo, setReplyTo] = useState(null);
+  const [replyBody, setReplyBody] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [translating, setTranslating] = useState({});
+  const [confirmId, setConfirmId] = useState(null);
+
+  const threadComments = comments.filter(c => c.maintenanceRequestId === request.id);
+  const byDate = (a, b) => (a.createdAt || "").localeCompare(b.createdAt || "");
+  const topLevel = threadComments.filter(c => !c.parentCommentId).sort(byDate);
+  const repliesOf = (id) => threadComments.filter(c => c.parentCommentId === id).sort(byDate);
+  const liveCount = threadComments.filter(c => !c.deletedAt).length;
+
+  const insertComment = async (text, parentId) => {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    const { data: inserted, error } = await supabase.from("maintenance_comments").insert({
+      maintenance_request_id: request.id,
+      parent_comment_id: parentId || null,
+      landlord_id: viewer.landlordId,
+      body: trimmed,
+      author_type: viewer.authorType,
+      author_id: viewer.authorId,
+      author_name: viewer.authorName,
+    }).select().single();
+    if (error || !inserted) return false;
+    const mapped = {
+      id: inserted.id, maintenanceRequestId: request.id, parentCommentId: parentId || null,
+      landlordId: viewer.landlordId, body: trimmed, bodyZh: "",
+      authorType: viewer.authorType, authorId: viewer.authorId, authorName: viewer.authorName,
+      deletedAt: null, createdAt: inserted.created_at,
+    };
+    setData(d => ({ ...d, maintenanceComments: [...(d.maintenanceComments || []), mapped] }));
+    return true;
+  };
+
+  const postTop = async () => { setPosting(true); const ok = await insertComment(body, null); if (ok) setBody(""); setPosting(false); };
+  const postReply = async (parentId) => { setPosting(true); const ok = await insertComment(replyBody, parentId); if (ok) { setReplyBody(""); setReplyTo(null); } setPosting(false); };
+
+  const translate = async (c) => {
+    setTranslating(s => ({ ...s, [c.id]: true }));
+    try {
+      const res = await fetch("/api/maintenance/translate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: c.body, landlordId: viewer.landlordId }),
+      });
+      const json = await res.json();
+      if (res.ok && json.translation) {
+        await supabase.from("maintenance_comments").update({ body_zh: json.translation }).eq("id", c.id);
+        setData(d => ({ ...d, maintenanceComments: d.maintenanceComments.map(x => x.id === c.id ? { ...x, bodyZh: json.translation } : x) }));
+      }
+    } finally {
+      setTranslating(s => ({ ...s, [c.id]: false }));
+    }
+  };
+
+  const remove = async (c) => {
+    setConfirmId(null);
+    const hasReplies = !c.parentCommentId && repliesOf(c.id).length > 0;
+    if (hasReplies) {
+      const stamp = new Date().toISOString();
+      await supabase.from("maintenance_comments").update({ deleted_at: stamp }).eq("id", c.id);
+      setData(d => ({ ...d, maintenanceComments: d.maintenanceComments.map(x => x.id === c.id ? { ...x, deletedAt: stamp, body: "", bodyZh: "" } : x) }));
+    } else {
+      await supabase.from("maintenance_comments").delete().eq("id", c.id);
+      setData(d => ({ ...d, maintenanceComments: d.maintenanceComments.filter(x => x.id !== c.id) }));
+    }
+  };
+
+  const isMine = (c) => c.authorId === viewer.authorId && c.authorType === viewer.authorType;
+
+  const renderComment = (c, isReply) => {
+    const deleted = !!c.deletedAt;
+    const isLandlord = c.authorType === "landlord";
+    return (
+      <div key={c.id} style={{ display: "flex", gap: 10, padding: "8px 0", marginLeft: isReply ? 34 : 0 }}>
+        <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, background: isLandlord ? "linear-gradient(135deg,#6366f1,#4338ca)" : "linear-gradient(135deg,#64748b,#475569)" }}>
+          {(c.authorName || "?").charAt(0).toUpperCase()}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{c.authorName || "—"}</span>
+            {isLandlord && <span style={{ fontSize: 10, fontWeight: 700, color: "#4338ca", background: "#eef2ff", padding: "1px 6px", borderRadius: 99, textTransform: "uppercase", letterSpacing: ".3px" }}>{L.landlord}</span>}
+            <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmtDate((c.createdAt || "").split("T")[0])}</span>
+          </div>
+          {deleted ? (
+            <p style={{ margin: "3px 0 0", fontSize: 13, color: "#94a3b8", fontStyle: "italic" }}>{L.deleted}</p>
+          ) : (
+            <p style={{ margin: "3px 0 0", fontSize: 14, color: "#334155", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{c.body}</p>
+          )}
+          {!deleted && c.bodyZh && <p style={{ margin: "5px 0 0", fontSize: 13, color: "#4338ca", background: "#eef2ff", borderRadius: 7, padding: "6px 9px", whiteSpace: "pre-wrap" }}>{c.bodyZh}</p>}
+          {!deleted && (
+            <div style={{ display: "flex", gap: 12, marginTop: 5, alignItems: "center" }}>
+              {!isReply && <button onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyBody(""); }} style={commentLinkStyle}>{L.reply}</button>}
+              {!c.bodyZh && <button onClick={() => translate(c)} disabled={translating[c.id]} style={{ ...commentLinkStyle, color: translating[c.id] ? "#94a3b8" : "#4f46e5" }}>{translating[c.id] ? L.translating : L.translate}</button>}
+              {isMine(c) && (confirmId === c.id ? (
+                <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>{L.deleteConfirm}</span>
+                  <button onClick={() => remove(c)} style={{ ...commentLinkStyle, color: "#dc2626", fontWeight: 700 }}>{L.delete}</button>
+                  <button onClick={() => setConfirmId(null)} style={commentLinkStyle}>{L.cancel}</button>
+                </span>
+              ) : (
+                <button onClick={() => setConfirmId(c.id)} style={{ ...commentLinkStyle, color: "#94a3b8" }}>{L.delete}</button>
+              ))}
+            </div>
+          )}
+          {replyTo === c.id && !isReply && (
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <input value={replyBody} onChange={e => setReplyBody(e.target.value)} placeholder={L.replyPlaceholder}
+                onKeyDown={e => { if (e.key === "Enter" && replyBody.trim() && !posting) postReply(c.id); }}
+                style={commentInputStyle} />
+              <button onClick={() => postReply(c.id)} disabled={posting || !replyBody.trim()} style={commentSendStyle(posting || !replyBody.trim())}>{posting ? L.posting : L.post}</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ marginTop: 14, borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: "#64748b", display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{open ? "▾" : "▸"}</span>
+        {liveCount > 0 ? L.show(liveCount) : L.heading}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          {topLevel.length === 0 && <div style={{ fontSize: 13, color: "#94a3b8", padding: "4px 0 10px" }}>{L.none}</div>}
+          {topLevel.map(top => (
+            <div key={top.id}>
+              {renderComment(top, false)}
+              {repliesOf(top.id).map(r => renderComment(r, true))}
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <input value={body} onChange={e => setBody(e.target.value)} placeholder={L.placeholder}
+              onKeyDown={e => { if (e.key === "Enter" && body.trim() && !posting) postTop(); }}
+              style={commentInputStyle} />
+            <button onClick={postTop} disabled={posting || !body.trim()} style={commentSendStyle(posting || !body.trim())}>{posting ? L.posting : L.post}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const commentLinkStyle = { background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, color: "#4f46e5" };
+const commentInputStyle = { flex: 1, padding: "8px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13, color: "#0f172a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+const commentSendStyle = (disabled) => ({ padding: "8px 16px", borderRadius: 8, border: "none", background: disabled ? "#e2e8f0" : "#4f46e5", color: disabled ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 });
+
 const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ tenantId: "", status: "new", type: "", description: "", descriptionZh: "" });
@@ -3313,7 +3479,7 @@ export default function App() {
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "", imageUrl: p.image_url || null });
-  const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id, notes: t.notes || "", securityDeposit: t.security_deposit || 0 });
+  const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id, notes: t.notes || "", securityDeposit: t.security_deposit || 0, landlordId: t.landlord_id || null });
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, descriptionZh: m.description_zh || "", type: m.type || "", priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
