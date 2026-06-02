@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS maintenance_comments (
 );
 
 CREATE INDEX IF NOT EXISTS maintenance_comments_request_idx
-  ON maintenance_comments (maintenance_request_id);
+  ON maintenance_comments (maintenance_request_id, created_at);
 
 ALTER TABLE maintenance_comments ENABLE ROW LEVEL SECURITY;
 
@@ -55,14 +55,13 @@ CREATE POLICY "Insert maintenance comments" ON maintenance_comments
   );
 
 -- Update: used for writing the body_zh translation cache and for soft-delete.
--- Landlord team or the request's tenant may update rows in their thread.
+-- Restricted to the comment's own author OR a landlord team member. A tenant
+-- can only mutate their OWN comments, never the landlord's (the UI gates the
+-- translate button to match: tenants translate own comments only).
 CREATE POLICY "Update maintenance comments" ON maintenance_comments
   FOR UPDATE USING (
-    is_team_member(landlord_id)
-    OR EXISTS (
-      SELECT 1 FROM maintenance_requests r
-      WHERE r.id = maintenance_request_id AND r.tenant_id = auth.uid()
-    )
+    author_id = auth.uid()
+    OR is_team_member(landlord_id)
   );
 
 -- Hard delete: only the comment's own author.

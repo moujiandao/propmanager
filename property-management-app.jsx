@@ -62,7 +62,7 @@ const T = {
     commentReply: "Reply", commentPost: "Post", commentPosting: "Posting...", commentCancel: "Cancel",
     commentPlaceholder: "Write a comment...", commentReplyPlaceholder: "Write a reply...",
     commentDelete: "Delete", commentDeleteConfirm: "Delete this comment?", commentDeleted: "[deleted]",
-    commentYou: "You", commentLandlord: "Landlord",
+    commentYou: "You", commentLandlord: "Landlord", commentError: "Couldn't post comment. Please try again.",
     maintAttachments: "Attachments", maintAddFiles: "Add Files",
     maintSubmitting: "Submitting...",
     emailTitle: "Email Automation", emailSubtitle: "Configure automated payment reminder emails",
@@ -177,7 +177,7 @@ const T = {
     commentReply: "回复", commentPost: "发布", commentPosting: "发布中...", commentCancel: "取消",
     commentPlaceholder: "写下评论...", commentReplyPlaceholder: "写下回复...",
     commentDelete: "删除", commentDeleteConfirm: "确定删除这条评论吗？", commentDeleted: "[已删除]",
-    commentYou: "你", commentLandlord: "房东",
+    commentYou: "你", commentLandlord: "房东", commentError: "评论发送失败，请重试。",
     maintAttachments: "附件", maintAddFiles: "添加文件",
     maintSubmitting: "提交中...",
     emailTitle: "邮件自动化", emailSubtitle: "配置自动付款提醒邮件",
@@ -2249,6 +2249,7 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
   const [posting, setPosting] = useState(false);
   const [translating, setTranslating] = useState({});
   const [confirmId, setConfirmId] = useState(null);
+  const [error, setError] = useState("");
 
   const threadComments = comments.filter(c => c.maintenanceRequestId === request.id);
   const byDate = (a, b) => (a.createdAt || "").localeCompare(b.createdAt || "");
@@ -2259,7 +2260,9 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
   const insertComment = async (text, parentId) => {
     const trimmed = text.trim();
     if (!trimmed) return false;
-    const { data: inserted, error } = await supabase.from("maintenance_comments").insert({
+    setError("");
+    if (!viewer.landlordId) { setError(L.error); return false; }
+    const { data: inserted, error: insErr } = await supabase.from("maintenance_comments").insert({
       maintenance_request_id: request.id,
       parent_comment_id: parentId || null,
       landlord_id: viewer.landlordId,
@@ -2268,7 +2271,7 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
       author_id: viewer.authorId,
       author_name: viewer.authorName,
     }).select().single();
-    if (error || !inserted) return false;
+    if (insErr || !inserted) { setError(L.error); return false; }
     const mapped = {
       id: inserted.id, maintenanceRequestId: request.id, parentCommentId: parentId || null,
       landlordId: viewer.landlordId, body: trimmed, bodyZh: "",
@@ -2312,6 +2315,9 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
     }
   };
 
+  // author_id is always auth.uid() (landlord: user.authId; tenant: user.id,
+  // which equals the tenant's auth.uid()), so this UI check matches the
+  // author-only RLS delete policy exactly.
   const isMine = (c) => c.authorId === viewer.authorId && c.authorType === viewer.authorType;
 
   const renderComment = (c, isReply) => {
@@ -2337,7 +2343,7 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
           {!deleted && (
             <div style={{ display: "flex", gap: 12, marginTop: 5, alignItems: "center" }}>
               {!isReply && <button onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyBody(""); }} style={commentLinkStyle}>{L.reply}</button>}
-              {!c.bodyZh && <button onClick={() => translate(c)} disabled={translating[c.id]} style={{ ...commentLinkStyle, color: translating[c.id] ? "#94a3b8" : "#4f46e5" }}>{translating[c.id] ? L.translating : L.translate}</button>}
+              {!c.bodyZh && (isMine(c) || viewer.authorType === "landlord") && <button onClick={() => translate(c)} disabled={translating[c.id]} style={{ ...commentLinkStyle, color: translating[c.id] ? "#94a3b8" : "#4f46e5" }}>{translating[c.id] ? L.translating : L.translate}</button>}
               {isMine(c) && (confirmId === c.id ? (
                 <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
                   <span style={{ fontSize: 12, color: "#64748b" }}>{L.deleteConfirm}</span>
@@ -2377,6 +2383,7 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
               {repliesOf(top.id).map(r => renderComment(r, true))}
             </div>
           ))}
+          {error && <div style={{ fontSize: 12, color: "#dc2626", marginTop: 8 }}>{error}</div>}
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <input value={body} onChange={e => setBody(e.target.value)} placeholder={L.placeholder}
               onKeyDown={e => { if (e.key === "Enter" && body.trim() && !posting) postTop(); }}
@@ -2510,6 +2517,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
     placeholder: t.commentPlaceholder, replyPlaceholder: t.commentReplyPlaceholder,
     delete: t.commentDelete, deleteConfirm: t.commentDeleteConfirm, deleted: t.commentDeleted,
     translate: t.maintTranslateChinese, translating: t.maintTranslating, landlord: t.commentLandlord,
+    error: t.commentError,
   };
 
   return (
@@ -2948,6 +2956,7 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
     placeholder: "Write a comment...", replyPlaceholder: "Write a reply...",
     delete: "Delete", deleteConfirm: "Delete this comment?", deleted: "[deleted]",
     translate: "Translate to Chinese", translating: "Translating...", landlord: "Landlord",
+    error: "Couldn't post comment. Please try again.",
   };
   const submit = async () => {
     if (!form.description) return;

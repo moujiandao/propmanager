@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-06-01]
+
+### Added
+- Threaded comments on maintenance requests. New `maintenance_comments` table (migration: `scripts/add-maintenance-comments.mjs`) with one level of reply nesting (`parent_comment_id`), cached Chinese translation (`body_zh`), author attribution (`author_type`/`author_id`/`author_name`), and soft-delete (`deleted_at`). RLS scopes reads/inserts to the landlord team (`is_team_member`) and the request's tenant; hard delete is restricted to the comment's own author.
+- Shared `CommentThread` component in `property-management-app.jsx`, rendered on both the landlord `MaintenancePage` and the tenant `TenantMaintenancePage`. Supports posting, one-level replies, per-comment "Translate to Chinese" (reusing `/api/maintenance/translate`), and delete-own (hard-delete leaves, soft-hide parents with replies). Comments load via `fetchAllData` into `data.maintenanceComments`.
+- Bilingual `T` keys for comment UI chrome (`commentsHeading`, `commentsShow`, `commentReply`, `commentPost`, `commentDelete`, `commentDeleted`, etc.); tenant portal uses inline English labels per its existing convention.
+
+### Changed
+- Property detail page unit cards now show each tenant's full name (first + last) instead of first name only.
+- Dashboard Unit Transitions rows now show a hover background highlight to make them more obviously clickable.
+- Payments tab filters to current tenants only.
+
 ## [2026-05-26]
 
 ### Changed
