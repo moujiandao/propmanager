@@ -838,8 +838,10 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
           return (
             <div key={row.key} style={{ padding: "14px 0", borderBottom: "1px solid #f8fafc" }}>
               <div
-                style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: expandedTransitions.has(row.key) ? 10 : 0, cursor: "pointer" }}
+                style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, cursor: "pointer", padding: 8, margin: `-8px -8px ${expandedTransitions.has(row.key) ? 2 : -8}px -8px`, borderRadius: 8, transition: "background .15s" }}
                 onClick={() => setExpandedTransitions(prev => { const next = new Set(prev); next.has(row.key) ? next.delete(row.key) : next.add(row.key); return next; })}
+                onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 13, color: "#94a3b8", userSelect: "none" }}>{expandedTransitions.has(row.key) ? "▾" : "▸"}</span>
