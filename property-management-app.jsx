@@ -3250,7 +3250,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [] });
+  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [], maintenanceComments: [] });
   const [loadingData, setLoadingData] = useState(false);
   const [lang, setLang] = useState("zh");
   const [langReady, setLangReady] = useState(false);
@@ -3319,6 +3319,7 @@ export default function App() {
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, descriptionZh: m.description_zh || "", type: m.type || "", priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
   const mapMaintenanceType = (t) => ({ id: t.id, name: t.name });
   const mapMaintenanceAttachment = (a) => ({ id: a.id, maintenanceRequestId: a.maintenance_request_id, fileName: a.file_name, filePath: a.file_path, fileType: a.file_type || "", fileSize: a.file_size || 0 });
+  const mapMaintenanceComment = (c) => ({ id: c.id, maintenanceRequestId: c.maintenance_request_id, parentCommentId: c.parent_comment_id || null, landlordId: c.landlord_id, body: c.body, bodyZh: c.body_zh || "", authorType: c.author_type, authorId: c.author_id, authorName: c.author_name || "", deletedAt: c.deleted_at || null, createdAt: c.created_at });
   const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
   const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, contractId: d.contract_id || null, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at, driveLink: d.drive_link || null })
   const mapEmailSettings = (e) => !e ? EMPTY_EMAIL_SETTINGS : ({
@@ -3332,7 +3333,7 @@ export default function App() {
     setLoadingData(true);
     try {
       if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes] = await Promise.all([
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes, maintCommRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
           supabase.from("contracts").select("*, contract_tenants(tenant_id)"),
@@ -3344,6 +3345,7 @@ export default function App() {
           supabase.from("landlord_profiles").select("*"),
           supabase.from("maintenance_types").select("*").order("name", { ascending: true }),
           supabase.from("maintenance_attachments").select("*").order("created_at", { ascending: true }),
+          supabase.from("maintenance_comments").select("*").order("created_at", { ascending: true }),
         ]);
         const today = new Date().toISOString().split("T")[0];
         const units = (unitRes.data || []).map(mapUnit).map(unit => {
@@ -3393,6 +3395,7 @@ export default function App() {
           landlords:              (llRes.data        || []),
           maintenanceTypes:       (maintTypesRes.data || []).map(mapMaintenanceType),
           maintenanceAttachments: (maintAttRes.data  || []).map(mapMaintenanceAttachment),
+          maintenanceComments:    (maintCommRes.data || []).map(mapMaintenanceComment),
         });
       } else {
         // Tenant: fetch own profile + related data
@@ -3404,11 +3407,12 @@ export default function App() {
           .eq("tenant_id", user.id)
           .order("created_at", { ascending: false });
         const contractId = ctRows?.[0]?.contract_id;
-        const [propRes, conRes, payRes, maintRes] = await Promise.all([
+        const [propRes, conRes, payRes, maintRes, maintCommRes] = await Promise.all([
           tenant?.propertyId ? supabase.from("properties").select("*").eq("id", tenant.propertyId) : Promise.resolve({ data: [] }),
           contractId ? supabase.from("contracts").select("*, contract_tenants(tenant_id)").eq("id", contractId) : Promise.resolve({ data: [] }),
           supabase.from("payments").select("*").eq("tenant_id", user.id).order("due_date", { ascending: false }),
           supabase.from("maintenance_requests").select("*").eq("tenant_id", user.id).order("created_at", { ascending: false }),
+          supabase.from("maintenance_comments").select("*").order("created_at", { ascending: true }),
         ]);
         setData({
           properties:    (propRes.data  || []).map(mapProperty),
@@ -3419,6 +3423,7 @@ export default function App() {
           emailSettings: EMPTY_EMAIL_SETTINGS,
           units:         [],
           documents:     [],
+          maintenanceComments: (maintCommRes.data || []).map(mapMaintenanceComment),
         });
       }
     } catch (err) {
