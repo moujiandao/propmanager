@@ -1,8 +1,25 @@
 # Changelog
 
+## [2026-06-11]
+
+### Added
+- Tenants tab: persistent property filter. Chips at the top toggle each property (and an "Unassigned" group) visible/hidden, with Show all / Hide all shortcuts. Selection persists across sessions via `localStorage` (`propmanager_tenant_hidden_props`, stores hidden ids so new properties show by default).
+- Dashboard Unit Transitions: single Expand all / Collapse all toggle in the section header.
+
+### Changed
+- Tenants tab grouped view restructured into a property → unit → tenant hierarchy: each property is a top-level section with its units (and their current/future tenants) nested underneath, plus per-property unit/tenant counts and total monthly rent.
+- Dashboard AI summary prompt now names the specific maintenance problem from the request description (e.g. "Kitchen: faucet leaking") instead of just the category, falling back to "<type> issue" when no description exists.
+
 ## [2026-06-01]
 
 ### Added
+- Email Automation feature (new "Email Automation" nav item, separate from the existing payment-reminder page which is now labelled "Payment Reminders"). Lets landlords send tenants date-triggered reminder emails before move-out, move-in, lease-end, projected move-out, and rent-due events.
+  - New tables (migration: `scripts/email-automation.sql` / `.mjs`): `email_templates` (named reusable templates with `{merge_tag}` placeholders), `email_automations` (event type + `offset_days[]` + template + scope + enabled), and `email_messages` (outbound send log + inbound replies + open/delivery/reply tracking). All landlord-scoped via `is_team_member` RLS; a partial unique index on `email_messages` guarantees idempotent automated sends.
+  - Shared isomorphic module `lib/email/` (its own `package.json` marks it ESM): `format.js` (extracted `fmt`/`fmtDate` + `daysBetween`), `merge.js` (`MERGE_TAGS`, `buildContext`, `renderTemplate`), `events.js` (event-date resolution), `context.js` (server-side snake→camel loaders), `send.js` (Resend wrapper with From/Reply-To/List-Unsubscribe/multipart). Unit tests in `merge.test.mjs` (run via `npm test`).
+  - New API routes: `app/api/email/test-send` (preview to a dummy address, logged `is_test`), `app/api/email/send-now` (manual send to a tenant), `app/api/cron/email-automations` (daily Vercel cron, `CRON_SECRET`-guarded, idempotent), `app/api/webhooks/resend` (Svix-verified delivery/open/bounce events + inbound reply correlation).
+  - New UI in `email-automation-components.jsx` (`EmailAutomationPage`): Templates manager (merge-tag insertion + live preview), Automations manager (event/offsets/template/scope/enable + test send), and Inbox/Activity (sent emails with delivery/opened/replied status and reply threads). New bilingual `T` keys in `property-management-app.jsx`.
+  - New `vercel.json` schedules the cron daily at 15:00 UTC.
+  - Requires infra setup before live use: verified Resend sending domain + SPF/DKIM/DMARC (and MX for inbound replies), env vars `CRON_SECRET`, `RESEND_WEBHOOK_SECRET`, `RESEND_REPLY_DOMAIN`, and `RESEND_FROM_EMAIL` repointed to the verified domain.
 - Threaded comments on maintenance requests. New `maintenance_comments` table (migration: `scripts/add-maintenance-comments.mjs`) with one level of reply nesting (`parent_comment_id`), cached Chinese translation (`body_zh`), author attribution (`author_type`/`author_id`/`author_name`), and soft-delete (`deleted_at`). RLS scopes reads/inserts to the landlord team (`is_team_member`) and the request's tenant; hard delete is restricted to the comment's own author.
 - Shared `CommentThread` component in `property-management-app.jsx`, rendered on both the landlord `MaintenancePage` and the tenant `TenantMaintenancePage`. Supports posting, one-level replies, per-comment "Translate to Chinese" (reusing `/api/maintenance/translate`), and delete-own (hard-delete leaves, soft-hide parents with replies). Comments load via `fetchAllData` into `data.maintenanceComments`.
 - Bilingual `T` keys for comment UI chrome (`commentsHeading`, `commentsShow`, `commentReply`, `commentPost`, `commentDelete`, `commentDeleted`, etc.); tenant portal uses inline English labels per its existing convention.

@@ -11,6 +11,8 @@ A property management web application built with Next.js and Supabase. Provides 
 - **Styling**: Inline styles with Playfair Display / Crimson Pro fonts
 - **UI monolith**: `property-management-app.jsx` contains all landlord and tenant UI components (~1600 lines)
 - **Phase 2 components**: `phase2-components.jsx` (planned) will hold PropertyDetailPage, TenantContactPage, DocumentsPageV2
+- **Email Automation components**: `email-automation-components.jsx` holds `EmailAutomationPage` (Templates / Automations / Inbox tabs). Imports shared UI from `property-management-app.jsx` (circular import, same pattern as phase2-components)
+- **Email module**: `lib/email/` is an isomorphic ESM module (own `package.json` with `"type":"module"`) shared by the UI and server: `format.js`, `merge.js` (merge-tag rendering), `events.js` (event-date resolution), `context.js` (server snake→camel loaders), `send.js` (Resend wrapper). Unit-tested via `npm test`
 - **API routes**: `app/api/` for auth, payments, webhooks, and document operations
 - **Supabase clients**: `lib/supabase/server.js` (service role), `lib/supabase/client.js` (anon key)
 - **Auth callback**: `app/auth/callback/route.js` handles Supabase recovery/magic link flows
@@ -26,6 +28,11 @@ A property management web application built with Next.js and Supabase. Provides 
 - `email_settings` - landlord email automation config
 - `units` (Phase 2) - individual units per property with bed/bath/rent
 - `documents` (Phase 2) - uploaded files with AI-extracted metadata
+- `email_templates` - named, reusable email templates with `{merge_tag}` placeholders
+- `email_automations` - date-triggered rules: `event_type`, `offset_days[]`, `template_id`, `scope`, `enabled`
+- `email_messages` - outbound send log + inbound replies; tracks delivery/open/reply status. Partial unique index `(automation_id, tenant_id, event_type, event_date, offset_days)` makes the cron idempotent
+
+Note: `email_settings` (payment reminders) is a separate, older feature — the "Payment Reminders" nav item. The new "Email Automation" nav item is the `email_templates`/`email_automations`/`email_messages` system above. Keep them distinct.
 
 ## Key Conventions
 - Naming: Next.js App Router conventions (page.js, layout.js, route.js)

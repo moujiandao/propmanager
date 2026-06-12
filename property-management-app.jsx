@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createClient } from '@/lib/supabase/client';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
+import { EmailAutomationPage } from './email-automation-components';
 
 const supabase = createClient();
 
@@ -66,6 +67,44 @@ const T = {
     maintAttachments: "Attachments", maintAddFiles: "Add Files",
     maintSubmitting: "Submitting...",
     emailTitle: "Email Automation", emailSubtitle: "Configure automated payment reminder emails",
+    navEmailAutomation: "Email Automation", navPaymentReminders: "Payment Reminders",
+    emailAutoTitle: "Email Automation", emailAutoSubtitle: "Send tenants timely reminders before key dates",
+    tabTemplates: "Templates", tabAutomations: "Automations", tabInbox: "Inbox",
+    newTemplate: "New Template", editTemplateTitle: "Edit Template",
+    templateName: "Template name", templateNamePlaceholder: "e.g. Move-out reminder — fall semester",
+    templateSubject: "Subject", templateBody: "Body", insertField: "Insert field",
+    preview: "Preview", previewNoSubject: "(no subject)", previewEmpty: "Your message preview appears here.",
+    previewSampleNote: "Preview uses sample data; real tenant values are filled in when sent.",
+    templateNameSubjectRequired: "Name and subject are required.",
+    save: "Save", saving: "Saving…", edit: "Edit", deleteTemplate: "Delete Template",
+    confirmDeleteTemplate: "Delete this template?", noTemplates: "No templates yet. Create your first reminder template.",
+    sendTest: "Send Test", testSendTitle: "Send Test Email",
+    testSendDesc: "Send this template to a test address so you can check how it looks before going live.",
+    testRecipient: "Send to (test address)", testUseTenant: "Fill with a tenant's data (optional)",
+    testSampleData: "Sample data", send: "Send", sending: "Sending…",
+    testSent: "Test email sent.", testFailed: "Could not send test email.", testRecipientRequired: "A test recipient email is required.",
+    emailAutoComingSoon: "Coming soon.",
+    evtMoveOut: "Move-out date", evtMoveIn: "Move-in date", evtLeaseEnd: "Lease end date",
+    evtProjectedMoveOut: "Projected move-out", evtRentDue: "Rent due",
+    newAutomation: "New Automation", editAutomationTitle: "Edit Automation",
+    automationName: "Automation name", automationNamePlaceholder: "e.g. Move-out reminders",
+    automationEvent: "Trigger event", automationOffsets: "Days before event",
+    automationOffsetsHint: "Comma-separated days before the event, e.g. 10, 5, 3.",
+    automationTemplate: "Template", automationSelectTemplate: "Select a template…",
+    automationScopeProperty: "Property (optional)", automationScopeStatus: "Tenant status (optional)",
+    scopeAllProperties: "All properties", scopeAllStatuses: "All statuses",
+    statusCurrent: "Current tenant", statusFuture: "Future tenant",
+    automationNameRequired: "A name is required.", automationTemplateRequired: "Please choose a template.",
+    automationOffsetsRequired: "Enter at least one valid day offset.",
+    deleteAutomation: "Delete Automation", confirmDeleteAutomation: "Delete this automation?",
+    noAutomations: "No automations yet. Create one to start sending reminders.",
+    automationsNeedTemplate: "Create a template first, then build an automation around it.",
+    offsetsLabel: "days before",
+    inboxEmpty: "No emails sent yet.", inboxShowTests: "Show test sends",
+    inboxTestTag: "Test", inboxOpened: "Opened", inboxReplied: "Replied",
+    inboxReplyThread: "Replies", inboxNoBody: "(no content)",
+    st_queued: "Queued", st_sent: "Sent", st_delivered: "Delivered", st_opened: "Opened",
+    st_bounced: "Bounced", st_complained: "Complaint", st_failed: "Failed", st_received: "Reply",
     editTemplate: "Edit Template", editTemplateLabel: "Edit Template:",
     variablesNote: "Variables: {tenant_name}, {amount}, {due_date}, {landlord_name}",
     saveTemplate: "Save Template",
@@ -85,6 +124,7 @@ const T = {
     dashTenantCount: (n) => `${n} tenant${n === 1 ? "" : "s"}`, dashUnitCount: (n) => `${n} unit${n === 1 ? "" : "s"}`, dashUpcomingCount: (n) => `${n} upcoming`,
     dashUnitsToRentOut: "Units to Rent Out", dashUnitsToRentOutEmpty: "All units are covered for the next 6 months.", dashAvailable: "Available",
     dashTransitions: "Unit Transitions — Next 6 Months", dashTransitionsEmpty: "No unit transitions in the next 6 months.",
+    dashExpandAll: "Expand all", dashCollapseAll: "Collapse all",
     dashMovingOut: "Moving out", dashMovingIn: "Moving in",
     dashGap: (mo, d) => mo > 0 && d > 0 ? `Gap ${mo}mo ${d}d` : mo > 0 ? `Gap ${mo}mo` : `Gap ${d}d`,
     dashGapUnresolved: "Need to find new tenant(s)",
@@ -94,6 +134,8 @@ const T = {
     payUnitLabel: (n) => `Unit ${n}`, payUnassigned: "Unassigned",
     saveChanges: "Save Changes", saving: "Saving...", discard: "Discard",
     displayBy: "Display by", displayAll: "All", displayByUnit: "Property + Unit",
+    tenNoProperty: "Unassigned", tenFilterProperties: "Filter properties", tenShowAll: "Show all", tenHideAll: "Hide all", tenPerMo: "/mo",
+    tenNoneToShow: "No tenants to show. Adjust the property filter above.",
     colMonthlyRent: "Monthly Rent", editBtn: "Edit",
     firstName: "First Name", lastName: "Last Name",
     zelleNameLabel: "Zelle Name", zelleNamePlaceholder: "Name or phone on Zelle",
@@ -181,6 +223,44 @@ const T = {
     maintAttachments: "附件", maintAddFiles: "添加文件",
     maintSubmitting: "提交中...",
     emailTitle: "邮件自动化", emailSubtitle: "配置自动付款提醒邮件",
+    navEmailAutomation: "邮件自动化", navPaymentReminders: "租金提醒",
+    emailAutoTitle: "邮件自动化", emailAutoSubtitle: "在关键日期前向租户发送及时提醒",
+    tabTemplates: "模板", tabAutomations: "自动化规则", tabInbox: "收件箱",
+    newTemplate: "新建模板", editTemplateTitle: "编辑模板",
+    templateName: "模板名称", templateNamePlaceholder: "例如：搬出提醒 — 秋季学期",
+    templateSubject: "邮件主题", templateBody: "正文", insertField: "插入字段",
+    preview: "预览", previewNoSubject: "（无主题）", previewEmpty: "邮件预览将显示在此处。",
+    previewSampleNote: "预览使用示例数据；发送时会填入真实租户的信息。",
+    templateNameSubjectRequired: "请填写名称和主题。",
+    save: "保存", saving: "保存中…", edit: "编辑", deleteTemplate: "删除模板",
+    confirmDeleteTemplate: "确定删除此模板？", noTemplates: "暂无模板。创建你的第一个提醒模板。",
+    sendTest: "发送测试", testSendTitle: "发送测试邮件",
+    testSendDesc: "将此模板发送到测试地址，以便在正式发送前查看效果。",
+    testRecipient: "发送至（测试地址）", testUseTenant: "使用某租户的数据填充（可选）",
+    testSampleData: "示例数据", send: "发送", sending: "发送中…",
+    testSent: "测试邮件已发送。", testFailed: "无法发送测试邮件。", testRecipientRequired: "请填写测试收件人邮箱。",
+    emailAutoComingSoon: "即将推出。",
+    evtMoveOut: "搬出日期", evtMoveIn: "入住日期", evtLeaseEnd: "租约到期日",
+    evtProjectedMoveOut: "预计搬出", evtRentDue: "租金到期",
+    newAutomation: "新建自动化", editAutomationTitle: "编辑自动化",
+    automationName: "自动化名称", automationNamePlaceholder: "例如：搬出提醒",
+    automationEvent: "触发事件", automationOffsets: "事件前天数",
+    automationOffsetsHint: "事件前的天数，以逗号分隔，例如 10、5、3。",
+    automationTemplate: "模板", automationSelectTemplate: "选择模板…",
+    automationScopeProperty: "物业（可选）", automationScopeStatus: "租户状态（可选）",
+    scopeAllProperties: "所有物业", scopeAllStatuses: "所有状态",
+    statusCurrent: "当前租户", statusFuture: "未来租户",
+    automationNameRequired: "请填写名称。", automationTemplateRequired: "请选择模板。",
+    automationOffsetsRequired: "请至少输入一个有效的天数。",
+    deleteAutomation: "删除自动化", confirmDeleteAutomation: "确定删除此自动化？",
+    noAutomations: "暂无自动化。创建一个以开始发送提醒。",
+    automationsNeedTemplate: "请先创建模板，再围绕它构建自动化。",
+    offsetsLabel: "天前",
+    inboxEmpty: "尚未发送任何邮件。", inboxShowTests: "显示测试发送",
+    inboxTestTag: "测试", inboxOpened: "已打开", inboxReplied: "已回复",
+    inboxReplyThread: "回复", inboxNoBody: "（无内容）",
+    st_queued: "排队中", st_sent: "已发送", st_delivered: "已送达", st_opened: "已打开",
+    st_bounced: "退信", st_complained: "投诉", st_failed: "失败", st_received: "回复",
     editTemplate: "编辑模板", editTemplateLabel: "编辑模板：",
     variablesNote: "变量：{tenant_name}，{amount}，{due_date}，{landlord_name}",
     saveTemplate: "保存模板",
@@ -200,6 +280,7 @@ const T = {
     dashTenantCount: (n) => `${n} 位租客`, dashUnitCount: (n) => `${n} 套单元`, dashUpcomingCount: (n) => `${n} 位待入住`,
     dashUnitsToRentOut: "待出租单元", dashUnitsToRentOutEmpty: "未来6个月内所有单元均已有租客安排。", dashAvailable: "可用日期",
     dashTransitions: "单元交接 — 未来 6 个月", dashTransitionsEmpty: "未来 6 个月内无单元交接。",
+    dashExpandAll: "全部展开", dashCollapseAll: "全部收起",
     dashMovingOut: "搬出", dashMovingIn: "搬入",
     dashGap: (mo, d) => mo > 0 && d > 0 ? `空档 ${mo} 个月 ${d} 天` : mo > 0 ? `空档 ${mo} 个月` : `空档 ${d} 天`,
     dashGapUnresolved: "需要寻找新租客",
@@ -209,6 +290,8 @@ const T = {
     payUnitLabel: (n) => `单元 ${n}`, payUnassigned: "未分配单元",
     saveChanges: "保存更改", saving: "保存中…", discard: "撤销更改",
     displayBy: "分组方式", displayAll: "全部", displayByUnit: "房产 + 单元",
+    tenNoProperty: "未分配房产", tenFilterProperties: "筛选房产", tenShowAll: "全部显示", tenHideAll: "全部隐藏", tenPerMo: "/月",
+    tenNoneToShow: "暂无可显示的租客。请调整上方的房产筛选。",
     colMonthlyRent: "月租金", editBtn: "编辑",
     firstName: "名", lastName: "姓",
     zelleNameLabel: "Zelle姓名", zelleNamePlaceholder: "Zelle上的姓名或电话",
@@ -522,7 +605,8 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
   ];
   const landlordBottomNav = [
     { id: "contracts", label: t.navLeases, icon: "file" },
-    { id: "email", label: t.navEmail, icon: "mail" },
+    { id: "email-automation", label: t.navEmailAutomation, icon: "mail" },
+    { id: "email", label: t.navPaymentReminders, icon: "dollar" },
     { id: "documents", label: t.navDocuments, icon: "key" },
     { id: "admin-users", label: t.navAdminUsers, icon: "users" },
   ];
@@ -838,7 +922,20 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
       <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f1f5f9", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.dashTransitions}</h3>
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(transitionRows.length)}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashUnitCount(transitionRows.length)}</span>
+            {transitionRows.length > 0 && (() => {
+              const allExpanded = transitionRows.every(r => expandedTransitions.has(r.key));
+              return (
+                <button
+                  onClick={() => setExpandedTransitions(allExpanded ? new Set() : new Set(transitionRows.map(r => r.key)))}
+                  style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                >
+                  {allExpanded ? t.dashCollapseAll : t.dashExpandAll}
+                </button>
+              );
+            })()}
+          </div>
         </div>
         {transitionRows.length === 0 ? (
           <div style={{ padding: "14px 0", fontSize: 13, color: "#64748b" }}>{t.dashTransitionsEmpty}</div>
@@ -1294,25 +1391,51 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     setSaving(false);
   };
 
-  const currentTenants = data.tenants.filter(t => t.status?.toLowerCase() === "current tenant");
-  const futureTenants  = data.tenants.filter(t => t.status?.toLowerCase() === "future tenant");
+  // Persisted property filter: store HIDDEN property ids so newly-added properties show by default
+  const [hiddenProps, setHiddenProps] = useState(new Set());
+  const [filterReady, setFilterReady] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("propmanager_tenant_hidden_props");
+      if (raw) setHiddenProps(new Set(JSON.parse(raw)));
+    } catch { /* ignore malformed storage */ }
+    setFilterReady(true);
+  }, []);
+  useEffect(() => {
+    if (filterReady) localStorage.setItem("propmanager_tenant_hidden_props", JSON.stringify([...hiddenProps]));
+  }, [hiddenProps, filterReady]);
 
-  // Combined groups: each unit has both current + future tenants stacked together
-  const tenantGroups = groupBy === "none" ? null : (() => {
+  const propKey = (ten) => ten.propertyId || "__none__";
+  const isVisible = (ten) => !hiddenProps.has(propKey(ten));
+  const filterChips = [
+    ...data.properties.map(p => ({ id: p.id, label: p.address })),
+    ...(data.tenants.some(ten => !ten.propertyId) ? [{ id: "__none__", label: t.tenNoProperty }] : []),
+  ];
+
+  const currentTenants = data.tenants.filter(t => t.status?.toLowerCase() === "current tenant" && isVisible(t));
+  const futureTenants  = data.tenants.filter(t => t.status?.toLowerCase() === "future tenant" && isVisible(t));
+
+  // Two-level hierarchy: property → unit → tenants (current + future stacked per unit)
+  const propertyGroups = groupBy === "none" ? null : (() => {
     const map = {};
-    const ensureGroup = (ten) => {
-      const prop = data.properties.find(p => p.id === ten.propertyId);
-      const key = `${ten.propertyId}::${ten.unit || "—"}`;
-      if (!map[key]) map[key] = { prop, unit: ten.unit || "—", current: [], future: [] };
-      return map[key];
+    const ensureUnit = (ten) => {
+      const key = propKey(ten);
+      if (!map[key]) map[key] = { key, prop: data.properties.find(p => p.id === ten.propertyId) || null, units: {} };
+      const unitKey = ten.unit || "—";
+      if (!map[key].units[unitKey]) map[key].units[unitKey] = { unit: unitKey, current: [], future: [] };
+      return map[key].units[unitKey];
     };
-    currentTenants.forEach(ten => ensureGroup(ten).current.push(ten));
-    futureTenants.forEach(ten => ensureGroup(ten).future.push(ten));
-    return Object.values(map).sort((a, b) => {
-      const pa = a.prop?.address || ""; const pb = b.prop?.address || "";
-      if (pa !== pb) return pa.localeCompare(pb);
-      return String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
-    });
+    currentTenants.forEach(ten => ensureUnit(ten).current.push(ten));
+    futureTenants.forEach(ten => ensureUnit(ten).future.push(ten));
+    return Object.values(map)
+      .map(g => {
+        const unitList = Object.values(g.units).sort((a, b) =>
+          String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true }));
+        const currentCount = unitList.reduce((s, u) => s + u.current.length, 0);
+        const totalRent = unitList.reduce((s, u) => s + u.current.reduce((x, ten) => x + (ten.monthlyRent || 0), 0), 0);
+        return { ...g, unitList, currentCount, totalRent };
+      })
+      .sort((a, b) => (a.prop?.address || "￿").localeCompare(b.prop?.address || "￿"));
   })();
 
   const renderTenantRow = (ten) => {
@@ -1357,6 +1480,30 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     <div>
       <PageHeader title={t.tenTitle} subtitle={t.tenSubtitle(currentTenants.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addTenant}</Btn>} />
 
+      {/* Property filter (persisted across sessions) */}
+      {filterChips.length > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px" }}>{t.tenFilterProperties}</span>
+          {filterChips.map(({ id, label }) => {
+            const shown = !hiddenProps.has(id);
+            return (
+              <button key={id}
+                onClick={() => setHiddenProps(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; })}
+                style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 12px", borderRadius: 7, border: "1.5px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s",
+                  borderColor: shown ? "#4f46e5" : "#e2e8f0", background: shown ? "#eef2ff" : "#fff", color: shown ? "#4f46e5" : "#94a3b8" }}>
+                <span style={{ width: 15, height: 15, borderRadius: 4, border: "1.5px solid", borderColor: shown ? "#4f46e5" : "#cbd5e1", background: shown ? "#4f46e5" : "#fff", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {shown && <Icon name="check" size={10} />}
+                </span>
+                {label}
+              </button>
+            );
+          })}
+          {hiddenProps.size > 0
+            ? <button onClick={() => setHiddenProps(new Set())} style={{ marginLeft: 4, fontSize: 12, fontWeight: 600, color: "#4f46e5", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>{t.tenShowAll}</button>
+            : <button onClick={() => setHiddenProps(new Set(filterChips.map(c => c.id)))} style={{ marginLeft: 4, fontSize: 12, fontWeight: 600, color: "#94a3b8", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>{t.tenHideAll}</button>}
+        </div>
+      )}
+
       {/* Display by toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px" }}>{t.displayBy}</span>
@@ -1379,7 +1526,9 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             </tr>
           </thead>
           <tbody>
-            {groupBy === "none" ? (
+            {currentTenants.length === 0 && futureTenants.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: "28px 20px", textAlign: "center", fontSize: 13, color: "#94a3b8" }}>{t.tenNoneToShow}</td></tr>
+            ) : groupBy === "none" ? (
               <>
                 {currentTenants.map(ten => renderTenantRow(ten))}
                 {futureTenants.length > 0 && <>
@@ -1389,35 +1538,45 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
               </>
             ) : (
               <>
-                {tenantGroups.map(({ prop, unit, current, future }) => {
-                  const totalRent = current.reduce((s, t) => s + (t.monthlyRent || 0), 0);
-                  return (
-                    <Fragment key={`${prop?.id}::${unit}`}>
-                      <tr>
-                        <td colSpan={6} style={{ padding: "12px 20px", background: "#1e293b", borderTop: "2px solid #334155" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <span style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.2px" }}>{prop?.address || "No property"}</span>
-                            <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>·</span>
-                            <span style={{ fontSize: 14, color: "#94a3b8", fontWeight: 600 }}>Unit {unit}</span>
-                            <span style={{ marginLeft: "auto", fontSize: 12, color: "#475569" }}>{current.length} tenant{current.length !== 1 ? "s" : ""}</span>
-                            {totalRent > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>{fmt(totalRent)}/mo</span>}
-                          </div>
-                        </td>
-                      </tr>
-                      {current.map(ten => renderTenantRow(ten))}
-                      {future.length > 0 && (
-                        <>
-                          <tr>
-                            <td colSpan={6} style={{ padding: "8px 20px", background: "#f8fafc", borderTop: "1px solid #e2e8f0", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".6px" }}>
-                              {t.statusFutureTenant}
-                            </td>
-                          </tr>
-                          {future.map(ten => renderTenantRow(ten))}
-                        </>
-                      )}
-                    </Fragment>
-                  );
-                })}
+                {propertyGroups.map(({ key, prop, unitList, currentCount, totalRent }) => (
+                  <Fragment key={key}>
+                    {/* Property section (top level) */}
+                    <tr>
+                      <td colSpan={6} style={{ padding: "14px 20px", background: "#1e293b", borderTop: "3px solid #4f46e5" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <span style={{ color: "#a5b4fc", display: "flex" }}><Icon name="building" size={16} /></span>
+                          <span style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.2px" }}>{prop?.address || t.tenNoProperty}</span>
+                          <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{t.dashUnitCount(unitList.length)} · {t.dashTenantCount(currentCount)}</span>
+                          {totalRent > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>{fmt(totalRent)}{t.tenPerMo}</span>}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Units (nested under property) */}
+                    {unitList.map(({ unit, current, future }) => (
+                      <Fragment key={`${key}::${unit}`}>
+                        <tr>
+                          <td colSpan={6} style={{ padding: "8px 20px 8px 48px", background: "#f1f5f9", borderTop: "1px solid #e2e8f0", borderLeft: "3px solid #c7d2fe" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>{t.unit} {unit}</span>
+                              <span style={{ fontSize: 12, color: "#94a3b8" }}>{t.dashTenantCount(current.length)}</span>
+                            </div>
+                          </td>
+                        </tr>
+                        {current.map(ten => renderTenantRow(ten))}
+                        {future.length > 0 && (
+                          <>
+                            <tr>
+                              <td colSpan={6} style={{ padding: "6px 20px 6px 48px", background: "#fafafa", borderLeft: "3px solid #c7d2fe", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".6px" }}>
+                                {t.statusFutureTenant}
+                              </td>
+                            </tr>
+                            {future.map(ten => renderTenantRow(ten))}
+                          </>
+                        )}
+                      </Fragment>
+                    ))}
+                  </Fragment>
+                ))}
               </>
             )}
           </tbody>
@@ -3444,7 +3603,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [], maintenanceComments: [] });
+  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [], maintenanceComments: [], emailTemplates: [], emailAutomations: [], emailMessages: [] });
   const [loadingData, setLoadingData] = useState(false);
   const [lang, setLang] = useState("zh");
   const [langReady, setLangReady] = useState(false);
@@ -3521,13 +3680,16 @@ export default function App() {
     oneDayOverdue: e.one_day_overdue || false, threeDayOverdue: e.three_day_overdue || false,
     sevenDayOverdue: e.seven_day_overdue || false, templates: e.templates || EMPTY_EMAIL_SETTINGS.templates,
   });
+  const mapEmailTemplate = (e) => ({ id: e.id, name: e.name, subject: e.subject || "", bodyHtml: e.body_html || "", bodyText: e.body_text || "", updatedAt: e.updated_at, createdAt: e.created_at });
+  const mapEmailAutomation = (a) => ({ id: a.id, name: a.name, eventType: a.event_type, offsetDays: a.offset_days || [], templateId: a.template_id || null, scope: a.scope || null, enabled: a.enabled || false });
+  const mapEmailMessage = (m) => ({ id: m.id, direction: m.direction, automationId: m.automation_id || null, templateId: m.template_id || null, tenantId: m.tenant_id || null, eventType: m.event_type || null, eventDate: m.event_date || null, toEmail: m.to_email || "", subject: m.subject || "", bodyHtml: m.body_html || "", bodyText: m.body_text || "", status: m.status, deliveredAt: m.delivered_at || null, openedAt: m.opened_at || null, repliedAt: m.replied_at || null, replyToMessageId: m.reply_to_message_id || null, isTest: m.is_test || false, createdAt: m.created_at });
 
   // ─── DATA FETCHING ─────────────────────────────────────────────────────────
   const fetchAllData = async () => {
     setLoadingData(true);
     try {
       if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes, maintCommRes] = await Promise.all([
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes, maintCommRes, emailTplRes, emailAutoRes, emailMsgRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
           supabase.from("contracts").select("*, contract_tenants(tenant_id)"),
@@ -3540,6 +3702,9 @@ export default function App() {
           supabase.from("maintenance_types").select("*").order("name", { ascending: true }),
           supabase.from("maintenance_attachments").select("*").order("created_at", { ascending: true }),
           supabase.from("maintenance_comments").select("*").order("created_at", { ascending: true }),
+          supabase.from("email_templates").select("*").order("updated_at", { ascending: false }),
+          supabase.from("email_automations").select("*").order("created_at", { ascending: true }),
+          supabase.from("email_messages").select("*").order("created_at", { ascending: false }).limit(300),
         ]);
         const today = new Date().toISOString().split("T")[0];
         const units = (unitRes.data || []).map(mapUnit).map(unit => {
@@ -3590,6 +3755,9 @@ export default function App() {
           maintenanceTypes:       (maintTypesRes.data || []).map(mapMaintenanceType),
           maintenanceAttachments: (maintAttRes.data  || []).map(mapMaintenanceAttachment),
           maintenanceComments:    (maintCommRes.data || []).map(mapMaintenanceComment),
+          emailTemplates:         (emailTplRes.data  || []).map(mapEmailTemplate),
+          emailAutomations:       (emailAutoRes.data || []).map(mapEmailAutomation),
+          emailMessages:          (emailMsgRes.data  || []).map(mapEmailMessage),
         });
       } else {
         // Tenant: fetch own profile + related data
@@ -3652,6 +3820,7 @@ export default function App() {
         case "payments":         return <PaymentsPage data={data} t={t} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
         case "maintenance":      return <MaintenancePage {...props} />;
         case "email":            return <EmailPage {...props} />;
+        case "email-automation": return <EmailAutomationPage {...props} />;
         case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={fetchAllData} user={user} />;
         case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
         case "admin-users":      return <AdminUsersPage t={t} data={data} user={user} refresh={fetchAllData} />;

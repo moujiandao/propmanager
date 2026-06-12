@@ -192,11 +192,11 @@ FORMAT (follow exactly):
 - Underneath, list each event for that unit on its own indented line starting with two spaces. Max ~10 words per line.
 - Separate units with one blank line.
 - If a fact is portfolio-wide (e.g. unpaid rent total across multiple units), put it under its respective unit too — do not aggregate across units.
-- Each unit's event lines should cover any of: move-out (with count + date), move-in (with count + date), cleaning due (with date), needs new tenant by <date>, open maintenance (issue + age), unpaid rent (count + month).
+- Each unit's event lines should cover any of: move-out (with count + date), move-in (with count + date), cleaning due (with date), needs new tenant by <date>, open maintenance (specific problem + age), unpaid rent (count + month).
 
 CONTENT RULES:
 - DO NOT list tenant names for move-ins, move-outs, cleanings, or unpaid rent. Use a count instead, e.g. "2 move out May 31".
-- For maintenance, name the issue and age in days. Tenant name optional, only if it adds clarity.
+- For maintenance, summarize the ACTUAL problem from the description field in a few words (e.g. "Kitchen: faucet leaking"), then age in days. If no description, fall back to "<type> issue". Tenant name optional, only if it adds clarity.
 - ALWAYS use the absolute date from the JSON (e.g., "May 31", "Jun 1"). NEVER use relative date words like "today", "tomorrow", "yesterday", "this week", "next week". The "today" field in the JSON is for your reference only.
 - No filler phrases like "Good news is", "You've got", "There is", "Heads up".
 - No intro or closing sentence. No markdown, no bullets, no numbering.
