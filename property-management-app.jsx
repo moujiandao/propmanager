@@ -31,7 +31,7 @@ const T = {
     streetAddress: "Street Address", city: "City", zip: "ZIP", type: "Type", units: "Units", status: "Status",
     tenants: "Tenants", revenue: "Revenue",
     uploadPhoto: "Upload Photo", uploadingPhoto: "Uploading…", changePhoto: "Change Photo",
-    tenTitle: "Tenants", tenSubtitle: (n) => `${n} active tenants`,
+    tenTitle: "Tenants", tenSubtitle: (n) => `${n} active tenants`, tenSubtitlePast: (n) => `${n} past tenants`,
     addTenant: "Add Tenant", addTenantTitle: "Add New Tenant",
     fullName: "Full Name", phone: "Phone", loginPassword: "Login Password", tempPassword: "Temporary password",
     selectProperty: "Select property", unit: "Unit",
@@ -135,7 +135,9 @@ const T = {
     saveChanges: "Save Changes", saving: "Saving...", discard: "Discard",
     displayBy: "Display by", displayAll: "All", displayByUnit: "Property + Unit",
     tenNoProperty: "Unassigned", tenFilterProperties: "Filter properties", tenShowAll: "Show all", tenHideAll: "Hide all", tenPerMo: "/mo",
+    tenFilterStatus: "Show", tenFilterCurrent: "Current Tenants", tenFilterPast: "Past Tenants",
     tenNoneToShow: "No tenants to show. Adjust the property filter above.",
+    tenNonePast: "No past tenants to show.",
     colMonthlyRent: "Monthly Rent", editBtn: "Edit",
     firstName: "First Name", lastName: "Last Name",
     zelleNameLabel: "Zelle Name", zelleNamePlaceholder: "Name or phone on Zelle",
@@ -187,7 +189,7 @@ const T = {
     streetAddress: "街道地址", city: "城市", zip: "邮编", type: "类型", units: "单元数", status: "状态",
     tenants: "租客", revenue: "收入",
     uploadPhoto: "上传照片", uploadingPhoto: "上传中…", changePhoto: "更换照片",
-    tenTitle: "租客管理", tenSubtitle: (n) => `共 ${n} 名活跃租客`,
+    tenTitle: "租客管理", tenSubtitle: (n) => `共 ${n} 名活跃租客`, tenSubtitlePast: (n) => `共 ${n} 名前租客`,
     addTenant: "添加租客", addTenantTitle: "添加新租客",
     fullName: "姓名", phone: "电话", loginPassword: "登录密码", tempPassword: "临时密码",
     selectProperty: "选择房产", unit: "单元",
@@ -291,7 +293,9 @@ const T = {
     saveChanges: "保存更改", saving: "保存中…", discard: "撤销更改",
     displayBy: "分组方式", displayAll: "全部", displayByUnit: "房产 + 单元",
     tenNoProperty: "未分配房产", tenFilterProperties: "筛选房产", tenShowAll: "全部显示", tenHideAll: "全部隐藏", tenPerMo: "/月",
+    tenFilterStatus: "显示", tenFilterCurrent: "现租客", tenFilterPast: "前租客",
     tenNoneToShow: "暂无可显示的租客。请调整上方的房产筛选。",
+    tenNonePast: "暂无可显示的前租客。",
     colMonthlyRent: "月租金", editBtn: "编辑",
     firstName: "名", lastName: "姓",
     zelleNameLabel: "Zelle姓名", zelleNamePlaceholder: "Zelle上的姓名或电话",
@@ -1405,6 +1409,20 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     if (filterReady) localStorage.setItem("propmanager_tenant_hidden_props", JSON.stringify([...hiddenProps]));
   }, [hiddenProps, filterReady]);
 
+  // Persisted status filter: "current" shows current + future tenants, "past" shows previous tenants
+  const [statusFilter, setStatusFilter] = useState("current");
+  const [statusReady, setStatusReady] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("propmanager_tenant_status_filter");
+      if (raw === "current" || raw === "past") setStatusFilter(raw);
+    } catch { /* ignore malformed storage */ }
+    setStatusReady(true);
+  }, []);
+  useEffect(() => {
+    if (statusReady) localStorage.setItem("propmanager_tenant_status_filter", statusFilter);
+  }, [statusFilter, statusReady]);
+
   const propKey = (ten) => ten.propertyId || "__none__";
   const isVisible = (ten) => !hiddenProps.has(propKey(ten));
   const filterChips = [
@@ -1414,8 +1432,13 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   const currentTenants = data.tenants.filter(t => t.status?.toLowerCase() === "current tenant" && isVisible(t));
   const futureTenants  = data.tenants.filter(t => t.status?.toLowerCase() === "future tenant" && isVisible(t));
+  const pastTenants    = data.tenants.filter(t => t.status?.toLowerCase() === "previous tenant" && isVisible(t));
 
-  // Two-level hierarchy: property → unit → tenants (current + future stacked per unit)
+  // Tenants shown depend on the persisted status filter; past view has no "future" secondary group
+  const primaryTenants   = statusFilter === "past" ? pastTenants : currentTenants;
+  const secondaryTenants = statusFilter === "past" ? []          : futureTenants;
+
+  // Two-level hierarchy: property → unit → tenants (primary + secondary stacked per unit)
   const propertyGroups = groupBy === "none" ? null : (() => {
     const map = {};
     const ensureUnit = (ten) => {
@@ -1425,8 +1448,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       if (!map[key].units[unitKey]) map[key].units[unitKey] = { unit: unitKey, current: [], future: [] };
       return map[key].units[unitKey];
     };
-    currentTenants.forEach(ten => ensureUnit(ten).current.push(ten));
-    futureTenants.forEach(ten => ensureUnit(ten).future.push(ten));
+    primaryTenants.forEach(ten => ensureUnit(ten).current.push(ten));
+    secondaryTenants.forEach(ten => ensureUnit(ten).future.push(ten));
     return Object.values(map)
       .map(g => {
         const unitList = Object.values(g.units).sort((a, b) =>
@@ -1478,7 +1501,21 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   return (
     <div>
-      <PageHeader title={t.tenTitle} subtitle={t.tenSubtitle(currentTenants.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addTenant}</Btn>} />
+      <PageHeader title={t.tenTitle} subtitle={statusFilter === "past" ? t.tenSubtitlePast(pastTenants.length) : t.tenSubtitle(currentTenants.length)} action={<Btn icon="plus" onClick={() => setShow(true)}>{t.addTenant}</Btn>} />
+
+      {/* Status filter (persisted across sessions) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px" }}>{t.tenFilterStatus}</span>
+        {[["current", t.tenFilterCurrent], ["past", t.tenFilterPast]].map(([val, label]) => (
+          <button key={val} onClick={() => setStatusFilter(val)}
+            style={{ padding: "5px 12px", borderRadius: 7, border: "1.5px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s",
+              borderColor: statusFilter === val ? "#4f46e5" : "#e2e8f0",
+              background: statusFilter === val ? "#eef2ff" : "#fff",
+              color: statusFilter === val ? "#4f46e5" : "#64748b" }}>
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* Property filter (persisted across sessions) */}
       {filterChips.length > 1 && (
@@ -1526,14 +1563,14 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             </tr>
           </thead>
           <tbody>
-            {currentTenants.length === 0 && futureTenants.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: "28px 20px", textAlign: "center", fontSize: 13, color: "#94a3b8" }}>{t.tenNoneToShow}</td></tr>
+            {primaryTenants.length === 0 && secondaryTenants.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: "28px 20px", textAlign: "center", fontSize: 13, color: "#94a3b8" }}>{statusFilter === "past" ? t.tenNonePast : t.tenNoneToShow}</td></tr>
             ) : groupBy === "none" ? (
               <>
-                {currentTenants.map(ten => renderTenantRow(ten))}
-                {futureTenants.length > 0 && <>
+                {primaryTenants.map(ten => renderTenantRow(ten))}
+                {secondaryTenants.length > 0 && <>
                   <tr><td colSpan={6} style={{ padding: "8px 20px", background: "#f8fafc", borderTop: "2px solid #e2e8f0", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".6px" }}>{t.statusFutureTenant}</td></tr>
-                  {futureTenants.map(ten => renderTenantRow(ten))}
+                  {secondaryTenants.map(ten => renderTenantRow(ten))}
                 </>}
               </>
             ) : (

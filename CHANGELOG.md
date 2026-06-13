@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-06-12]
+
+### Added
+- Tenants tab: persistent status filter ("Current Tenants" / "Past Tenants"). Defaults to Current Tenants (current + future statuses); Past Tenants shows previous tenants only. Selection persists across sessions via `localStorage` (`propmanager_tenant_status_filter`).
+
 ## [2026-06-11]
 
 ### Added
