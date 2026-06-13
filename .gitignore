@@ -46,3 +46,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .superpowers/
+
+# test artifacts
+login-themed.png
+.playwright-mcp/

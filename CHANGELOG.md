@@ -2,6 +2,9 @@
 
 ## [2026-06-12]
 
+### Changed
+- Figma-inspired theme refresh across all UI (`property-management-app.jsx`, `phase2-components.jsx`, `email-automation-components.jsx`): removed indigo brand accent in favor of neutral near-black (`#111`), neutralized slate grays, softened borders to 1px hairline (`#eaeaea`), standardized radii (buttons/inputs 8, cards/modals 12), flattened primary buttons (solid black), and added a `theme` token constant in `property-management-app.jsx`. Recolored `pending`/`in-progress` status badges from indigo to amber. Converted the three previously dark Phase 2 pages (property detail, documents, tenant contact) to the light theme; the sidebar and login remain dark (neutralized). Design spec: `docs/superpowers/specs/2026-06-12-figma-theme-design.md`.
+
 ### Added
 - Tenants tab: persistent status filter ("Current Tenants" / "Past Tenants"). Defaults to Current Tenants (current + future statuses); Past Tenants shows previous tenants only. Selection persists across sessions via `localStorage` (`propmanager_tenant_status_filter`).
 

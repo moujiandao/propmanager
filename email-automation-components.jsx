@@ -8,7 +8,7 @@ import { fmtDate } from '@/lib/email/format'
 
 const supabase = createClient()
 
-const card = { background: '#fff', borderRadius: 14, padding: 22, border: '1px solid #f1f5f9' }
+const card = { background: '#fff', borderRadius: 14, padding: 22, border: '1px solid #f5f5f5' }
 
 // Strip tags to safe plaintext (used for externally-authored inbound reply bodies).
 const stripTags = (s) => !s ? '' : String(s).replace(/<br\s*\/?>(?=\s*)/gi, '\n').replace(/<[^>]+>/g, '')
@@ -16,7 +16,7 @@ const stripTags = (s) => !s ? '' : String(s).replace(/<br\s*\/?>(?=\s*)/gi, '\n'
 // Local toggle (the monolith's Toggle isn't exported).
 const Toggle = ({ value, onChange }) => (
   <button type="button" onClick={() => onChange(!value)}
-    style={{ width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', padding: 0, background: value ? '#4f46e5' : '#cbd5e1', position: 'relative', transition: 'background .15s' }}>
+    style={{ width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', padding: 0, background: value ? '#111111' : '#cbd5e1', position: 'relative', transition: 'background .15s' }}>
     <span style={{ position: 'absolute', top: 3, left: value ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
   </button>
 )
@@ -30,10 +30,10 @@ const eventLabel = (t, value) => ({
 // ─── Merge-tag insert bar ─────────────────────────────────────────────────────
 const MergeTagBar = ({ onInsert, t }) => (
   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0' }}>
-    <span style={{ fontSize: 12, color: '#94a3b8', alignSelf: 'center', marginRight: 4 }}>{t.insertField}:</span>
+    <span style={{ fontSize: 12, color: '#9ca3af', alignSelf: 'center', marginRight: 4 }}>{t.insertField}:</span>
     {MERGE_TAGS.map(m => (
       <button key={m.tag} type="button" title={m.label} onClick={() => onInsert(`{${m.tag}}`)}
-        style={{ padding: '3px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', cursor: 'pointer', fontFamily: 'inherit' }}>
+        style={{ padding: '3px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #eaeaea', background: '#fafafa', color: '#6b7280', cursor: 'pointer', fontFamily: 'inherit' }}>
         {`{${m.tag}}`}
       </button>
     ))}
@@ -84,7 +84,7 @@ const TemplateEditor = ({ initial, user, t, onClose, onSaved }) => {
           <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', margin: '12px 0 6px' }}>{t.templateBody}</label>
           <MergeTagBar onInsert={insertTag} t={t} />
           <textarea ref={bodyRef} value={body} onChange={e => setBody(e.target.value)}
-            style={{ width: '100%', minHeight: 220, padding: '12px 14px', border: '1.5px solid #e2e8f0', borderRadius: 9, fontSize: 13, color: '#374151', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', outline: 'none', lineHeight: 1.6 }} />
+            style={{ width: '100%', minHeight: 220, padding: '12px 14px', border: '1px solid #eaeaea', borderRadius: 9, fontSize: 13, color: '#374151', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', outline: 'none', lineHeight: 1.6 }} />
           {err && <p style={{ color: '#ef4444', fontSize: 13, margin: '8px 0 0' }}>{err}</p>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
             <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
@@ -93,11 +93,11 @@ const TemplateEditor = ({ initial, user, t, onClose, onSaved }) => {
         </div>
         <div>
           <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>{t.preview}</label>
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: 9, overflow: 'hidden' }}>
-            <div style={{ padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{preview.subject || t.previewNoSubject}</div>
-            <div style={{ padding: '16px 14px', fontSize: 14, color: '#0f172a', minHeight: 180 }} dangerouslySetInnerHTML={{ __html: preview.html || `<span style="color:#94a3b8">${t.previewEmpty}</span>` }} />
+          <div style={{ border: '1px solid #eaeaea', borderRadius: 9, overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', background: '#fafafa', borderBottom: '1px solid #eaeaea', fontSize: 13, fontWeight: 600, color: '#111111' }}>{preview.subject || t.previewNoSubject}</div>
+            <div style={{ padding: '16px 14px', fontSize: 14, color: '#111111', minHeight: 180 }} dangerouslySetInnerHTML={{ __html: preview.html || `<span style="color:#9ca3af">${t.previewEmpty}</span>` }} />
           </div>
-          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>{t.previewSampleNote}</p>
+          <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>{t.previewSampleNote}</p>
         </div>
       </div>
     </Modal>
@@ -132,7 +132,7 @@ const TestSendModal = ({ template, eventType, data, user, t, onClose }) => {
 
   return (
     <Modal title={t.testSendTitle} onClose={onClose}>
-      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 14px' }}>{t.testSendDesc}</p>
+      <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 14px' }}>{t.testSendDesc}</p>
       <Inp label={t.testRecipient} value={toEmail} onChange={setToEmail} type="email" />
       <Sel label={t.testUseTenant} value={tenantId} onChange={setTenantId} options={tenantOptions} />
       {result?.error && <p style={{ color: '#ef4444', fontSize: 13, margin: '8px 0 0' }}>{result.error}</p>}
@@ -164,20 +164,20 @@ const TemplatesTab = ({ data, user, t, refresh }) => {
         <Btn icon="plus" onClick={() => setEditing({})}>{t.newTemplate}</Btn>
       </div>
       {templates.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center', color: '#94a3b8', fontSize: 14, padding: 40 }}>{t.noTemplates}</div>
+        <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.noTemplates}</div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {templates.map(tpl => (
             <div key={tpl.id} style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a' }}>{tpl.name}</div>
-                <div style={{ fontSize: 13, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tpl.subject}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: '#111111' }}>{tpl.name}</div>
+                <div style={{ fontSize: 13, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tpl.subject}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                 <Btn size="sm" variant="secondary" icon="mail" onClick={() => setTesting(tpl)}>{t.sendTest}</Btn>
                 <Btn size="sm" variant="ghost" icon="edit" onClick={() => setEditing(tpl)}>{t.edit}</Btn>
                 <button onClick={() => setConfirmDel(tpl)} title={t.deleteTemplate}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 6, display: 'inline-flex' }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 6, display: 'inline-flex' }}>
                   <Icon name="trash" size={16} />
                 </button>
               </div>
@@ -239,7 +239,7 @@ const AutomationEditor = ({ initial, data, user, t, onClose, onSaved }) => {
       <Inp label={t.automationName} value={name} onChange={setName} placeholder={t.automationNamePlaceholder} />
       <Sel label={t.automationEvent} value={eventType} onChange={setEventType} options={EVENT_TYPES.map(e => ({ value: e.value, label: eventLabel(t, e.value) }))} />
       <Inp label={t.automationOffsets} value={offsets} onChange={setOffsets} placeholder="10, 5, 3" />
-      <p style={{ fontSize: 12, color: '#94a3b8', margin: '-6px 0 12px' }}>{t.automationOffsetsHint}</p>
+      <p style={{ fontSize: 12, color: '#9ca3af', margin: '-6px 0 12px' }}>{t.automationOffsetsHint}</p>
       <Sel label={t.automationTemplate} value={templateId} onChange={setTemplateId} options={templateOpts} />
       <Sel label={t.automationScopeProperty} value={propertyId} onChange={setPropertyId} options={propertyOpts} />
       <Sel label={t.automationScopeStatus} value={status} onChange={setStatus} options={statusOpts} />
@@ -268,7 +268,7 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
   const del = async () => { await supabase.from('email_automations').delete().eq('id', confirmDel.id); setConfirmDel(null); refresh() }
 
   if (templates.length === 0) {
-    return <div style={{ ...card, textAlign: 'center', color: '#94a3b8', fontSize: 14, padding: 40 }}>{t.automationsNeedTemplate}</div>
+    return <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.automationsNeedTemplate}</div>
   }
 
   return (
@@ -277,21 +277,21 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
         <Btn icon="plus" onClick={() => setEditing({})}>{t.newAutomation}</Btn>
       </div>
       {automations.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center', color: '#94a3b8', fontSize: 14, padding: 40 }}>{t.noAutomations}</div>
+        <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.noAutomations}</div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {automations.map(a => (
             <div key={a.id} style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a' }}>{a.name}</div>
-                <div style={{ fontSize: 13, color: '#64748b' }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: '#111111' }}>{a.name}</div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>
                   {eventLabel(t, a.eventType)} · {t.offsetsLabel}: {(a.offsetDays || []).join(', ')} · {tplName(a.templateId)}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                 <Btn size="sm" variant="secondary" icon="mail" onClick={() => setTesting(a)}>{t.sendTest}</Btn>
                 <Btn size="sm" variant="ghost" icon="edit" onClick={() => setEditing(a)}>{t.edit}</Btn>
-                <button onClick={() => setConfirmDel(a)} title={t.deleteAutomation} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 6, display: 'inline-flex' }}><Icon name="trash" size={16} /></button>
+                <button onClick={() => setConfirmDel(a)} title={t.deleteAutomation} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 6, display: 'inline-flex' }}><Icon name="trash" size={16} /></button>
                 <Toggle value={a.enabled} onChange={v => toggle(a, v)} />
               </div>
             </div>
@@ -316,8 +316,8 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
 
 // ─── Inbox / activity tab ─────────────────────────────────────────────────────
 const STATUS_STYLE = {
-  queued:     { bg: '#f1f5f9', text: '#475569' },
-  sent:       { bg: '#e0e7ff', text: '#3730a3' },
+  queued:     { bg: '#f5f5f5', text: '#9ca3af' },
+  sent:       { bg: '#f3f4f6', text: '#000000' },
   delivered:  { bg: '#dcfce7', text: '#166534' },
   opened:     { bg: '#cffafe', text: '#155e75' },
   bounced:    { bg: '#fee2e2', text: '#991b1b' },
@@ -345,23 +345,23 @@ const InboxTab = ({ data, t }) => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <Toggle value={showTests} onChange={setShowTests} />
-        <span style={{ fontSize: 13, color: '#64748b' }}>{t.inboxShowTests}</span>
+        <span style={{ fontSize: 13, color: '#6b7280' }}>{t.inboxShowTests}</span>
       </div>
       {outbound.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center', color: '#94a3b8', fontSize: 14, padding: 40 }}>{t.inboxEmpty}</div>
+        <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.inboxEmpty}</div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #f1f5f9', overflow: 'hidden' }}>
+        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #f5f5f5', overflow: 'hidden' }}>
           {outbound.map(m => {
             const replies = repliesFor(m.id)
             const open = expanded === m.id
             return (
-              <div key={m.id} style={{ borderTop: '1px solid #f8fafc' }}>
+              <div key={m.id} style={{ borderTop: '1px solid #fafafa' }}>
                 <div onClick={() => setExpanded(open ? null : m.id)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', cursor: 'pointer' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {m.subject || '—'} {m.isTest && <span style={{ fontSize: 11, color: '#94a3b8' }}>· {t.inboxTestTag}</span>}
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {m.subject || '—'} {m.isTest && <span style={{ fontSize: 11, color: '#9ca3af' }}>· {t.inboxTestTag}</span>}
                     </div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>{tenantName(m.tenantId)} · {m.toEmail} · {fmtDate((m.createdAt || '').split('T')[0])}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>{tenantName(m.tenantId)} · {m.toEmail} · {fmtDate((m.createdAt || '').split('T')[0])}</div>
                   </div>
                   {m.repliedAt && <StatusPill status="received" label={t.inboxReplied} />}
                   {!m.repliedAt && m.openedAt && <StatusPill status="opened" label={t.inboxOpened} />}
@@ -370,13 +370,13 @@ const InboxTab = ({ data, t }) => {
                 {open && (
                   <div style={{ padding: '0 20px 18px', background: '#fafbfc' }}>
                     <div style={{ border: '1px solid #eef2f7', borderRadius: 9, padding: 14, background: '#fff', fontSize: 13, color: '#334155' }}
-                      dangerouslySetInnerHTML={{ __html: m.bodyHtml || (m.bodyText ? m.bodyText.replace(/\n/g, '<br>') : `<span style="color:#94a3b8">${t.inboxNoBody}</span>`) }} />
+                      dangerouslySetInnerHTML={{ __html: m.bodyHtml || (m.bodyText ? m.bodyText.replace(/\n/g, '<br>') : `<span style="color:#9ca3af">${t.inboxNoBody}</span>`) }} />
                     {replies.length > 0 && (
                       <div style={{ marginTop: 12 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>{t.inboxReplyThread}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>{t.inboxReplyThread}</div>
                         {replies.map(r => (
-                          <div key={r.id} style={{ borderLeft: '3px solid #4f46e5', padding: '8px 12px', marginBottom: 8, background: '#fff', borderRadius: 6 }}>
-                            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>{r.toEmail} · {fmtDate((r.createdAt || '').split('T')[0])}</div>
+                          <div key={r.id} style={{ borderLeft: '3px solid #111111', padding: '8px 12px', marginBottom: 8, background: '#fff', borderRadius: 6 }}>
+                            <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>{r.toEmail} · {fmtDate((r.createdAt || '').split('T')[0])}</div>
                             {/* Inbound bodies come from external senders — render as plain text, never raw HTML (XSS). */}
                             <div style={{ fontSize: 13, color: '#334155', whiteSpace: 'pre-wrap' }}>{r.bodyText || stripTags(r.bodyHtml) || ''}</div>
                           </div>
@@ -405,10 +405,10 @@ export const EmailAutomationPage = ({ data, user, t, refresh }) => {
   return (
     <div>
       <PageHeader title={t.emailAutoTitle} subtitle={t.emailAutoSubtitle} />
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #e2e8f0', marginBottom: 22 }}>
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #eaeaea', marginBottom: 22 }}>
         {tabs.map(x => (
           <button key={x.id} onClick={() => setTab(x.id)}
-            style={{ padding: '10px 16px', border: 'none', borderBottom: tab === x.id ? '2px solid #4f46e5' : '2px solid transparent', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: tab === x.id ? 600 : 400, color: tab === x.id ? '#4f46e5' : '#64748b' }}>
+            style={{ padding: '10px 16px', border: 'none', borderBottom: tab === x.id ? '2px solid #111111' : '2px solid transparent', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: tab === x.id ? 600 : 400, color: tab === x.id ? '#111111' : '#6b7280' }}>
             {x.label}
           </button>
         ))}
