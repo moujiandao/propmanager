@@ -937,14 +937,20 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, background: "#f0fdf4", border: "1px solid #dcfce7", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
           <div style={{ fontSize: 14, color: "#166534", lineHeight: 1.6 }}>
             <span style={{ fontWeight: 600 }}>{t.dashNewTenantsTitle}</span>{": "}
-            {visibleNewTenants.map((x, i) => (
-              <span key={x.id}>
-                {i > 0 && ", "}
-                <button onClick={() => { setSelectedTenantId(x.id); setPage('tenant-detail'); }} style={{ background: "none", border: "none", padding: 0, color: "#166534", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
-                  {x.name}{x.lastName ? ` ${x.lastName}` : ""}
-                </button>
-              </span>
-            ))}
+            {visibleNewTenants.map((x, i) => {
+              const prop = properties.find(p => p.id === x.propertyId);
+              const unitLabel = x.unit || units.find(u => u.id === x.unitId)?.unitNumber || "";
+              const loc = [prop?.address, unitLabel && `${t.unit} ${unitLabel}`].filter(Boolean).join(" · ");
+              return (
+                <span key={x.id}>
+                  {i > 0 && ", "}
+                  <button onClick={() => { setSelectedTenantId(x.id); setPage('tenant-detail'); }} style={{ background: "none", border: "none", padding: 0, color: "#166534", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+                    {x.name}{x.lastName ? ` ${x.lastName}` : ""}
+                  </button>
+                  {loc && <span style={{ color: "#4d7c5a", fontWeight: 400 }}>{` (${loc})`}</span>}
+                </span>
+              );
+            })}
           </div>
           <button onClick={dismissNewTenants} title={t.dashDismiss} aria-label={t.dashDismiss} style={{ background: "none", border: "none", padding: 0, color: "#166534", fontSize: 18, lineHeight: 1, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>×</button>
         </div>
