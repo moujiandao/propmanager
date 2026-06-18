@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-17]
+
+### Added
+- Tenant record audit timestamps: `updated_at` column on `tenant_profiles` (`scripts/add-tenant-timestamps.sql`) with a reusable `set_updated_at()` trigger that bumps it on every UPDATE. The Tenant Detail view (`phase2-components.jsx → TenantContactPage`) now shows "Account Created" and "Last Updated" rows; `mapTenant` exposes `createdAt`/`updatedAt`.
+- Dashboard "new tenants" banner: surfaces tenants created within the last 7 days (by `created_at`) as clickable links to their detail page. Dismissible via "×"; dismissal persists per-tenant-id in `localStorage` (`propmanager_dismissed_new_tenants`), so the banner reappears for newly added tenants but stays hidden for acknowledged ones.
+
 ## [2026-06-12]
 
 ### Changed

@@ -1009,6 +1009,12 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
                   <span style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>Not received</span>
                 )}
               </InfoRow>
+              <InfoRow label="Account Created">
+                <span style={{ fontSize: 14, color: "#6b7280" }}>{tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : "—"}</span>
+              </InfoRow>
+              <InfoRow label="Last Updated">
+                <span style={{ fontSize: 14, color: "#6b7280" }}>{tenant.updatedAt ? new Date(tenant.updatedAt).toLocaleDateString() : "—"}</span>
+              </InfoRow>
             </>
           )}
         </TenantCard>
