@@ -162,6 +162,7 @@ const T = {
     moveInDateReq: "Move-in Date *", moveInDate: "Move-in Date", moveOutDate: "Move-out Date",
     notesLabel: "Notes", notesPlaceholder: "Internal notes about this tenant",
     securityDepositLabel: "Security Deposit ($)", securityDepositNotReceived: "Security Deposit not received", securityDepositReceived: "Security Deposit received",
+    colSecurityDeposit: "Security Deposit", colDepositRefunded: "Security Deposit Refunded", depositRefunded: "Refunded", depositNotRefunded: "Not refunded",
     createLoginLabel: "Create tenant portal login",
     createLoginDesc: "Optional — only needed if the tenant will log in to pay rent or submit maintenance requests",
     creating: "Creating…", noPropOption: "— No property —", selectPropFirst: "— Select a property first —",
@@ -321,6 +322,7 @@ const T = {
     moveInDateReq: "入住日期 *", moveInDate: "入住日期", moveOutDate: "退租日期",
     notesLabel: "备注", notesPlaceholder: "关于此租客的内部备注",
     securityDepositLabel: "押金（$）", securityDepositNotReceived: "押金未收到", securityDepositReceived: "押金已收到",
+    colSecurityDeposit: "押金", colDepositRefunded: "押金已退还", depositRefunded: "已退还", depositNotRefunded: "未退还",
     createLoginLabel: "创建租客门户账号",
     createLoginDesc: "可选 — 仅在租客需要登录付款或提交维修请求时使用",
     creating: "创建中…", noPropOption: "— 无房产 —", selectPropFirst: "— 请先选择房产 —",
@@ -1366,7 +1368,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addError, setAddError] = useState("");
-  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", createLogin: false });
+  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
   const [editTenant, setEditTenant] = useState(null);
@@ -1390,7 +1392,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "", notes: ten.notes || "", securityDeposit: ten.securityDeposit || "" });
+    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "", notes: ten.notes || "", securityDeposit: ten.securityDeposit || "", securityDepositRefunded: ten.securityDepositRefunded || false });
   };
 
   const saveEdit = async () => {
@@ -1416,6 +1418,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         moveOutDate: editForm.moveOutDate || null,
         notes: editForm.notes || null,
         securityDeposit: editForm.securityDeposit === "" ? null : editForm.securityDeposit,
+        securityDepositRefunded: editForm.securityDepositRefunded,
       }),
     });
     const json = await res.json();
@@ -1441,6 +1444,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         moveInDate: form.moveInDate, moveOutDate: form.moveOutDate || null,
         notes: form.notes || null,
         securityDeposit: form.securityDeposit === "" ? null : form.securityDeposit,
+        securityDepositRefunded: form.securityDepositRefunded,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -1451,7 +1455,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     }
     await refresh();
     setShow(false);
-    setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", createLogin: false });
+    setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
     setSaving(false);
   };
 
@@ -1521,6 +1525,22 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       .sort((a, b) => (a.prop?.address || "￿").localeCompare(b.prop?.address || "￿"));
   })();
 
+  // Inline "Security Deposit Refunded" checkbox (Past Tenants view). Optimistically
+  // flips local state, persists via the dedicated route, and reverts on failure.
+  const toggleRefunded = async (ten, checked) => {
+    setData(d => ({ ...d, tenants: d.tenants.map(x => x.id === ten.id ? { ...x, securityDepositRefunded: checked } : x) }));
+    try {
+      const res = await fetch("/api/auth/set-deposit-refunded", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId: ten.id, refunded: checked }),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch {
+      setData(d => ({ ...d, tenants: d.tenants.map(x => x.id === ten.id ? { ...x, securityDepositRefunded: !checked } : x) }));
+    }
+  };
+
   const renderTenantRow = (ten) => {
     const prop = data.properties.find(p => p.id === ten.propertyId);
     return (
@@ -1545,6 +1565,18 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
           </span>
         </td>
         <td style={{ padding: "14px 20px" }}><Badge status={ten.status} t={t} /></td>
+        <td style={{ padding: "14px 20px", whiteSpace: "nowrap" }}>
+          {statusFilter === "past" ? (
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!ten.securityDepositRefunded} onChange={e => toggleRefunded(ten, e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: ten.securityDepositRefunded ? "#16a34a" : "#9ca3af" }}>{ten.securityDepositRefunded ? t.depositRefunded : t.depositNotRefunded}</span>
+            </label>
+          ) : (!ten.securityDeposit || +ten.securityDeposit <= 0) ? (
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#dc2626" }}>{t.securityDepositNotReceived}</span>
+          ) : (
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#111111" }}>{fmt(ten.securityDeposit)}</span>
+          )}
+        </td>
         <td style={{ padding: "14px 20px" }}>
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={() => openEdit(ten)} style={{ background: "#fafafa", border: "1px solid #eaeaea", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
@@ -1619,17 +1651,17 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ background: "#fafafa" }}>
             <tr style={{ color: "#6b7280", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              {[t.colTenant, t.colContact, t.colProperty, t.colMonthlyRent, t.colStatus, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>)}
+              {[t.colTenant, t.colContact, t.colProperty, t.colMonthlyRent, t.colStatus, statusFilter === "past" ? t.colDepositRefunded : t.colSecurityDeposit, ""].map((h,i) => <th key={i} style={{ padding: "14px 20px", textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
             {primaryTenants.length === 0 && secondaryTenants.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: "28px 20px", textAlign: "center", fontSize: 13, color: "#9ca3af" }}>{statusFilter === "past" ? t.tenNonePast : t.tenNoneToShow}</td></tr>
+              <tr><td colSpan={7} style={{ padding: "28px 20px", textAlign: "center", fontSize: 13, color: "#9ca3af" }}>{statusFilter === "past" ? t.tenNonePast : t.tenNoneToShow}</td></tr>
             ) : groupBy === "none" ? (
               <>
                 {primaryTenants.map(ten => renderTenantRow(ten))}
                 {secondaryTenants.length > 0 && <>
-                  <tr><td colSpan={6} style={{ padding: "8px 20px", background: "#fafafa", borderTop: "2px solid #eaeaea", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".6px" }}>{t.statusFutureTenant}</td></tr>
+                  <tr><td colSpan={7} style={{ padding: "8px 20px", background: "#fafafa", borderTop: "2px solid #eaeaea", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".6px" }}>{t.statusFutureTenant}</td></tr>
                   {secondaryTenants.map(ten => renderTenantRow(ten))}
                 </>}
               </>
@@ -1639,7 +1671,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                   <Fragment key={key}>
                     {/* Property section (top level) */}
                     <tr>
-                      <td colSpan={6} style={{ padding: "14px 20px", background: "#fafafa", borderTop: "1px solid #eaeaea" }}>
+                      <td colSpan={7} style={{ padding: "14px 20px", background: "#fafafa", borderTop: "1px solid #eaeaea" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <span style={{ color: "#6b7280", display: "flex" }}><Icon name="building" size={16} /></span>
                           <span style={{ fontSize: 16, fontWeight: 800, color: "#111111", letterSpacing: "-0.2px" }}>{prop?.address || t.tenNoProperty}</span>
@@ -1652,7 +1684,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                     {unitList.map(({ unit, current, future }) => (
                       <Fragment key={`${key}::${unit}`}>
                         <tr>
-                          <td colSpan={6} style={{ padding: "8px 20px 8px 48px", background: "#f5f5f5", borderTop: "1px solid #eaeaea", borderLeft: "3px solid #e5e5e5" }}>
+                          <td colSpan={7} style={{ padding: "8px 20px 8px 48px", background: "#f5f5f5", borderTop: "1px solid #eaeaea", borderLeft: "3px solid #e5e5e5" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                               <span style={{ fontSize: 13, fontWeight: 700, color: "#9ca3af" }}>{t.unit} {unit}</span>
                               <span style={{ fontSize: 12, color: "#9ca3af" }}>{t.dashTenantCount(current.length)}</span>
@@ -1663,7 +1695,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
                         {future.length > 0 && (
                           <>
                             <tr>
-                              <td colSpan={6} style={{ padding: "6px 20px 6px 48px", background: "#fafafa", borderLeft: "3px solid #e5e5e5", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".6px" }}>
+                              <td colSpan={7} style={{ padding: "6px 20px 6px 48px", background: "#fafafa", borderLeft: "3px solid #e5e5e5", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".6px" }}>
                                 {t.statusFutureTenant}
                               </td>
                             </tr>
@@ -1695,6 +1727,10 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Inp label={t.moveInDateReq} value={form.moveInDate} onChange={v => setF("moveInDate",v)} type="date" />
             <Inp label={t.moveOutDate} value={form.moveOutDate||""} onChange={v => setF("moveOutDate",v)} type="date" />
             <Inp label={t.securityDepositLabel} value={form.securityDeposit} onChange={v => setF("securityDeposit",v)} type="number" placeholder="0" />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#374151", alignSelf: "end", paddingBottom: 10 }}>
+              <input type="checkbox" checked={form.securityDepositRefunded} onChange={e => setF("securityDepositRefunded", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+              {t.colDepositRefunded}
+            </label>
             <div style={{ gridColumn: "1 / -1", marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.notesLabel}</label>
               <textarea value={form.notes} onChange={e => setF("notes", e.target.value)} placeholder={t.notesPlaceholder} rows={3}
@@ -1772,6 +1808,10 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Inp label={t.moveInDate} value={editForm.moveInDate} onChange={v => setEF("moveInDate",v)} type="date" />
             <Inp label={t.moveOutDate} value={editForm.moveOutDate} onChange={v => setEF("moveOutDate",v)} type="date" />
             <Inp label={t.securityDepositLabel} value={editForm.securityDeposit} onChange={v => setEF("securityDeposit",v)} type="number" placeholder="0" />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#374151", alignSelf: "end", paddingBottom: 10 }}>
+              <input type="checkbox" checked={!!editForm.securityDepositRefunded} onChange={e => setEF("securityDepositRefunded", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+              {t.colDepositRefunded}
+            </label>
             <div style={{ gridColumn: "1 / -1" }}>
               <Inp label={t.email} value={editForm.email} onChange={v => setEF("email",v)} type="email" placeholder="tenant@email.com" />
               <div style={{ fontSize: 12, color: "#6b7280", marginTop: -8, marginBottom: 4 }}>{t.emailLoginNote}</div>
@@ -3763,7 +3803,7 @@ export default function App() {
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "", imageUrl: p.image_url || null });
-  const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id, notes: t.notes || "", securityDeposit: t.security_deposit || 0, landlordId: t.landlord_id || null, createdAt: t.created_at || null, updatedAt: t.updated_at || null });
+  const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id, notes: t.notes || "", securityDeposit: t.security_deposit || 0, securityDepositRefunded: t.security_deposit_refunded || false, landlordId: t.landlord_id || null, createdAt: t.created_at || null, updatedAt: t.updated_at || null });
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, descriptionZh: m.description_zh || "", type: m.type || "", priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });

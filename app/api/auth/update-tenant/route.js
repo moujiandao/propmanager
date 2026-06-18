@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request) {
-  const { tenantId, name, lastName, email, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId, notes, securityDeposit } = await request.json()
+  const { tenantId, name, lastName, email, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId, notes, securityDeposit, securityDepositRefunded } = await request.json()
 
   if (!tenantId) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
@@ -50,6 +50,7 @@ export async function POST(request) {
     unit_id: unitId || null,
     notes: notes !== undefined ? (notes || null) : undefined,
     security_deposit: securityDeposit !== undefined ? (securityDeposit === null || securityDeposit === '' ? null : +securityDeposit) : undefined,
+    security_deposit_refunded: securityDepositRefunded !== undefined ? !!securityDepositRefunded : undefined,
   }
   const trimmedEmail = typeof email === 'string' ? email.trim() : undefined
   if (trimmedEmail !== undefined && trimmedEmail !== '') {

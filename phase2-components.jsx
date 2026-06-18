@@ -708,7 +708,7 @@ const TenantCard = ({ title, children }) => (
 const EMPTY_TENANT_FORM = {
   name: "", phone: "", propertyId: "", unit: "", status: "current tenant", monthlyRent: "",
   moveInDate: "", moveOutDate: "", hasCosigner: false, studentStatus: "", studentYear: "",
-  zelleName: "", homeAddress: "", age: "", unitId: "", notes: "", securityDeposit: "",
+  zelleName: "", homeAddress: "", age: "", unitId: "", notes: "", securityDeposit: "", securityDepositRefunded: false,
 }
 
 export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBack, onNavigateToProperty }) => {
@@ -744,6 +744,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
         unitId: tenant.unitId || "",
         notes: tenant.notes || "",
         securityDeposit: tenant.securityDeposit ? String(tenant.securityDeposit) : "",
+        securityDepositRefunded: tenant.securityDepositRefunded || false,
       })
     }
     setEditing(false)
@@ -796,6 +797,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
         unitId: form.unitId || null,
         notes: form.notes || null,
         securityDeposit: form.securityDeposit === "" ? null : form.securityDeposit,
+        securityDepositRefunded: form.securityDepositRefunded,
       }),
     })
     const json = await res.json()
@@ -828,6 +830,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
       unitId: tenant.unitId || null,
       notes: tenant.notes || null,
       securityDeposit: tenant.securityDeposit || null,
+      securityDepositRefunded: tenant.securityDepositRefunded || false,
     }
     const res = await fetch("/api/auth/update-tenant", {
       method: "POST",
@@ -976,6 +979,10 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
               </div>
               <Inp label="Monthly Rent ($)" value={form.monthlyRent} onChange={v => setF("monthlyRent", v)} type="number" placeholder="e.g. 1500" />
               <Inp label="Security Deposit ($)" value={form.securityDeposit} onChange={v => setF("securityDeposit", v)} type="number" placeholder="e.g. 1500" />
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#374151", marginTop: 4 }}>
+                <input type="checkbox" checked={!!form.securityDepositRefunded} onChange={e => setF("securityDepositRefunded", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                Security Deposit Refunded
+              </label>
             </>
           ) : (
             <>
@@ -1008,6 +1015,9 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
                 ) : (
                   <span style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>Not received</span>
                 )}
+              </InfoRow>
+              <InfoRow label="Deposit Refunded">
+                <span style={{ fontSize: 14, fontWeight: 600, color: tenant.securityDepositRefunded ? "#16a34a" : "#9ca3af" }}>{tenant.securityDepositRefunded ? "Refunded" : "Not refunded"}</span>
               </InfoRow>
               <InfoRow label="Account Created">
                 <span style={{ fontSize: 14, color: "#6b7280" }}>{tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : "—"}</span>
