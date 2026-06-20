@@ -999,12 +999,13 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
             {transitionRows.length > 0 && (() => {
               const allExpanded = transitionRows.every(r => expandedTransitions.has(r.key));
               return (
-                <button
+                <Btn
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setExpandedTransitions(allExpanded ? new Set() : new Set(transitionRows.map(r => r.key)))}
-                  style={{ fontSize: 12, fontWeight: 600, color: "#111111", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
                 >
                   {allExpanded ? t.dashCollapseAll : t.dashExpandAll}
-                </button>
+                </Btn>
               );
             })()}
           </div>
