@@ -8,6 +8,17 @@ import { releaseSubmitter } from '../../../../lib/docuseal/client'
 // (order:1 countersigner) is auto-notified by DocuSeal once all tenants finish,
 // thanks to the submission's preserved order — so we never release it here.
 export async function POST(request) {
+  // Fail-safe send gate. This is the ONLY path that emails real tenants
+  // (releaseSubmitter flips DocuSeal's send_email:true). It is DISABLED unless
+  // RENEWALS_SEND_ENABLED is explicitly 'true', so an unset/missing var means
+  // nothing goes out. Flip it on in Vercel (and redeploy) when ready to send for real.
+  if (process.env.RENEWALS_SEND_ENABLED !== 'true') {
+    return Response.json(
+      { error: 'Renewal sending is disabled. Set RENEWALS_SEND_ENABLED=true to enable.', code: 'sending_disabled' },
+      { status: 423 }
+    )
+  }
+
   let body
   try {
     body = await request.json()
