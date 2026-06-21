@@ -13,6 +13,7 @@ A property management web application built with Next.js and Supabase. Provides 
 - **Phase 2 components**: `phase2-components.jsx` (planned) will hold PropertyDetailPage, TenantContactPage, DocumentsPageV2
 - **Email Automation components**: `email-automation-components.jsx` holds `EmailAutomationPage` (Templates / Automations / Inbox tabs). Imports shared UI from `property-management-app.jsx` (circular import, same pattern as phase2-components)
 - **Email module**: `lib/email/` is an isomorphic ESM module (own `package.json` with `"type":"module"`) shared by the UI and server: `format.js`, `merge.js` (merge-tag rendering), `events.js` (event-date resolution), `context.js` (server snake→camel loaders), `send.js` (Resend wrapper). Unit-tested via `npm test`
+- **Lease-renewal (DocuSeal) feature**: `renewal-components.jsx` holds `RenewalsPage` (due queue → prepare → review gate → confirm-to-send), same circular-import pattern as the other component files. `lib/docuseal/` is an isomorphic ESM module (own `package.json`): `client.js` (DocuSeal API: create suppressed submission, release submitter, fetch signed PDF, HMAC webhook verify) and `renewal.js` (shared UTC term-derivation + original-lease-date selection, used by both the create route and the UI so they never drift). Unit-tested via `npm test`. Routes: `app/api/renewals/create`, `app/api/renewals/send`, `app/api/webhooks/docuseal`. Spec: `docs/docuseal-tenant-renewal-spec.md`. v1 excludes Phase 4 (Drive filing + auto lease-advance).
 - **API routes**: `app/api/` for auth, payments, webhooks, and document operations
 - **Supabase clients**: `lib/supabase/server.js` (service role), `lib/supabase/client.js` (anon key)
 - **Auth callback**: `app/auth/callback/route.js` handles Supabase recovery/magic link flows
@@ -31,6 +32,7 @@ A property management web application built with Next.js and Supabase. Provides 
 - `email_templates` - named, reusable email templates with `{merge_tag}` placeholders
 - `email_automations` - date-triggered rules: `event_type`, `offset_days[]`, `template_id`, `scope`, `enabled`
 - `email_messages` - outbound send log + inbound replies; tracks delivery/open/reply status. Partial unique index `(automation_id, tenant_id, event_type, event_date, offset_days)` makes the cron idempotent
+- `lease_renewals` - one row per renewal attempt (DocuSeal workflow). Serves as the review queue, the renewal chain, and the audit trail. Holds `original_lease_date` (immutable "X date" pinned at the chain root), derived new term, carried rent, `status` (draft|pending_review|sent|signed|countersigned|declined|blocked), `docuseal_submission_id`, and `signers` jsonb. RLS gated on `is_team_member(landlord_id)`
 
 Note: `email_settings` (payment reminders) is a separate, older feature — the "Payment Reminders" nav item. The new "Email Automation" nav item is the `email_templates`/`email_automations`/`email_messages` system above. Keep them distinct.
 

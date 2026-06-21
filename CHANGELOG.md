@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-20]
+
+### Added
+- DocuSeal tenant lease-renewal workflow (v1). New `lease_renewals` table (`scripts/add-lease-renewals.sql`) with `is_team_member` RLS, serving as review queue + renewal chain + audit trail. New `lib/docuseal/` ESM module: `client.js` (create email-suppressed submission, release submitter to send, fetch signed PDF, HMAC-SHA256 webhook verification) and `renewal.js` (shared UTC term-derivation + original-lease-date chain selection). New routes `app/api/renewals/create`, `app/api/renewals/send`, `app/api/webhooks/docuseal`. New UI `renewal-components.jsx → RenewalsPage` (due queue within ~150 days of `end_date`, placeholder-email blocking, prepare → review → confirm-to-send gate, status badges), wired into the monolith (nav, `renderPage`, `mapLeaseRenewal`, `fetchAllData`, 43 bilingual `T.en`/`T.zh` keys). Unit tests in `lib/docuseal/*.test.mjs` (`npm test` glob widened). v1 excludes Phase 4 (Google Drive filing of the signed PDF + auto lease-term advance), deferred. Spec: `docs/docuseal-tenant-renewal-spec.md`.
+
+### Changed
+- Unified renewal term math: the create route and `RenewalsPage` now share `lib/docuseal/renewal.js` (UTC-based, end-of-month clamped) instead of duplicating logic; fixes a local-timezone off-by-one that the client-side version could produce in negative-UTC regions.
+
+## [2026-06-19]
+
+### Added
+- Spec for the DocuSeal tenant lease-renewal workflow (`docs/docuseal-tenant-renewal-spec.md`): date-surfaced renewal review queue, DocuSeal-rendered draft with a confirm-to-send gate, tenants-then-landlord signing order, email-based match-back, and a new `lease_renewals` chain table. v1 excludes Phase 4 (Google Drive filing + auto lease-term advance), tracked as deferred.
+
 ## [2026-06-17]
 
 ### Added

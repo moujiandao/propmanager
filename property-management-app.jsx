@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createClient } from '@/lib/supabase/client';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
+import { RenewalsPage } from './renewal-components';
 
 const supabase = createClient();
 
@@ -86,6 +87,50 @@ const T = {
     maintSubmitting: "Submitting...",
     emailTitle: "Email Automation", emailSubtitle: "Configure automated payment reminder emails",
     navEmailAutomation: "Email Automation", navPaymentReminders: "Payment Reminders",
+    navRenewals: "Lease Renewals",
+    renewalsTitle: "Lease Renewals",
+    renewalsSubtitle: "Review and send renewal addendums for leases nearing expiry",
+    renewalStatDue: "Renewals due",
+    renewalStatUrgent: "Urgent",
+    renewalStatBlocked: "Blocked",
+    renewalsDueHeading: "Renewals due",
+    renewalsDueEmpty: "No leases are due for renewal right now.",
+    renewalsInFlightHeading: "In progress",
+    renewalsInFlightEmpty: "No renewals in progress.",
+    renewalUrgent: "Urgent",
+    renewalEndsOn: "Lease ends",
+    renewalDaysLeft: "{n} days left",
+    renewalNewTerm: "New term",
+    renewalCarriedRent: "Carried rent",
+    renewalUnknownProperty: "Unknown property",
+    renewalUnknownTenant: "Unknown tenant",
+    renewalNoEmail: "No email",
+    renewalFixEmail: "Fix tenant email",
+    renewalBlockedHint: "A signer is missing a valid email. Add a real email to this tenant before preparing.",
+    renewalPrepare: "Prepare renewal",
+    renewalPreparing: "Preparing…",
+    renewalPrepareTitle: "Prepare renewal",
+    renewalReviewTitle: "Review renewal",
+    renewalProperty: "Property",
+    renewalOriginalLeaseDate: "Original lease date",
+    renewalNewTermStart: "New term start",
+    renewalNewTermEnd: "New term end",
+    renewalMonthlyRent: "Monthly rent",
+    renewalSigners: "Signers",
+    renewalCountersignNote: "Tenants sign first; you countersign last.",
+    renewalPreparedReady: "Draft created. Preview each signer's document, then confirm to send.",
+    renewalPreviewLink: "Preview document",
+    renewalConfirmSend: "Confirm & send",
+    renewalSending: "Sending…",
+    renewalPrepareFailed: "Could not prepare the renewal. Please try again.",
+    renewalSendFailed: "Could not send the renewal. Please try again.",
+    renewalStatus_draft: "Draft",
+    renewalStatus_pending_review: "Pending review",
+    renewalStatus_sent: "Sent",
+    renewalStatus_signed: "Signed",
+    renewalStatus_countersigned: "Countersigned",
+    renewalStatus_declined: "Declined",
+    renewalStatus_blocked: "Blocked",
     emailAutoTitle: "Email Automation", emailAutoSubtitle: "Send tenants timely reminders before key dates",
     tabTemplates: "Templates", tabAutomations: "Automations", tabInbox: "Inbox",
     newTemplate: "New Template", editTemplateTitle: "Edit Template",
@@ -246,6 +291,50 @@ const T = {
     maintSubmitting: "提交中...",
     emailTitle: "邮件自动化", emailSubtitle: "配置自动付款提醒邮件",
     navEmailAutomation: "邮件自动化", navPaymentReminders: "租金提醒",
+    navRenewals: "租约续签",
+    renewalsTitle: "租约续签",
+    renewalsSubtitle: "审核并发送即将到期租约的续签附录",
+    renewalStatDue: "待续签",
+    renewalStatUrgent: "紧急",
+    renewalStatBlocked: "已阻止",
+    renewalsDueHeading: "待续签租约",
+    renewalsDueEmpty: "目前没有需要续签的租约。",
+    renewalsInFlightHeading: "进行中",
+    renewalsInFlightEmpty: "没有正在进行的续签。",
+    renewalUrgent: "紧急",
+    renewalEndsOn: "租约到期",
+    renewalDaysLeft: "剩余 {n} 天",
+    renewalNewTerm: "新租期",
+    renewalCarriedRent: "沿用租金",
+    renewalUnknownProperty: "未知物业",
+    renewalUnknownTenant: "未知租客",
+    renewalNoEmail: "无电子邮件",
+    renewalFixEmail: "请修正租客邮箱",
+    renewalBlockedHint: "有签署人缺少有效邮箱。请先为该租客填写真实邮箱再准备续签。",
+    renewalPrepare: "准备续签",
+    renewalPreparing: "准备中…",
+    renewalPrepareTitle: "准备续签",
+    renewalReviewTitle: "审核续签",
+    renewalProperty: "物业",
+    renewalOriginalLeaseDate: "原租约日期",
+    renewalNewTermStart: "新租期开始",
+    renewalNewTermEnd: "新租期结束",
+    renewalMonthlyRent: "月租金",
+    renewalSigners: "签署人",
+    renewalCountersignNote: "租客先签署，您最后会签。",
+    renewalPreparedReady: "草稿已创建。请预览各签署人的文件，确认后发送。",
+    renewalPreviewLink: "预览文件",
+    renewalConfirmSend: "确认并发送",
+    renewalSending: "发送中…",
+    renewalPrepareFailed: "无法准备续签，请重试。",
+    renewalSendFailed: "无法发送续签，请重试。",
+    renewalStatus_draft: "草稿",
+    renewalStatus_pending_review: "待审核",
+    renewalStatus_sent: "已发送",
+    renewalStatus_signed: "已签署",
+    renewalStatus_countersigned: "已会签",
+    renewalStatus_declined: "已拒绝",
+    renewalStatus_blocked: "已阻止",
     emailAutoTitle: "邮件自动化", emailAutoSubtitle: "在关键日期前向租户发送及时提醒",
     tabTemplates: "模板", tabAutomations: "自动化规则", tabInbox: "收件箱",
     newTemplate: "新建模板", editTemplateTitle: "编辑模板",
@@ -630,6 +719,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
   ];
   const landlordBottomNav = [
     { id: "contracts", label: t.navLeases, icon: "file" },
+    { id: "renewals", label: t.navRenewals, icon: "file" },
     { id: "email-automation", label: t.navEmailAutomation, icon: "mail" },
     { id: "email", label: t.navPaymentReminders, icon: "dollar" },
     { id: "documents", label: t.navDocuments, icon: "key" },
@@ -3747,7 +3837,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [], maintenanceComments: [], emailTemplates: [], emailAutomations: [], emailMessages: [] });
+  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [], maintenanceComments: [], emailTemplates: [], emailAutomations: [], emailMessages: [], leaseRenewals: [], contractTenants: [] });
   const [loadingData, setLoadingData] = useState(false);
   const [lang, setLang] = useState("zh");
   const [langReady, setLangReady] = useState(false);
@@ -3827,13 +3917,15 @@ export default function App() {
   const mapEmailTemplate = (e) => ({ id: e.id, name: e.name, subject: e.subject || "", bodyHtml: e.body_html || "", bodyText: e.body_text || "", updatedAt: e.updated_at, createdAt: e.created_at });
   const mapEmailAutomation = (a) => ({ id: a.id, name: a.name, eventType: a.event_type, offsetDays: a.offset_days || [], templateId: a.template_id || null, scope: a.scope || null, enabled: a.enabled || false });
   const mapEmailMessage = (m) => ({ id: m.id, direction: m.direction, automationId: m.automation_id || null, templateId: m.template_id || null, tenantId: m.tenant_id || null, eventType: m.event_type || null, eventDate: m.event_date || null, toEmail: m.to_email || "", subject: m.subject || "", bodyHtml: m.body_html || "", bodyText: m.body_text || "", status: m.status, deliveredAt: m.delivered_at || null, openedAt: m.opened_at || null, repliedAt: m.replied_at || null, replyToMessageId: m.reply_to_message_id || null, isTest: m.is_test || false, createdAt: m.created_at });
+  const mapLeaseRenewal = (r) => ({ id: r.id, landlordId: r.landlord_id || null, contractId: r.contract_id, propertyId: r.property_id || null, originalLeaseDate: r.original_lease_date || null, newTermStart: r.new_term_start || null, newTermEnd: r.new_term_end || null, rentAmount: r.rent_amount, status: r.status || "draft", docusealSubmissionId: r.docuseal_submission_id || null, signers: r.signers || [], appliedToContract: r.applied_to_contract || false, createdAt: r.created_at || null, updatedAt: r.updated_at || null });
+  const mapContractTenant = (ct) => ({ contractId: ct.contract_id, tenantId: ct.tenant_id });
 
   // ─── DATA FETCHING ─────────────────────────────────────────────────────────
   const fetchAllData = async () => {
     setLoadingData(true);
     try {
       if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes, maintCommRes, emailTplRes, emailAutoRes, emailMsgRes] = await Promise.all([
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes, maintCommRes, emailTplRes, emailAutoRes, emailMsgRes, renewalRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
           supabase.from("contracts").select("*, contract_tenants(tenant_id)"),
@@ -3849,6 +3941,7 @@ export default function App() {
           supabase.from("email_templates").select("*").order("updated_at", { ascending: false }),
           supabase.from("email_automations").select("*").order("created_at", { ascending: true }),
           supabase.from("email_messages").select("*").order("created_at", { ascending: false }).limit(300),
+          supabase.from("lease_renewals").select("*").order("created_at", { ascending: false }),
         ]);
         const today = new Date().toISOString().split("T")[0];
         const units = (unitRes.data || []).map(mapUnit).map(unit => {
@@ -3886,6 +3979,20 @@ export default function App() {
           return fromApi && fromApi.length > 0 ? { ...c, tenantIds: fromApi } : c;
         });
 
+        // Flatten the contract→tenant junction into a list the Renewals page
+        // consumes. Prefer the service-role linkMap (RLS-safe); fall back to
+        // the embedded client-side join when the API route is unavailable.
+        const contractTenants = [];
+        for (const c of (conRes.data || [])) {
+          const fromApi = linkMap.get(c.id);
+          const tenantIds = (fromApi && fromApi.length > 0)
+            ? fromApi
+            : (c.contract_tenants || []).map(ct => ct.tenant_id);
+          for (const tenantId of tenantIds) {
+            contractTenants.push(mapContractTenant({ contract_id: c.id, tenant_id: tenantId }));
+          }
+        }
+
         setData({
           properties:    (propRes.data  || []).map(mapProperty),
           tenants:       (tenRes.data   || []).map(mapTenant),
@@ -3902,6 +4009,8 @@ export default function App() {
           emailTemplates:         (emailTplRes.data  || []).map(mapEmailTemplate),
           emailAutomations:       (emailAutoRes.data || []).map(mapEmailAutomation),
           emailMessages:          (emailMsgRes.data  || []).map(mapEmailMessage),
+          leaseRenewals:          (renewalRes.data   || []).map(mapLeaseRenewal),
+          contractTenants,
         });
       } else {
         // Tenant: fetch own profile + related data
@@ -3965,6 +4074,7 @@ export default function App() {
         case "maintenance":      return <MaintenancePage {...props} />;
         case "email":            return <EmailPage {...props} />;
         case "email-automation": return <EmailAutomationPage {...props} />;
+        case "renewals":         return <RenewalsPage {...props} />;
         case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={fetchAllData} user={user} />;
         case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
         case "admin-users":      return <AdminUsersPage t={t} data={data} user={user} refresh={fetchAllData} />;
