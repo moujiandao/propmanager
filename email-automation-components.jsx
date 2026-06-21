@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader } from './property-management-app'
 import { MERGE_TAGS, renderTemplate, buildContext, sampleContext } from '@/lib/email/merge'
@@ -201,6 +201,244 @@ const TemplatesTab = ({ data, user, t, refresh }) => {
   )
 }
 
+// ─── Batch send flow (Run now): preview → review/edit → confirm → result ──────
+// Drives the human-reviewed batch send for one automation. Backed by the
+// /api/email/batches routes; messages are persisted draft rows (resumable).
+//
+// API responses use snake_case (to_email, body_html, body_text). PATCH upserts
+// use camelCase (toEmail, bodyHtml, bodyText, tenantId) — we map between them.
+const BatchSendModal = ({ automation, data, user, t, onClose, refresh }) => {
+  const [step, setStep] = useState('loading')   // loading | preview | review | result | error
+  const [batch, setBatch] = useState(null)
+  const [messages, setMessages] = useState([])  // snake_case rows from the API
+  const [errMsg, setErrMsg] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [addTenantId, setAddTenantId] = useState('')
+  const [result, setResult] = useState(null)
+  const loadedRef = useRef(false)
+
+  const tenants = data.tenants || []
+  const tenantName = (id) => {
+    const x = tenants.find(v => v.id === id)
+    return x ? ([x.name, x.lastName].filter(Boolean).join(' ') || t.batchNoName) : t.batchNoName
+  }
+
+  // POST /api/email/batches — idempotent: resumes an existing draft if present.
+  const runNow = async () => {
+    setStep('loading'); setErrMsg(null)
+    try {
+      const res = await fetch('/api/email/batches', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ landlordId: user.id, automationId: automation.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setErrMsg(json?.error || t.batchLoadFailed); setStep('error'); return }
+      setBatch(json.batch)
+      setMessages(json.messages || [])
+      setStep('preview')
+    } catch (e) { setErrMsg(e.message || t.batchLoadFailed); setStep('error') }
+  }
+
+  // Run on mount once (ref guard survives StrictMode's double-invoke of effects).
+  useEffect(() => {
+    if (loadedRef.current) return
+    loadedRef.current = true
+    runNow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // PATCH /api/email/batches/[id] — persist edits/adds/removes, re-render from response.
+  const patch = async ({ upserts = [], deleteIds = [] }) => {
+    setSaving(true); setErrMsg(null)
+    try {
+      const res = await fetch(`/api/email/batches/${batch.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ landlordId: user.id, upserts, deleteIds }),
+      })
+      const json = await res.json()
+      setSaving(false)
+      if (!res.ok) { setErrMsg(json?.error || t.batchSaveFailed); return false }
+      setBatch(json.batch)
+      setMessages(json.messages || [])
+      return true
+    } catch (e) { setSaving(false); setErrMsg(e.message || t.batchSaveFailed); return false }
+  }
+
+  // Local edit of a draft row; persisted on blur to avoid a request per keystroke.
+  const editLocal = (id, field, value) =>
+    setMessages(ms => ms.map(m => m.id === id ? { ...m, [field]: value } : m))
+
+  // Persist subject and body independently so the two blur events fired by one
+  // tab-out (body → subject) touch disjoint fields and can't stomp each other.
+  const persistSubject = (m) => patch({ upserts: [{ id: m.id, subject: m.subject }] })
+  const persistBody = (m) => patch({ upserts: [{ id: m.id, bodyText: m.body_text, bodyHtml: m.body_text ? m.body_text.replace(/\n/g, '<br>') : '' }] })
+
+  const removeRow = (id) => patch({ deleteIds: [id] })
+
+  const addRecipient = async () => {
+    if (!addTenantId) return
+    if (messages.some(m => m.tenant_id === addTenantId)) { setErrMsg(t.batchAlreadyAdded); return }
+    const ok = await patch({ upserts: [{ tenantId: addTenantId }] })
+    if (ok) setAddTenantId('')
+  }
+
+  // POST /api/email/batches/[id]/send — fires only from the confirm dialog.
+  const send = async () => {
+    setSending(true); setErrMsg(null)
+    try {
+      const res = await fetch(`/api/email/batches/${batch.id}/send`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ landlordId: user.id }),
+      })
+      const json = await res.json()
+      setSending(false)
+      if (!res.ok) { setErrMsg(json?.error || t.batchSendFailed); setConfirming(false); return }
+      setResult({ sent: json.sent || 0, failed: json.failed || 0, skipped: json.skipped || 0 })
+      setConfirming(false)
+      setStep('result')
+      refresh && refresh()
+    } catch (e) { setSending(false); setErrMsg(e.message || t.batchSendFailed) }
+  }
+
+  const first = messages[0]
+  const renderBody = (m) => m.body_html || (m.body_text ? m.body_text.replace(/\n/g, '<br>') : '')
+
+  // Tenants not already in the batch, restricted to current/future like elsewhere.
+  const inBatch = new Set(messages.map(m => m.tenant_id).filter(Boolean))
+  const addOptions = [{ value: '', label: t.batchAddTenantPlaceholder },
+    ...tenants.filter(x => (x.status === 'current tenant' || x.status === 'future tenant') && !inBatch.has(x.id))
+      .map(x => ({ value: x.id, label: [x.name, x.lastName].filter(Boolean).join(' ') || t.batchNoName }))]
+
+  // ── Loading / error ─────────────────────────────────────────────────────────
+  if (step === 'loading') {
+    return (
+      <Modal title={automation.name} onClose={onClose}>
+        <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>{t.batchLoading}</p>
+      </Modal>
+    )
+  }
+  if (step === 'error') {
+    return (
+      <Modal title={automation.name} onClose={onClose}>
+        <p style={{ fontSize: 14, color: '#ef4444', margin: '0 0 16px' }}>{errMsg || t.batchLoadFailed}</p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
+        </div>
+      </Modal>
+    )
+  }
+
+  // ── Result ──────────────────────────────────────────────────────────────────
+  if (step === 'result') {
+    return (
+      <Modal title={t.batchResultTitle} onClose={onClose}>
+        <p style={{ fontSize: 15, color: '#111111', margin: '0 0 8px', fontWeight: 600 }}>
+          {t.batchResultSummary(result.sent, result.failed, result.skipped)}
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+          <Btn onClick={onClose}>{t.batchDone}</Btn>
+        </div>
+      </Modal>
+    )
+  }
+
+  // ── Step 1: preview (first recipient's rendered copy) ─────────────────────────
+  if (step === 'preview') {
+    if (!first) {
+      return (
+        <Modal title={automation.name} onClose={onClose}>
+          <p style={{ fontSize: 14, color: '#6b7280', margin: '0 0 16px' }}>{t.batchNoRecipients}</p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
+          </div>
+        </Modal>
+      )
+    }
+    return (
+      <Modal title={t.batchPreviewTitle} onClose={onClose} wide>
+        <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 12px' }}>{t.batchPreviewNote(tenantName(first.tenant_id))}</p>
+        <div style={{ border: '1px solid #eaeaea', borderRadius: 9, overflow: 'hidden' }}>
+          <div style={{ padding: '10px 14px', background: '#fafafa', borderBottom: '1px solid #eaeaea', fontSize: 13, fontWeight: 600, color: '#111111' }}>{first.subject || t.batchPreviewNoSubject}</div>
+          <div style={{ padding: '16px 14px', fontSize: 14, color: '#111111', minHeight: 160 }} dangerouslySetInnerHTML={{ __html: renderBody(first) }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+          <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
+          <Btn onClick={() => setStep('review')}>{t.batchContinue}</Btn>
+        </div>
+      </Modal>
+    )
+  }
+
+  // ── Step 2: review & edit + Step 3 confirm dialog ─────────────────────────────
+  return (
+    <Modal title={t.batchReviewTitle} onClose={onClose} wide>
+      <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 8px' }}>{t.batchReviewSubtitle}</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 14px' }}>
+        <span style={{ background: '#f3f4f6', color: '#111111', padding: '4px 12px', borderRadius: 99, fontSize: 13, fontWeight: 600 }}>{t.batchRecipientCount(messages.length)}</span>
+        {saving && <span style={{ fontSize: 12, color: '#9ca3af' }}>{t.batchSaving}</span>}
+      </div>
+
+      <div style={{ display: 'grid', gap: 12, maxHeight: '48vh', overflow: 'auto' }}>
+        {messages.map(m => (
+          <div key={m.id} style={{ border: '1px solid #eaeaea', borderRadius: 10, padding: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#111111' }}>{tenantName(m.tenant_id)}</div>
+                <div style={{ fontSize: 12, color: m.to_email ? '#6b7280' : '#ef4444' }}>{m.to_email || t.batchRecipientNoEmail}</div>
+              </div>
+              <Btn size="sm" variant="ghost" icon="trash" onClick={() => removeRow(m.id)}>{t.batchRemove}</Btn>
+            </div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', margin: '8px 0 4px' }}>{t.batchRecipientSubject}</label>
+            <input value={m.subject || ''} onChange={e => editLocal(m.id, 'subject', e.target.value)} onBlur={() => persistSubject(m)}
+              style={{ width: '100%', padding: '8px 12px', border: '1px solid #eaeaea', borderRadius: 8, fontSize: 13, color: '#111111', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', margin: '10px 0 4px' }}>{t.batchRecipientBody}</label>
+            <textarea value={m.body_text || ''} onChange={e => editLocal(m.id, 'body_text', e.target.value)}
+              onBlur={() => persistBody(m)}
+              style={{ width: '100%', minHeight: 120, padding: '10px 12px', border: '1px solid #eaeaea', borderRadius: 8, fontSize: 13, color: '#374151', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', outline: 'none', lineHeight: 1.6 }} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: 14 }}>
+        <div style={{ flex: 1 }}>
+          <Sel label={t.batchAddRecipient} value={addTenantId} onChange={setAddTenantId} options={addOptions} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <Btn variant="secondary" icon="plus" onClick={addRecipient} disabled={!addTenantId || saving}>{t.batchAddRecipient}</Btn>
+        </div>
+      </div>
+
+      {errMsg && <p style={{ color: '#ef4444', fontSize: 13, margin: '4px 0 0' }}>{errMsg}</p>}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+        <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
+        <Btn onClick={() => { setErrMsg(null); setConfirming(true) }} disabled={messages.length === 0 || saving}>{t.batchSendEmails}</Btn>
+      </div>
+
+      {confirming && (
+        <Modal title={t.batchConfirmTitle} onClose={() => !sending && setConfirming(false)}>
+          <p style={{ fontSize: 14, color: '#374151', margin: '0 0 12px' }}>{t.batchConfirmBody(messages.length)}</p>
+          <div style={{ maxHeight: '40vh', overflow: 'auto', border: '1px solid #f0f0f0', borderRadius: 9 }}>
+            {messages.map(m => (
+              <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 12px', borderTop: '1px solid #fafafa', fontSize: 13 }}>
+                <span style={{ color: '#111111', fontWeight: 600 }}>{tenantName(m.tenant_id)}</span>
+                <span style={{ color: m.to_email ? '#6b7280' : '#ef4444' }}>{m.to_email || t.batchRecipientNoEmail}</span>
+              </div>
+            ))}
+          </div>
+          {errMsg && <p style={{ color: '#ef4444', fontSize: 13, margin: '8px 0 0' }}>{errMsg}</p>}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+            <Btn variant="secondary" onClick={() => setConfirming(false)} disabled={sending}>{t.cancel}</Btn>
+            <Btn onClick={send} disabled={sending}>{sending ? t.batchSending : t.batchConfirmSend}</Btn>
+          </div>
+        </Modal>
+      )}
+    </Modal>
+  )
+}
+
 // ─── Automation editor modal ──────────────────────────────────────────────────
 const AutomationEditor = ({ initial, data, user, t, onClose, onSaved }) => {
   const [name, setName] = useState(initial?.name || '')
@@ -256,6 +494,7 @@ const AutomationEditor = ({ initial, data, user, t, onClose, onSaved }) => {
 const AutomationsTab = ({ data, user, t, refresh }) => {
   const [editing, setEditing] = useState(null)
   const [testing, setTesting] = useState(null)
+  const [running, setRunning] = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
   const automations = data.emailAutomations || []
   const templates = data.emailTemplates || []
@@ -289,6 +528,7 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <Btn size="sm" icon="mail" onClick={() => setRunning(a)}>{t.runNow}</Btn>
                 <Btn size="sm" variant="secondary" icon="mail" onClick={() => setTesting(a)}>{t.sendTest}</Btn>
                 <Btn size="sm" variant="ghost" icon="edit" onClick={() => setEditing(a)}>{t.edit}</Btn>
                 <button onClick={() => setConfirmDel(a)} title={t.deleteAutomation} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 6, display: 'inline-flex' }}><Icon name="trash" size={16} /></button>
@@ -301,6 +541,7 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
 
       {editing && <AutomationEditor initial={editing} data={data} user={user} t={t} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />}
       {testing && <TestSendModal template={{ id: testing.templateId }} eventType={testing.eventType} data={data} user={user} t={t} onClose={() => setTesting(null)} />}
+      {running && <BatchSendModal automation={running} data={data} user={user} t={t} onClose={() => setRunning(null)} refresh={refresh} />}
       {confirmDel && (
         <Modal title={t.deleteAutomation} onClose={() => setConfirmDel(null)}>
           <p style={{ fontSize: 14, color: '#374151', margin: '0 0 20px' }}>{t.confirmDeleteAutomation} <strong>{confirmDel.name}</strong>?</p>

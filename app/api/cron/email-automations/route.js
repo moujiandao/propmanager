@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { renderTemplate, buildContext } from '@/lib/email/merge'
 import { eventDateFor, offsetsDueToday } from '@/lib/email/events'
 import { loadLandlordDataset, contractForTenant } from '@/lib/email/context'
+import { candidates, matchesScope } from '@/lib/email/audience'
 import { sendEmail } from '@/lib/email/send'
 
 export const dynamic = 'force-dynamic'
@@ -10,31 +11,8 @@ export const dynamic = 'force-dynamic'
 // `offset` days away today, render the template, and send. Idempotent — a unique
 // partial index on email_messages makes a duplicate insert fail (code 23505),
 // so re-running the same day never double-sends.
-
-// Candidate tenants for an automation's event type, before offset/scope filtering.
-function candidates(eventType, { tenants, contracts }) {
-  switch (eventType) {
-    case 'move_out':
-      return tenants.filter(t => t.status === 'current tenant' && t.moveOutDate)
-    case 'projected_move_out':
-      return tenants.filter(t => t.status === 'current tenant' && (t.moveOutDate || contractForTenant(contracts, t.id)?.endDate))
-    case 'move_in':
-      return tenants.filter(t => t.status === 'future tenant' && t.moveInDate)
-    case 'lease_end':
-      return tenants.filter(t => contractForTenant(contracts, t.id)?.endDate)
-    case 'rent_due':
-      return tenants.filter(t => t.status === 'current tenant' && contractForTenant(contracts, t.id)?.dueDay)
-    default:
-      return []
-  }
-}
-
-function matchesScope(tenant, scope) {
-  if (!scope) return true
-  if (scope.propertyId && tenant.propertyId !== scope.propertyId) return false
-  if (scope.status && tenant.status !== scope.status) return false
-  return true
-}
+// Recipient matching (candidates / matchesScope) lives in lib/email/audience.js
+// so the cron and the manual batch route never drift.
 
 async function handle(request) {
   const auth = request.headers.get('authorization') || ''
