@@ -34,6 +34,9 @@ export async function POST(request) {
   // Create landlord profile row
   const { error: profileError } = await supabase
     .from('landlord_profiles')
+    // `plan` is intentionally omitted: the column defaults to 'free' (see
+    // scripts/add-landlord-plan.sql). Relying on the default decouples this code
+    // from the migration so signup keeps working regardless of migration timing.
     .insert({ id: authData.user.id, name, email })
 
   if (profileError) {

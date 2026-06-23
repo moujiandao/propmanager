@@ -633,141 +633,6 @@ const LangToggle = ({ lang, setLang }) => (
   </div>
 );
 
-// ─── LOGIN ────────────────────────────────────────────────────────────────────
-const LoginPage = ({ onLogin }) => {
-  const [tab, setTab] = useState("landlord");
-  const [mode, setMode] = useState("login"); // 'login' | 'signup'
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const reset = () => { setEmail(""); setPassword(""); setName(""); setConfirmPassword(""); setError(""); setSuccess(""); };
-  useEffect(() => { reset(); setMode("login"); }, [tab]);
-
-  const handleLogin = async () => {
-    setLoading(true); setError("");
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) { setError("Invalid email or password."); setLoading(false); return; }
-
-    const { data: membership } = await supabase.from("landlord_members").select("landlord_id").eq("auth_user_id", authData.user.id).maybeSingle();
-    if (membership) {
-      const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", membership.landlord_id).single();
-      if (landlord) { onLogin({ id: landlord.id, authId: authData.user.id, role: "landlord", email, name: landlord.name || email.split("@")[0] }); return; }
-    }
-
-    const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", authData.user.id).single();
-    if (tenant) { onLogin({ id: tenant.id, authId: authData.user.id, role: "tenant", email, name: tenant.name || email.split("@")[0] }); return; }
-
-    setError("No profile found for this account.");
-    setLoading(false);
-  };
-
-  const handleSignup = async () => {
-    setError(""); setSuccess("");
-    if (!name.trim()) { setError("Full name is required."); return; }
-    if (!email.trim()) { setError("Email is required."); return; }
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    if (password !== confirmPassword) { setError("Passwords do not match."); return; }
-    setLoading(true);
-    const res = await fetch("/api/auth/register-landlord", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
-    });
-    const json = await res.json();
-    setLoading(false);
-    if (!res.ok) { setError(json.error || "Something went wrong. Please try again."); return; }
-    setSuccess("Account created! You can now sign in.");
-    setMode("login");
-    setPassword(""); setName(""); setConfirmPassword("");
-  };
-
-  const inputStyle = { width: "100%", padding: "11px 14px", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, color: "#f5f5f5", fontSize: 14, boxSizing: "border-box", outline: "none", fontFamily: "inherit" };
-  const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#9ca3af", marginBottom: 6, letterSpacing: ".5px", textTransform: "uppercase" };
-
-  return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#111111 0%,#1a1a1a 50%,#111111 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); * { box-sizing: border-box; } body { margin: 0; -webkit-font-smoothing: antialiased; }`}</style>
-      <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-        {[...Array(8)].map((_, i) => <div key={i} style={{ position: "absolute", width: 2, height: 2, background: `rgba(255,255,255,${0.15+i*0.05})`, borderRadius: "50%", top: `${10+i*12}%`, left: `${5+i*13}%`, boxShadow: `0 0 ${20+i*10}px ${8+i*4}px rgba(255,255,255,${0.05+i*0.02})` }} />)}
-      </div>
-      <div style={{ width: "100%", maxWidth: 420, padding: 24 }}>
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,#111111,#000000)", borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Icon name="home" size={28} /></div>
-          <h1 style={{ color: "#fafafa", fontSize: 22, fontWeight: 700, margin: "0 0 6px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>2703 Ridge Rd Berkeley CA</h1>
-          <p style={{ color: "#9ca3af", margin: 0, fontSize: 15, fontWeight: 300 }}>Property management, simplified.</p>
-        </div>
-        <div style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 32 }}>
-          {/* Role tabs */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 24, background: "rgba(0,0,0,.2)", borderRadius: 10, padding: 4 }}>
-            {["landlord", "tenant"].map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                style={{ flex: 1, padding: "8px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", transition: "all .2s", background: tab === t ? "rgba(255,255,255,.14)" : "transparent", color: tab === t ? "#fff" : "#9ca3af" }}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          {mode === "login" ? (
-            <>
-              {success && <p style={{ color: "#4ade80", fontSize: 13, margin: "0 0 16px", background: "rgba(74,222,128,.1)", padding: "10px 14px", borderRadius: 8 }}>{success}</p>}
-              {[["Email", email, setEmail, "email"], ["Password", password, setPassword, "password"]].map(([lbl, val, setter, type]) => (
-                <div key={lbl} style={{ marginBottom: 16 }}>
-                  <label style={labelStyle}>{lbl}</label>
-                  <input value={val} onChange={e => setter(e.target.value)} type={type}
-                    onKeyDown={e => e.key === "Enter" && handleLogin()}
-                    style={inputStyle} />
-                </div>
-              ))}
-              {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
-              <button onClick={handleLogin} disabled={loading}
-                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#111111,#000000)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
-                {loading ? "Signing in…" : "Sign In"}
-              </button>
-              {tab === "landlord" && (
-                <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 13, color: "#6b7280" }}>
-                  Don&apos;t have an account?{" "}
-                  <button onClick={() => { reset(); setMode("signup"); }} style={{ background: "none", border: "none", color: "#111111", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Create one</button>
-                </p>
-              )}
-              {tab === "tenant" && (
-                <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 12, color: "#9ca3af" }}>
-                  Tenant accounts are created by your landlord.
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              <p style={{ color: "#9ca3af", fontSize: 13, margin: "0 0 20px", textAlign: "center" }}>Create your landlord account</p>
-              {[["Full Name", name, setName, "text"], ["Email", email, setEmail, "email"], ["Password", password, setPassword, "password"], ["Confirm Password", confirmPassword, setConfirmPassword, "password"]].map(([lbl, val, setter, type]) => (
-                <div key={lbl} style={{ marginBottom: 16 }}>
-                  <label style={labelStyle}>{lbl}</label>
-                  <input value={val} onChange={e => setter(e.target.value)} type={type}
-                    onKeyDown={e => e.key === "Enter" && handleSignup()}
-                    style={inputStyle} />
-                </div>
-              ))}
-              {error && <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</p>}
-              <button onClick={handleSignup} disabled={loading}
-                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg,#111111,#000000)", border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1, fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
-                {loading ? "Creating account…" : "Create Account"}
-              </button>
-              <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 13, color: "#6b7280" }}>
-                Already have an account?{" "}
-                <button onClick={() => { reset(); setMode("login"); }} style={{ background: "none", border: "none", color: "#111111", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Sign in</button>
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) => {
   const landlordNav = [
@@ -4108,7 +3973,13 @@ export default function App() {
   };
 
   if (authLoading) return null;
-  if (!user) return <LoginPage onLogin={u => { setUser(u); setPage("dashboard"); }} />;
+  // The dashboard lives behind a server-side auth guard (app/(app)/dashboard/layout.js).
+  // This is a client-side fallback for the rare case the guard's session check and the
+  // client profile resolution disagree (e.g. valid cookie but missing profile row).
+  if (!user) {
+    if (typeof window !== "undefined") window.location.href = "/login?next=/dashboard";
+    return null;
+  }
 
   if (loadingData && !data.properties.length && !data.tenants.length) {
     return (
@@ -4156,9 +4027,8 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setData({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [] });
-    setPage("dashboard");
+    // Leave the dashboard surface entirely and land on the public marketing home.
+    window.location.href = "/";
   };
 
   return (

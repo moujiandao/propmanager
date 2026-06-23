@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-22]
+
+### Added
+- Commercialization Phase 1 — public marketing site + auth restructure. New App Router route groups: `(marketing)` (`/` home with hero, faux product preview, four feature sections, and CTA band; `/pricing` with Free/Pro/Business flat tiers, "Most popular" highlight), `(auth)` (`/login` with landlord/tenant role tabs and pre-navigation role resolution; `/signup` that registers a free-tier landlord then auto-signs-in and lands on `/dashboard`), and `(app)` (the existing monolith mounted at `/dashboard` behind a server-side auth guard in `app/(app)/dashboard/layout.js` that redirects unauthenticated visitors to `/login?next=/dashboard`). New shared modules: `lib/theme.js` (palette/tokens/`btnStyle`, importable by server + client without dragging in the monolith), `app/_brand.jsx` (`Logo`), `app/(auth)/_form.jsx` (form primitives). Fonts moved to `next/font` Inter + `app/globals.css` in the root layout (new surfaces only; the monolith keeps its inline `@import` for now).
+- `landlord_profiles` plan/billing columns (`scripts/add-landlord-plan.sql`): `plan` (text, default `'free'`, CHECK in free/pro/business) plus nullable `subscription_status`, `stripe_customer_id`, `stripe_subscription_id` placeholders for Phase 2 Stripe billing. Existing `is_team_member(id)` RLS covers them; unique partial index on `stripe_customer_id`.
+
+### Changed
+- `property-management-app.jsx`: removed the in-app dark `LoginPage` (login/signup now live on public routes); the `!user` branch is a client-side redirect fallback to `/login`; logout signs out and navigates to `/`. Internal state-driven nav and `onAuthStateChange` session resolution unchanged.
+- `app/layout.js` now wires `next/font` Inter and imports `app/globals.css`; `app/page.js` removed (replaced by `app/(marketing)/page.js`).
+
 ## [2026-06-20]
 
 ### Added

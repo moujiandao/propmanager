@@ -8,8 +8,9 @@ A property management web application built with Next.js and Supabase. Provides 
 - **Database & Auth**: Supabase (PostgreSQL + Auth + Storage)
 - **Payments**: Stripe (ACH)
 - **Email**: Resend
-- **Styling**: Inline styles with Playfair Display / Crimson Pro fonts
-- **UI monolith**: `property-management-app.jsx` contains all landlord and tenant UI components (~1600 lines)
+- **Styling**: Inline styles, **Inter** font (the in-app monolith loads it via inline `@import`; the public marketing/auth surfaces use `next/font` Inter + `app/globals.css`). The in-app palette is the `theme` object at the top of `property-management-app.jsx`; the public surfaces mirror it via `lib/theme.js` (`palette`/`btnStyle`)
+- **Routing & public surface**: App Router **route groups** organize three surfaces (groups don't appear in URLs). `(marketing)` = public site: `/` (home) and `/pricing` (Free/Pro/Business flat tiers), light-themed server components. `(auth)` = `/login` (landlord/tenant role tabs; resolves role before navigating) and `/signup` (registers a free-tier landlord, auto-signs-in, lands on `/dashboard`). `(app)` = the monolith mounted at `/dashboard`, gated by a server-side auth guard in `app/(app)/dashboard/layout.js` (redirects to `/login?next=/dashboard` if no session). Shared brand mark in `app/_brand.jsx`, auth form primitives in `app/(auth)/_form.jsx`. `middleware.js` only refreshes the session cookie — gating lives in the dashboard layout, not middleware.
+- **UI monolith**: `property-management-app.jsx` contains all landlord and tenant UI components. Mounted only at `/dashboard` and assumes an authed user (the login/signup screens were removed when the public auth routes were added). Navigation inside the dashboard is state-driven (`page` state), not URL-driven
 - **Phase 2 components**: `phase2-components.jsx` (planned) will hold PropertyDetailPage, TenantContactPage, DocumentsPageV2
 - **Email Automation components**: `email-automation-components.jsx` holds `EmailAutomationPage` (Templates / Automations / Inbox tabs) and `BatchSendModal` (the "Run now" human-review batch send: preview → per-recipient review/edit → mandatory confirm dialog → send, backed by the `/api/email/batches` routes). Imports shared UI from `property-management-app.jsx` (circular import, same pattern as phase2-components)
 - **Email module**: `lib/email/` is an isomorphic ESM module (own `package.json` with `"type":"module"`) shared by the UI and server: `format.js`, `merge.js` (merge-tag rendering), `events.js` (event-date resolution), `context.js` (server snake→camel loaders), `audience.js` (`candidates`/`matchesScope` recipient matching, shared by the cron and the batch route so they never drift), `send.js` (Resend wrapper). Unit-tested via `npm test`
@@ -20,7 +21,7 @@ A property management web application built with Next.js and Supabase. Provides 
 - **Auth callback**: `app/auth/callback/route.js` handles Supabase recovery/magic link flows
 
 ## Database Tables
-- `landlord_profiles` - landlord accounts; one row per **team**, not per auth user
+- `landlord_profiles` - landlord accounts; one row per **team**, not per auth user. Carries commercialization plan state: `plan` (default `'free'`, CHECK free/pro/business) + nullable `subscription_status`/`stripe_customer_id`/`stripe_subscription_id` placeholders for Phase 2 Stripe subscription billing (`scripts/add-landlord-plan.sql`). Billing logic + plan gating are not built yet (Phase 2/3)
 - `landlord_members` - maps `auth.users` to a `landlord_id` (a team). Multiple auth users can be members of the same team. Login resolves the active landlord_id via this table; **do not** assume `auth.uid() === landlord_id`. Use the SQL helper `is_team_member(landlord_id)` in RLS policies.
 - `tenant_profiles` - tenant accounts linked to landlords, properties, and units
 - `properties` - rental properties with address, type, unit count, Google Drive link
