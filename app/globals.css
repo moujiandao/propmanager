@@ -19,3 +19,41 @@ body {
 a {
   color: inherit;
 }
+
+/* Smooth in-page anchor scrolling; offset targets below the sticky header. */
+html {
+  scroll-behavior: smooth;
+}
+
+[id] {
+  scroll-margin-top: 88px;
+}
+
+/* Hover affordances. These toggle `opacity` only, which the inline styles never
+   set, so the cascade applies cleanly over inline `style={}` props. */
+.pm-btn,
+.pm-navlink {
+  transition: opacity 0.15s ease;
+}
+
+.pm-btn:hover {
+  opacity: 0.88;
+}
+
+.pm-navlink:hover {
+  opacity: 0.6;
+}
+
+/* Marketing header: collapse the secondary links on narrow screens so the nav
+   never overflows; keep Log in + the primary CTA. */
+@media (max-width: 640px) {
+  .pm-nav-secondary {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

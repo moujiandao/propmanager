@@ -69,8 +69,8 @@ function Hero() {
           handle maintenance — all from one clean dashboard.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 56 }}>
-          <Link href="/signup" style={btnStyle('primary', 'lg')}>Start for free</Link>
-          <Link href="/pricing" style={btnStyle('secondary', 'lg')}>See pricing</Link>
+          <Link href="/signup" className="pm-btn" style={btnStyle('primary', 'lg')}>Start for free</Link>
+          <Link href="/pricing" className="pm-btn" style={btnStyle('secondary', 'lg')}>See pricing</Link>
         </div>
         <ProductMock />
       </div>
@@ -254,7 +254,7 @@ function ClosingCta() {
         <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.7)', margin: '0 0 28px' }}>
           Free to get started. No credit card required.
         </p>
-        <Link href="/signup" style={{ ...btnStyle('secondary', 'lg'), background: '#fff' }}>
+        <Link href="/signup" className="pm-btn" style={{ ...btnStyle('secondary', 'lg'), background: '#fff' }}>
           Create your free account
         </Link>
       </div>

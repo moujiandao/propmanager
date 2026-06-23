@@ -76,8 +76,51 @@ export default function PricingPage() {
         <p style={{ textAlign: 'center', color: palette.textFaint, fontSize: 14, marginTop: 40 }}>
           Prices in USD. Paid plans are billed monthly and can be cancelled anytime.
         </p>
+
+        <Faq />
       </div>
     </section>
+  )
+}
+
+const FAQS = [
+  {
+    q: 'Is the Free plan really free?',
+    a: 'Yes — Free is free forever for up to 3 units, with no credit card required to start.',
+  },
+  {
+    q: 'Can I change plans later?',
+    a: 'Anytime. Upgrade as your portfolio grows, or downgrade if your needs change.',
+  },
+  {
+    q: 'What counts as a unit?',
+    a: 'Each rentable unit you manage — a single-family home is one unit, a fourplex is four.',
+  },
+  {
+    q: 'Do my tenants pay to use it?',
+    a: 'No. Tenants use the portal for free to pay rent, submit maintenance requests, and manage their profile.',
+  },
+  {
+    q: 'How do tenant accounts work?',
+    a: 'You create tenant accounts from your dashboard — tenants do not sign up on their own.',
+  },
+]
+
+function Faq() {
+  return (
+    <div style={{ maxWidth: 760, margin: '88px auto 0' }}>
+      <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, letterSpacing: '-0.02em', textAlign: 'center', margin: '0 0 36px' }}>
+        Frequently asked questions
+      </h2>
+      <div>
+        {FAQS.map(({ q, a }) => (
+          <div key={q} style={{ padding: '22px 0', borderTop: `1px solid ${palette.border}` }}>
+            <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px' }}>{q}</h3>
+            <p style={{ fontSize: 15, color: palette.textMuted, lineHeight: 1.55, margin: 0 }}>{a}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -119,7 +162,7 @@ function PlanCard({ tier }) {
         <span style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.03em' }}>{price}</span>
         <span style={{ fontSize: 15, color: palette.textMuted }}>{cadence}</span>
       </div>
-      <Link href="/signup" style={{ ...btnStyle(highlighted ? 'blue' : 'secondary', 'md'), width: '100%' }}>
+      <Link href="/signup" className="pm-btn" style={{ ...btnStyle(highlighted ? 'blue' : 'secondary', 'md'), width: '100%' }}>
         {cta}
       </Link>
       {featuresLabel && (
