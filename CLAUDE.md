@@ -49,7 +49,7 @@ Note: `email_settings` (payment reminders) is a separate, older feature — the 
 - Run dev server: `npm run dev` (localhost:3000)
 
 ## Non-Obvious Decisions
-- All UI lives in a single JSX file (`property-management-app.jsx`) rather than separate route files. Navigation is state-driven (`page` state variable), not URL-driven.
+- **Two routing models, by surface.** The public surfaces (marketing + auth, in route groups `(marketing)`/`(auth)`) are real Next.js route files with URL routing. The authed app is the opposite: the entire landlord/tenant UI lives in one JSX file (`property-management-app.jsx`), mounted at `/dashboard`, with **state-driven** navigation (`page` state variable), not per-view URLs. So "add a public page" = new route file; "add a dashboard view" = new case in `renderPage()`.
 - `lib/supabase/server.js` uses the service role key (not anon key) for admin operations like creating/updating auth users.
 - Google Drive links are stored per-property in `properties.drive_link` and embedded as iframes. Phase 2 adds Supabase Storage for direct file uploads.
 - Tenant accounts are created by landlords via API (not self-service signup).
@@ -57,12 +57,13 @@ Note: `email_settings` (payment reminders) is a separate, older feature — the 
 
 ## Common Tasks
 - **Run locally**: `npm install && npm run dev`
-- **Add a page**: Add a case to `renderPage()` in `property-management-app.jsx` and a nav entry in `Sidebar`
+- **Add a dashboard view**: Add a case to `renderPage()` in `property-management-app.jsx` and a nav entry in `Sidebar`
+- **Add a public (marketing/auth) page**: Create a route file under `app/(marketing)/` or `app/(auth)/`; reuse tokens from `lib/theme.js` and the `Logo` from `app/_brand.jsx` (keep marketing pages as server components so they don't pull in the client monolith)
 - **Add an API route**: Create `app/api/<route>/route.js`
 - **Add a data entity**: Add Supabase table, mapper function, fetch in `fetchAllData()`, and entry in `data` state
 
 ## Do Not
-- Do not create separate Next.js page files for app views - use the state-driven navigation pattern in the monolith
+- Do not create separate Next.js page files for **authed app views** - use the state-driven navigation pattern in the monolith (mounted at `/dashboard`). This does NOT apply to the public marketing/auth surfaces, which are intentionally real route files.
 - Do not use the anon key in server-side API routes that need admin access (use service role key via `lib/supabase/server.js`)
 - Do not drop existing `unit` text columns when adding `unit_id` foreign keys - keep both for backward compatibility
 - Do not hardcode visible strings in JSX - always add to T.en and T.zh first, then reference via `t.keyName`. Before reporting any landlord-UI change complete, grep your diff for hardcoded English strings (quoted text inside JSX, including `title=`, `placeholder=`, modal copy, error messages, and confirm dialogs). If you find any, add matching entries to both `T.en` and `T.zh` and replace the literals with `t.keyName`.
