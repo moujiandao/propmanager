@@ -18,7 +18,11 @@ export async function POST(request) {
       messages: [
         {
           role: 'user',
-          content: `Translate the following maintenance request text into natural, vernacular Mandarin Chinese as it would be spoken or written by a native speaker in mainland China. Do not translate literally — capture the meaning and intent authentically, using natural phrasing a Chinese-speaking landlord or property manager would actually use. Return only the translated text, nothing else.
+          content: `Translate the following maintenance request text into natural, vernacular Mandarin Chinese as it would be spoken or written by a native speaker in mainland China. Do not translate literally — capture the meaning and intent authentically, using natural phrasing a Chinese-speaking landlord or property manager would actually use.
+
+Important: Keep all personal names (such as tenant names) exactly as written in the original English/Latin script. Do not translate or transliterate names into Chinese characters.
+
+Return only the translated text, nothing else.
 
 Text to translate:
 ${text}`,
