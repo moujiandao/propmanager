@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-25]
+
+### Changed
+- Landlord "Maintenance" page reskinned as a Trello-style **To Do List** kanban board (`property-management-app.jsx`). Three columns (New / In Progress / Closed) over the existing `maintenance_requests`; drag a card between columns to set its status (reuses the optimistic `updateStatus`). No schema change — stored status values (`new`/`in-progress`/`closed`, plus legacy `resolved`/`open`) are unchanged; `resolved`/`closed` and any unknown status map to the Closed/New columns respectively. Cards open a detail modal carrying the full description, metadata, attachments, status dropdown, the per-request "Translate to Chinese" action (moved off the card face), and the existing `CommentThread`.
+- Split the shared `navMaintenance` nav label: landlord nav now reads "To Do List" (`navTodo`), tenant portal keeps "Maintenance". Tenant maintenance page is unchanged (still a submit-and-track list).
+
+### Added
+- Dependency `@dnd-kit/core` + `@dnd-kit/utilities` for the kanban drag-and-drop (first runtime UI dep in the monolith; see `docs/adr/0001-dnd-kit-kanban-board.md`).
+- `CONTEXT.md` (domain glossary) and `docs/adr/` (first ADR).
+- Bilingual strings: `navTodo`, `todoDetailTitle`, `todoEmptyColumn` (`T.en`/`T.zh`).
+
 ## [2026-06-22]
 
 ### Added

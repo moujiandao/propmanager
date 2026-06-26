@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, Fragment } from "react";
+import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { createClient } from '@/lib/supabase/client';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
@@ -31,7 +33,7 @@ const T = {
     appName: "PropManager", landlord: "Landlord", tenant: "Tenant", signIn: "Sign In",
     email: "Email", password: "Password", logout: "Logout", cancel: "Cancel", note: "Note",
     navDashboard: "Dashboard", navProperties: "Properties", navTenants: "Tenants",
-    navLeases: "Leases", navPayments: "Payments", navMaintenance: "Maintenance", navEmail: "Email Automation",
+    navLeases: "Leases", navPayments: "Payments", navMaintenance: "Maintenance", navTodo: "To Do List", navEmail: "Email Automation",
     dashTitle: "Dashboard", dashSubtitle: "Good morning! Here's your portfolio overview.",
     dashSummaryTitle: "What needs your attention", dashSummaryGenerate: "Generate Summary", dashSummaryRegenerate: "Regenerate",
     dashSummaryLoading: "Thinking…", dashSummaryEmpty: "Click Generate Summary to get a quick read on what needs your attention this week.",
@@ -66,8 +68,9 @@ const T = {
     createLease: "Create Lease",
     payTitle: "Payments", paySubtitle: "ACH payment tracking across all tenants",
     filterAll: "All", typeRecurring: "Recurring", typeOneTime: "One-time", naLabel: "N/A",
-    maintTitle: "Maintenance Requests", maintSubtitle: (n) => `${n} open requests`,
+    maintTitle: "To Do List", maintSubtitle: (n) => `${n} open requests`,
     maintNewRequest: "New Request",
+    todoDetailTitle: "Request Details", todoEmptyColumn: "Nothing here",
     priorityHigh: "high priority", priorityMedium: "medium priority", priorityLow: "low priority",
     statusOpen: "Open", statusInProgress: "In Progress", statusResolved: "Resolved",
     statusNew: "New", statusClosed: "Closed",
@@ -265,7 +268,7 @@ const T = {
     appName: "房产管理", landlord: "房东", tenant: "租客", signIn: "登录",
     email: "电子邮件", password: "密码", logout: "退出登录", cancel: "取消", note: "备注",
     navDashboard: "控制台", navProperties: "房产", navTenants: "租客",
-    navLeases: "合同", navPayments: "付款", navMaintenance: "维修", navEmail: "邮件自动化",
+    navLeases: "合同", navPayments: "付款", navMaintenance: "维修", navTodo: "待办事项", navEmail: "邮件自动化",
     dashTitle: "控制台", dashSubtitle: "早上好！以下是您的房产组合概览。",
     dashSummaryTitle: "需要关注的事项", dashSummaryGenerate: "生成摘要", dashSummaryRegenerate: "重新生成",
     dashSummaryLoading: "生成中…", dashSummaryEmpty: "点击「生成摘要」快速了解本周需要关注的事项。",
@@ -300,8 +303,9 @@ const T = {
     createLease: "创建租约",
     payTitle: "付款管理", paySubtitle: "所有租客的ACH付款追踪",
     filterAll: "全部", typeRecurring: "自动续费", typeOneTime: "单次付款", naLabel: "不适用",
-    maintTitle: "维修请求", maintSubtitle: (n) => `${n} 个待处理请求`,
+    maintTitle: "待办事项", maintSubtitle: (n) => `${n} 个待处理请求`,
     maintNewRequest: "新建请求",
+    todoDetailTitle: "请求详情", todoEmptyColumn: "暂无",
     priorityHigh: "高优先级", priorityMedium: "中优先级", priorityLow: "低优先级",
     statusOpen: "待处理", statusInProgress: "处理中", statusResolved: "已解决",
     statusNew: "新建", statusClosed: "已关闭",
@@ -640,7 +644,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
     { id: "properties", label: t.navProperties, icon: "building" },
     { id: "tenants", label: t.navTenants, icon: "users" },
     { id: "payments", label: t.navPayments, icon: "dollar" },
-    { id: "maintenance", label: t.navMaintenance, icon: "wrench" },
+    { id: "maintenance", label: t.navTodo, icon: "wrench" },
   ];
   const landlordBottomNav = [
     { id: "contracts", label: t.navLeases, icon: "file" },
@@ -2718,6 +2722,64 @@ const commentLinkStyle = { background: "none", border: "none", padding: 0, curso
 const commentInputStyle = { flex: 1, padding: "8px 12px", border: "1px solid #eaeaea", borderRadius: 8, fontSize: 13, color: "#111111", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
 const commentSendStyle = (disabled) => ({ padding: "8px 16px", borderRadius: 8, border: "none", background: disabled ? "#eaeaea" : "#111111", color: disabled ? "#9ca3af" : "#fff", fontSize: 13, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 });
 
+// ─── TO DO LIST (kanban) ────────────────────────────────────────────────────
+// Board over the existing maintenance_requests. Stored status values are unchanged
+// (new / in-progress / closed, plus legacy resolved/open); these map onto three
+// columns. Dragging a card to a column writes that column's status.
+const TODO_COLUMNS = [
+  { key: "new", tKey: "statusNew" },
+  { key: "in-progress", tKey: "statusInProgress" },
+  { key: "closed", tKey: "statusClosed" },
+];
+const todoColumnOf = (status) =>
+  status === "in-progress" ? "in-progress" : (status === "closed" || status === "resolved" ? "closed" : "new");
+
+const TodoCard = ({ request, tenantName, sub, typeText, priorityColor, commentCount, attachmentCount, onOpen }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: request.id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={() => onOpen(request.id)}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.4 : 1,
+        background: "#fff", borderRadius: 10, border: "1px solid #eee",
+        padding: "12px 14px", display: "flex", gap: 10, alignItems: "stretch",
+        cursor: "grab", boxShadow: "0 1px 2px rgba(0,0,0,.04)", touchAction: "none",
+      }}>
+      <div style={{ width: 3, borderRadius: 3, background: priorityColor || "#eaeaea", flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: "0 0 6px", fontSize: 14, color: "#111111", fontWeight: 500, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{request.description}</p>
+        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{tenantName}</div>
+        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: typeText || commentCount || attachmentCount ? 8 : 0 }}>{sub}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {typeText && <span style={{ background: "#f3f4f6", color: "#111111", padding: "1px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>{typeText}</span>}
+          {commentCount > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, color: "#9ca3af" }}><Icon name="mail" size={12} />{commentCount}</span>}
+          {attachmentCount > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, color: "#9ca3af" }}><Icon name="file" size={12} />{attachmentCount}</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TodoColumn = ({ id, title, count, emptyText, children }) => {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div style={{ flex: "1 0 300px", minWidth: 300, display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 4px 12px" }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#111111" }}>{title}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", background: "#f3f4f6", borderRadius: 99, padding: "1px 9px" }}>{count}</span>
+      </div>
+      <div ref={setNodeRef} style={{ background: isOver ? "#f0f0f0" : "#fafafa", borderRadius: 12, padding: 10, display: "grid", gap: 10, alignContent: "start", minHeight: 120, flex: 1, transition: "background .15s" }}>
+        {children}
+        {count === 0 && <div style={{ textAlign: "center", padding: "24px 0", color: "#cbcbcb", fontSize: 13 }}>{emptyText}</div>}
+      </div>
+    </div>
+  );
+};
+
 const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ tenantId: "", status: "new", type: "", description: "", descriptionZh: "" });
@@ -2729,8 +2791,19 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const [submitting, setSubmitting] = useState(false);
   const [translateState, setTranslateState] = useState("idle");
   const [cardTranslating, setCardTranslating] = useState({});
+  const [detailId, setDetailId] = useState(null);
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const fileInputRef = useRef(null);
+
+  // A few px of movement before a drag begins, so a click opens the card detail
+  // and only an actual drag moves it between columns.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const onDragEnd = ({ active, over }) => {
+    if (!over) return;
+    const m = data.maintenance.find(x => x.id === active.id);
+    if (!m || todoColumnOf(m.status) === over.id) return;
+    updateStatus(active.id, over.id);
+  };
 
   const selectedTenant = data.tenants.find(ten => ten.id === form.tenantId);
   const selectedUnit = selectedTenant
@@ -2842,78 +2915,96 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
     <div>
       <PageHeader title={t.maintTitle} subtitle={t.maintSubtitle(data.maintenance.filter(m => m.status !== "closed" && m.status !== "resolved").length)} action={<Btn icon="plus" onClick={() => { resetModal(); setShowModal(true); }}>{t.maintNewRequest}</Btn>} />
 
-      {/* Request list */}
-      <div style={{ display: "grid", gap: 14 }}>
-        {data.maintenance.map(m => {
-          const ten = data.tenants.find(ten => ten.id === m.tenantId);
-          const prop = data.properties.find(p => p.id === m.propertyId);
-          const attachments = (data.maintenanceAttachments || []).filter(a => a.maintenanceRequestId === m.id);
-          return (
-            <div key={m.id} style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #f5f5f5", display: "flex", gap: 18, alignItems: "flex-start" }}>
-              <div style={{ width: 4, borderRadius: 4, alignSelf: "stretch", background: pColors[m.priority] || "#eaeaea", flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
-                      <p style={{ margin: 0, fontSize: 15, color: "#111111", fontWeight: 500, flex: 1 }}>{m.description}</p>
-                      {!m.descriptionZh && (
-                        <button
-                          onClick={async () => {
-                            setCardTranslating(s => ({ ...s, [m.id]: true }));
-                            try {
-                              const res = await fetch("/api/maintenance/translate", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ text: m.description, landlordId: user.id }),
-                              });
-                              const json = await res.json();
-                              if (res.ok && json.translation) {
-                                await supabase.from("maintenance_requests").update({ description_zh: json.translation }).eq("id", m.id);
-                                setData(d => ({ ...d, maintenance: d.maintenance.map(x => x.id === m.id ? { ...x, descriptionZh: json.translation } : x) }));
-                              }
-                            } finally {
-                              setCardTranslating(s => ({ ...s, [m.id]: false }));
-                            }
-                          }}
-                          disabled={cardTranslating[m.id]}
-                          style={{ fontSize: 11, fontWeight: 600, color: cardTranslating[m.id] ? "#9ca3af" : "#111111", background: "none", border: "1px solid #e5e5e5", borderRadius: 6, padding: "3px 9px", cursor: cardTranslating[m.id] ? "not-allowed" : "pointer", whiteSpace: "nowrap", fontFamily: "inherit", flexShrink: 0 }}>
-                          {cardTranslating[m.id] ? t.maintTranslating : t.maintTranslateChinese}
-                        </button>
-                      )}
-                    </div>
-                    {m.descriptionZh && <p style={{ margin: "0 0 6px", fontSize: 13, color: "#000000", background: "#f5f5f5", borderRadius: 7, padding: "7px 10px" }}>{m.descriptionZh}</p>}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 13, color: "#6b7280", marginBottom: attachments.length ? 10 : 0 }}>
-                      <span>{ten ? tenantFullName(ten) : "—"}</span>
-                      <span>{prop?.address}{m.unit ? ` · ${m.unit}` : ""}</span>
-                      <span>{fmtDate(m.date)}</span>
-                      {m.priority && <span style={{ color: pColors[m.priority], fontWeight: 600 }}>{pLabels[m.priority]}</span>}
-                      {m.type && <span style={{ background: "#f3f4f6", color: "#111111", padding: "1px 8px", borderRadius: 99, fontSize: 12, fontWeight: 600 }}>{m.type}</span>}
-                    </div>
-                    {attachments.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
-                        {attachments.map(att => (
-                          <AttachmentChip key={att.id} att={att} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
-                    <Badge status={m.status} t={t} />
-                    <select value={m.status} onChange={e => updateStatus(m.id, e.target.value)}
-                      style={{ padding: "6px 10px", border: "1px solid #eaeaea", borderRadius: 8, fontSize: 12, color: "#374151", cursor: "pointer", fontFamily: "inherit", outline: "none" }}>
-                      <option value="new">{t.statusNew}</option>
-                      <option value="in-progress">{t.statusInProgress}</option>
-                      <option value="closed">{t.statusClosed}</option>
-                    </select>
-                  </div>
-                </div>
-                <CommentThread request={m} comments={data.maintenanceComments || []} viewer={commentViewer} setData={setData} L={commentLabels} />
-              </div>
+      {/* Kanban board */}
+      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+        <div style={{ display: "flex", gap: 16, alignItems: "flex-start", overflowX: "auto", paddingBottom: 8 }}>
+          {TODO_COLUMNS.map(col => {
+            const cards = data.maintenance.filter(m => todoColumnOf(m.status) === col.key);
+            return (
+              <TodoColumn key={col.key} id={col.key} title={t[col.tKey]} count={cards.length} emptyText={t.todoEmptyColumn}>
+                {cards.map(m => {
+                  const ten = data.tenants.find(ten => ten.id === m.tenantId);
+                  const prop = data.properties.find(p => p.id === m.propertyId);
+                  const attachmentCount = (data.maintenanceAttachments || []).filter(a => a.maintenanceRequestId === m.id).length;
+                  const commentCount = (data.maintenanceComments || []).filter(c => c.maintenanceRequestId === m.id && !c.deletedAt).length;
+                  const sub = `${prop?.address || "—"}${m.unit ? ` · ${m.unit}` : ""} · ${fmtDate(m.date)}`;
+                  return (
+                    <TodoCard key={m.id} request={m} tenantName={ten ? tenantFullName(ten) : "—"} sub={sub}
+                      typeText={m.type} priorityColor={pColors[m.priority]} commentCount={commentCount}
+                      attachmentCount={attachmentCount} onOpen={setDetailId} />
+                  );
+                })}
+              </TodoColumn>
+            );
+          })}
+        </div>
+      </DndContext>
+
+      {/* Card detail modal */}
+      {detailId && (() => {
+        const m = data.maintenance.find(x => x.id === detailId);
+        if (!m) return null;
+        const ten = data.tenants.find(ten => ten.id === m.tenantId);
+        const prop = data.properties.find(p => p.id === m.propertyId);
+        const attachments = (data.maintenanceAttachments || []).filter(a => a.maintenanceRequestId === m.id);
+        return (
+          <Modal title={t.todoDetailTitle} onClose={() => setDetailId(null)} wide>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
+              <p style={{ margin: 0, fontSize: 16, color: "#111111", fontWeight: 600, flex: 1, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{m.description}</p>
+              {!m.descriptionZh && (
+                <button
+                  onClick={async () => {
+                    setCardTranslating(s => ({ ...s, [m.id]: true }));
+                    try {
+                      const res = await fetch("/api/maintenance/translate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: m.description, landlordId: user.id }),
+                      });
+                      const json = await res.json();
+                      if (res.ok && json.translation) {
+                        await supabase.from("maintenance_requests").update({ description_zh: json.translation }).eq("id", m.id);
+                        setData(d => ({ ...d, maintenance: d.maintenance.map(x => x.id === m.id ? { ...x, descriptionZh: json.translation } : x) }));
+                      }
+                    } finally {
+                      setCardTranslating(s => ({ ...s, [m.id]: false }));
+                    }
+                  }}
+                  disabled={cardTranslating[m.id]}
+                  style={{ fontSize: 11, fontWeight: 600, color: cardTranslating[m.id] ? "#9ca3af" : "#111111", background: "none", border: "1px solid #e5e5e5", borderRadius: 6, padding: "3px 9px", cursor: cardTranslating[m.id] ? "not-allowed" : "pointer", whiteSpace: "nowrap", fontFamily: "inherit", flexShrink: 0 }}>
+                  {cardTranslating[m.id] ? t.maintTranslating : t.maintTranslateChinese}
+                </button>
+              )}
             </div>
-          );
-        })}
-        {data.maintenance.length === 0 && <div style={{ textAlign: "center", padding: 48, color: "#9ca3af", fontSize: 15 }}>{t.noMaintenance}</div>}
-      </div>
+            {m.descriptionZh && <p style={{ margin: "0 0 10px", fontSize: 14, color: "#000000", background: "#f5f5f5", borderRadius: 7, padding: "8px 11px", whiteSpace: "pre-wrap" }}>{m.descriptionZh}</p>}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 13, color: "#6b7280", margin: "8px 0 14px" }}>
+              <span>{ten ? tenantFullName(ten) : "—"}</span>
+              <span>{prop?.address}{m.unit ? ` · ${m.unit}` : ""}</span>
+              <span>{fmtDate(m.date)}</span>
+              {m.priority && <span style={{ color: pColors[m.priority], fontWeight: 600 }}>{pLabels[m.priority]}</span>}
+              {m.type && <span style={{ background: "#f3f4f6", color: "#111111", padding: "1px 8px", borderRadius: 99, fontSize: 12, fontWeight: 600 }}>{m.type}</span>}
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: attachments.length ? 14 : 4 }}>
+              <Badge status={m.status} t={t} />
+              <select value={m.status} onChange={e => updateStatus(m.id, e.target.value)}
+                style={{ padding: "6px 10px", border: "1px solid #eaeaea", borderRadius: 8, fontSize: 12, color: "#374151", cursor: "pointer", fontFamily: "inherit", outline: "none" }}>
+                <option value="new">{t.statusNew}</option>
+                <option value="in-progress">{t.statusInProgress}</option>
+                <option value="closed">{t.statusClosed}</option>
+                {/* Keep legacy stored values selectable so the control matches the Badge until the landlord re-files it */}
+                {m.status === "open" && <option value="open">{t.statusOpen}</option>}
+                {m.status === "resolved" && <option value="resolved">{t.statusResolved}</option>}
+              </select>
+            </div>
+            {attachments.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+                {attachments.map(att => <AttachmentChip key={att.id} att={att} />)}
+              </div>
+            )}
+            <CommentThread request={m} comments={data.maintenanceComments || []} viewer={commentViewer} setData={setData} L={commentLabels} />
+          </Modal>
+        );
+      })()}
 
       {/* New Request Modal */}
       {showModal && (

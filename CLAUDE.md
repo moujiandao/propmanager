@@ -27,7 +27,7 @@ A property management web application built with Next.js and Supabase. Provides 
 - `properties` - rental properties with address, type, unit count, Google Drive link
 - `contracts` - lease agreements between tenants and properties
 - `payments` - payment records with Stripe integration
-- `maintenance_requests` - tenant-submitted maintenance requests
+- `maintenance_requests` - tenant-submitted maintenance requests. The landlord views these as the **To Do List** kanban board (Trello-style, 3 columns New/In Progress/Closed via `@dnd-kit`); drag-to-move writes `status`. Stored status values are unchanged (`new`/`in-progress`/`closed` + legacy `resolved`/`open`); the board maps them onto columns. The tenant portal still shows a plain submit-and-track list. Nav label is split: landlord = `navTodo` ("To Do List"), tenant = `navMaintenance` ("Maintenance")
 - `email_settings` - landlord email automation config
 - `units` (Phase 2) - individual units per property with bed/bath/rent
 - `documents` (Phase 2) - uploaded files with AI-extracted metadata
