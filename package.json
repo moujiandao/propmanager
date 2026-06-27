@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test lib/email/*.test.mjs lib/docuseal/*.test.mjs lib/maintenance/*.test.mjs lib/tenant/*.test.mjs"
+    "test": "node --test lib/email/*.test.mjs lib/docuseal/*.test.mjs lib/maintenance/*.test.mjs lib/tenant/*.test.mjs lib/payment-reminders/*.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",

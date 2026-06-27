@@ -11,6 +11,10 @@ import * as maintStatus from '@/lib/maintenance/status';
 import { createTenantAdapter } from '@/lib/tenant/adapter';
 import { mapTenant } from '@/lib/tenant/mappers';
 import * as tenantOps from '@/lib/tenant/core';
+import { createPaymentReminderAdapter } from '@/lib/payment-reminders/adapter';
+import { mapEmailSettings } from '@/lib/payment-reminders/mappers';
+import { EMPTY_EMAIL_SETTINGS } from '@/lib/payment-reminders/constants';
+import * as reminderOps from '@/lib/payment-reminders/core';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -2637,6 +2641,22 @@ function useMaintenanceMutations(setData, { onError } = {}) {
   };
 }
 
+// Payment-reminder settings writes behind the lib/payment-reminders seam.
+// setReminder is optimistic (toggle flips instantly) with rollback on failure;
+// the field→column mapping lives in the core, not here.
+function useEmailSettingsMutations(setData) {
+  const adapter = createPaymentReminderAdapter(supabase);
+  return {
+    setReminder: async (field, value) => {
+      let prev;
+      setData(d => { prev = d.emailSettings; return { ...d, emailSettings: { ...d.emailSettings, [field]: value } }; });
+      try { await reminderOps.setReminderField(adapter, field, value); }
+      catch (e) { setData(d => ({ ...d, emailSettings: prev })); console.error("[payment-reminders]", e); }
+    },
+    saveTemplates: (templates) => reminderOps.saveTemplates(adapter, templates),
+  };
+}
+
 // Tenant self-service profile writes behind the lib/tenant seam. These call
 // refresh()/setUser at the call site (not optimistic setData), so the hook just
 // builds the adapter and exposes the typed ops — no React state coupling.
@@ -3181,14 +3201,11 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
 // ─── EMAIL PAGE ───────────────────────────────────────────────────────────────
 const EmailPage = ({ data, setData, t, refresh }) => {
   const s = data.emailSettings;
-  const KEY_MAP = { fiveDayReminder: "five_day_reminder", dayOfReminder: "day_of_reminder", oneDayOverdue: "one_day_overdue", threeDayOverdue: "three_day_overdue", sevenDayOverdue: "seven_day_overdue" };
-  const updS = async (k, v) => {
-    setData(d => ({...d, emailSettings:{...d.emailSettings,[k]:v}}));
-    await supabase.from("email_settings").upsert({ [KEY_MAP[k]]: v }, { onConflict: "landlord_id" });
-  };
+  const reminderMx = useEmailSettingsMutations(setData);
+  const updS = (k, v) => reminderMx.setReminder(k, v);
   const updT = (k, v) => setData(d => ({...d, emailSettings:{...d.emailSettings,templates:{...d.emailSettings.templates,[k]:v}}}));
   const saveTemplate = async () => {
-    await supabase.from("email_settings").upsert({ templates: s.templates }, { onConflict: "landlord_id" });
+    try { await reminderMx.saveTemplates(s.templates); } catch (e) { console.error("[payment-reminders] saveTemplates", e); }
     setEditing(null);
   };
   const [editing, setEditing] = useState(null);
@@ -3895,16 +3912,7 @@ const TenantProfilePage = ({ user, setUser }) => {
 };
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-const EMPTY_EMAIL_SETTINGS = {
-  fiveDayReminder: false, dayOfReminder: false, oneDayOverdue: false, threeDayOverdue: false, sevenDayOverdue: false,
-  templates: {
-    fiveDayReminder: "Dear {tenant_name},\n\nThis is a friendly reminder that your rent payment of ${amount} is due in 5 days on {due_date}.\n\nThank you,\n{landlord_name}",
-    dayOfReminder: "Dear {tenant_name},\n\nYour rent payment of ${amount} is due today, {due_date}.\n\nThank you,\n{landlord_name}",
-    oneDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} was due yesterday. Please make your payment as soon as possible.\n\nThank you,\n{landlord_name}",
-    threeDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} is now 3 days overdue. Please contact us immediately.\n\nThank you,\n{landlord_name}",
-    sevenDayOverdue: "Dear {tenant_name},\n\nYour rent payment of ${amount} is now 7 days overdue. This is your final reminder before additional action is taken.\n\n{landlord_name}",
-  }
-};
+// EMPTY_EMAIL_SETTINGS now lives in lib/payment-reminders/constants (imported at top).
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -3979,11 +3987,7 @@ export default function App() {
   // mapMaintenance / -Type / -Attachment / -Comment now live in lib/maintenance/mappers (imported at top) — one home for the aggregate's shape.
   const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
   const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, contractId: d.contract_id || null, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at, driveLink: d.drive_link || null })
-  const mapEmailSettings = (e) => !e ? EMPTY_EMAIL_SETTINGS : ({
-    fiveDayReminder: e.five_day_reminder || false, dayOfReminder: e.day_of_reminder || false,
-    oneDayOverdue: e.one_day_overdue || false, threeDayOverdue: e.three_day_overdue || false,
-    sevenDayOverdue: e.seven_day_overdue || false, templates: e.templates || EMPTY_EMAIL_SETTINGS.templates,
-  });
+  // mapEmailSettings now lives in lib/payment-reminders/mappers (imported at top).
   const mapEmailTemplate = (e) => ({ id: e.id, name: e.name, subject: e.subject || "", bodyHtml: e.body_html || "", bodyText: e.body_text || "", updatedAt: e.updated_at, createdAt: e.created_at });
   const mapEmailAutomation = (a) => ({ id: a.id, name: a.name, eventType: a.event_type, offsetDays: a.offset_days || [], templateId: a.template_id || null, scope: a.scope || null, enabled: a.enabled || false });
   const mapEmailMessage = (m) => ({ id: m.id, direction: m.direction, automationId: m.automation_id || null, templateId: m.template_id || null, tenantId: m.tenant_id || null, eventType: m.event_type || null, eventDate: m.event_date || null, toEmail: m.to_email || "", subject: m.subject || "", bodyHtml: m.body_html || "", bodyText: m.body_text || "", status: m.status, deliveredAt: m.delivered_at || null, openedAt: m.opened_at || null, repliedAt: m.replied_at || null, replyToMessageId: m.reply_to_message_id || null, isTest: m.is_test || false, createdAt: m.created_at });
