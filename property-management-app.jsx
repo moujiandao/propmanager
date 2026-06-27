@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { createSupabaseAdapter } from '@/lib/maintenance/adapter';
 import { mapMaintenance, mapMaintenanceType, mapMaintenanceAttachment, mapMaintenanceComment } from '@/lib/maintenance/mappers';
 import * as maint from '@/lib/maintenance/core';
+import * as maintStatus from '@/lib/maintenance/status';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -851,7 +852,7 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
   }, [user?.id, langReady]);
   const occupied = properties.filter(p => p.status === "occupied").length;
   const pendingPayments = payments.filter(p => p.status === "pending" || p.status === "overdue");
-  const openMaint = maintenance.filter(m => m.status !== "closed" && m.status !== "resolved");
+  const openMaint = maintenance.filter(m => maintStatus.isOpen(m.status));
 
   const now = new Date();
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -2776,13 +2777,15 @@ const commentSendStyle = (disabled) => ({ padding: "8px 16px", borderRadius: 8, 
 // Board over the existing maintenance_requests. Stored status values are unchanged
 // (new / in-progress / closed, plus legacy resolved/open); these map onto three
 // columns. Dragging a card to a column writes that column's status.
+// Column keys + their bilingual label tokens. The key→column logic and the
+// open-status predicate live in lib/maintenance/status (columnOf/isOpen),
+// shared with the dashboard counts and the server create route so they can't drift.
 const TODO_COLUMNS = [
   { key: "new", tKey: "statusNew" },
   { key: "in-progress", tKey: "statusInProgress" },
   { key: "closed", tKey: "statusClosed" },
 ];
-const todoColumnOf = (status) =>
-  status === "in-progress" ? "in-progress" : (status === "closed" || status === "resolved" ? "closed" : "new");
+const todoColumnOf = maintStatus.columnOf;
 
 const TodoCard = ({ request, tenantName, sub, typeText, priorityColor, commentCount, attachmentCount, onOpen }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: request.id });
@@ -2956,7 +2959,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
 
   return (
     <div>
-      <PageHeader title={t.maintTitle} subtitle={t.maintSubtitle(data.maintenance.filter(m => m.status !== "closed" && m.status !== "resolved").length)} action={<Btn icon="plus" onClick={() => { resetModal(); setShowModal(true); }}>{t.maintNewRequest}</Btn>} />
+      <PageHeader title={t.maintTitle} subtitle={t.maintSubtitle(data.maintenance.filter(m => maintStatus.isOpen(m.status)).length)} action={<Btn icon="plus" onClick={() => { resetModal(); setShowModal(true); }}>{t.maintNewRequest}</Btn>} />
 
       {/* Kanban board */}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
@@ -3227,7 +3230,7 @@ const TenantDashboard = ({ data, user }) => {
   const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const property = data.properties.find(p => p.id === tenant?.propertyId);
   const payments = data.payments.filter(p => p.tenantId === user.id).sort((a,b) => new Date(b.dueDate)-new Date(a.dueDate));
-  const openMaint = data.maintenance.filter(m => m.tenantId === user.id && m.status !== "closed" && m.status !== "resolved");
+  const openMaint = data.maintenance.filter(m => m.tenantId === user.id && maintStatus.isOpen(m.status));
 
   return (
     <div>

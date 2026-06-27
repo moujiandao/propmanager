@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { normalizeWriteStatus } from '@/lib/maintenance/status'
 
 export async function POST(request) {
   const supabase = createClient(
@@ -12,7 +13,7 @@ export async function POST(request) {
   const tenantId = formData.get('tenantId')
   const propertyId = formData.get('propertyId') || null
   const unit = formData.get('unit') || null
-  const status = formData.get('status') || 'new'
+  const status = normalizeWriteStatus(formData.get('status'))
   const type = formData.get('type') || null
   const description = formData.get('description')
   const descriptionZh = formData.get('descriptionZh') || null
