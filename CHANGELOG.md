@@ -3,6 +3,7 @@
 ## [2026-06-26]
 
 ### Added
+- `lib/format/` — canonical isomorphic formatting module (`fmt`, `fmtDate`, `daysBetween`), unit-tested via `npm test`. The one home for the currency/date formatters that were previously duplicated.
 - `lib/maintenance/` — isomorphic ESM module that is the persistence seam for the maintenance aggregate (request + comments + attachments + types). `core.js` (React-free write ops + the soft/hard-delete rule, adapter-injected), `adapter.js` (real adapter over the anon Supabase client + maintenance routes), `fake.js` (in-memory adapter for tests), `mappers.js` (the one home for the aggregate's camelCase shape). Unit-tested via `npm test`.
 - `lib/property/` — persistence seam for property writes (fourth entity slice). `core.js` (`createProperty`/`deleteProperty`/`setDriveLink`, React-free, adapter-injected), `adapter.js`/`fake.js`, `mappers.js` (`mapProperty`). The three direct `properties` writes (PropertiesPage add + delete, DocumentsPage drive-link save) now go through a `usePropertyMutations()` hook; edit + image-upload stay in their server routes. No direct `properties` writes remain in the monolith. Unit-tested.
 - `lib/payment-reminders/` — persistence seam for the older `email_settings` "Payment Reminders" feature (third entity slice; distinct from `lib/email` automation). `constants.js` (default settings shape + the camelCase-field→snake_case-column map that was the hardcoded `KEY_MAP` in `EmailPage`), `mappers.js` (`mapEmailSettings`), `core.js` (`setReminderField`/`saveTemplates`, React-free, adapter-injected), `adapter.js`/`fake.js`. `EmailPage` now writes through a `useEmailSettingsMutations()` hook (toggle is optimistic with rollback); no `KEY_MAP` or direct `email_settings` writes remain in the monolith. Unit-tested.
@@ -20,6 +21,9 @@
 - Dependency `@dnd-kit/core` + `@dnd-kit/utilities` for the kanban drag-and-drop (first runtime UI dep in the monolith; see `docs/adr/0001-dnd-kit-kanban-board.md`).
 - `CONTEXT.md` (domain glossary) and `docs/adr/` (first ADR).
 - Bilingual strings: `navTodo`, `todoDetailTitle`, `todoEmptyColumn` (`T.en`/`T.zh`).
+
+### Changed
+- Consolidated the duplicated `fmtDate` (byte-identical in three places, incl. the subtle YYYY-MM-DD timezone rule) and the monolith's `fmt` into `lib/format`. `property-management-app.jsx` and `renewal-components.jsx` now import from it; `lib/email/format.js` re-exports from it so the email module's existing imports are unchanged. Renewals keeps its `fmtMoney` (returns "—" for null) and `daysBetween(Date, Date)` (different signature) locally — deliberately not merged, since their contracts differ from the canonical versions.
 
 ## [2026-06-22]
 

@@ -2,19 +2,16 @@
 import { useState, useMemo } from 'react'
 import { Modal, Btn, Icon, PageHeader } from './property-management-app'
 import { deriveRenewalTerm, pickOriginalLeaseDate } from './lib/docuseal/renewal.js'
+import { fmtDate } from '@/lib/format'
 
 const card = { background: '#fff', borderRadius: 14, padding: 22, border: '1px solid #f5f5f5' }
 
 const PLACEHOLDER_DOMAIN = '@placeholder.local'
 
 // ─── Date helpers (date-only, no timezone drift) ──────────────────────────────
-// "YYYY-MM-DD" strings are treated as local calendar dates. fmtDate appends
-// T00:00:00 so they don't shift a day in negative-offset zones.
-const fmtDate = (d) => {
-  if (!d) return '—'
-  const iso = typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T00:00:00` : d
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+// fmtDate now comes from lib/format (shared). fmtMoney (returns "—" for null) and
+// daysBetween (operates on Date objects via toDate) keep their renewal-specific
+// contracts, so they stay local.
 const fmtMoney = (n) =>
   n == null || n === '' ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(Number(n))
 

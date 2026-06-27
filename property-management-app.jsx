@@ -21,6 +21,7 @@ import * as propertyOps from '@/lib/property/core';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
+import { fmt, fmtDate } from '@/lib/format';
 
 const supabase = createClient();
 
@@ -549,14 +550,8 @@ export const Icon = ({ name, size = 18 }) => {
 };
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
-const fmt = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
-const fmtDate = (d) => {
-  if (!d) return "—";
-  // Date-only strings ("YYYY-MM-DD") parse as UTC midnight by default, which renders as the previous day
-  // in negative-offset timezones. Append T00:00:00 so the value is interpreted as local midnight.
-  const iso = typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T00:00:00` : d;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-};
+// fmt / fmtDate now live in lib/format (imported at top) — the one home for the
+// currency/date formatters previously duplicated here, in renewals, and in lib/email.
 const tenantFullName = (ten) => [ten.name, ten.lastName].filter(Boolean).join(" ");
 
 const statusColors = {
