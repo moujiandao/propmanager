@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { createClient } from '@/lib/supabase/client';
+import { createSupabaseAdapter } from '@/lib/maintenance/adapter';
+import { mapMaintenance, mapMaintenanceType, mapMaintenanceAttachment, mapMaintenanceComment } from '@/lib/maintenance/mappers';
+import * as maint from '@/lib/maintenance/core';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -2559,6 +2562,77 @@ const AttachmentChip = ({ att }) => {
   );
 };
 
+// React-coupled wrapper over the maintenance core (lib/maintenance). It owns the
+// optimistic local-state updates + rollback that the core deliberately knows
+// nothing about: the core persists and returns/throws; this hook applies the
+// change to `data`, and on failure restores the exact prior snapshot and reports
+// the error. The single home for the rollback that 9 scattered writes lacked.
+function useMaintenanceMutations(setData, { onError } = {}) {
+  // Plain values — the React Compiler memoizes; manual useMemo/useCallback here
+  // conflicts with it. createSupabaseAdapter(supabase) is effectively stable.
+  const adapter = createSupabaseAdapter(supabase);
+  const report = (e) => { console.error("[maintenance]", e); onError?.(e); };
+
+  // Apply optimistically, persist, roll back on failure. Rollback restores ONLY
+  // the touched slice (via a functional updater), so a concurrent change to a
+  // different slice in flight isn't clobbered.
+  const optimistic = async (slice, applyFn, persistFn) => {
+    let prevSlice;
+    setData(d => { prevSlice = d[slice]; return applyFn(d); });
+    try { return await persistFn(); }
+    catch (e) { setData(d => ({ ...d, [slice]: prevSlice })); report(e); throw e; }
+  };
+
+  return {
+    // Optimistic (instant board move / thread change), with rollback.
+    setStatus: (id, status) => optimistic("maintenance",
+      d => ({ ...d, maintenance: d.maintenance.map(m => m.id === id ? { ...m, status } : m) }),
+      () => maint.setStatus(adapter, id, status),
+    ),
+    deleteComment: (comment, hasReplies) => {
+      const now = new Date().toISOString();
+      return optimistic("maintenanceComments",
+        d => ({ ...d, maintenanceComments: hasReplies
+          ? d.maintenanceComments.map(x => x.id === comment.id ? { ...x, deletedAt: now, body: "", bodyZh: "" } : x)
+          : d.maintenanceComments.filter(x => x.id !== comment.id) }),
+        () => maint.deleteComment(adapter, comment, hasReplies, now),
+      );
+    },
+    // Pessimistic (persist first, then reflect the real result), error surfaced.
+    addComment: async (input) => {
+      try {
+        const c = await maint.addComment(adapter, input);
+        setData(d => ({ ...d, maintenanceComments: [...(d.maintenanceComments || []), c] }));
+        return c;
+      } catch (e) { report(e); throw e; }
+    },
+    // Translate is best-effort and silent on failure (matching prior behavior):
+    // log to console but do NOT route through onError, so a failed translate
+    // never pops the comment-action error banner.
+    translateComment: async (comment) => {
+      try {
+        const t = await maint.translateComment(adapter, comment);
+        if (t) setData(d => ({ ...d, maintenanceComments: d.maintenanceComments.map(x => x.id === comment.id ? { ...x, bodyZh: t } : x) }));
+        return t;
+      } catch (e) { console.error("[maintenance] translateComment", e); return null; }
+    },
+    translateRequest: async (req) => {
+      try {
+        const t = await maint.translateRequest(adapter, req);
+        if (t) setData(d => ({ ...d, maintenance: d.maintenance.map(x => x.id === req.id ? { ...x, descriptionZh: t } : x) }));
+        return t;
+      } catch (e) { console.error("[maintenance] translateRequest", e); return null; }
+    },
+    addType: async (input) => {
+      const ty = await maint.addType(adapter, input);
+      setData(d => ({ ...d, maintenanceTypes: [...(d.maintenanceTypes || []), ty].sort((a, b) => a.name.localeCompare(b.name)) }));
+      return ty;
+    },
+    submitRequest: (input) => maint.submitRequest(adapter, input),
+    createRequest: (formData) => maint.createRequest(adapter, formData),
+  };
+}
+
 // Shared threaded-comment UI for a single maintenance request. Used by both the
 // landlord MaintenancePage and the tenant TenantMaintenancePage. `viewer` carries
 // the posting identity (author_id must equal auth.uid()); `L` is a localized label
@@ -2579,29 +2653,20 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
   const repliesOf = (id) => threadComments.filter(c => c.parentCommentId === id).sort(byDate);
   const liveCount = threadComments.filter(c => !c.deletedAt).length;
 
+  const mx = useMaintenanceMutations(setData, { onError: () => setError(L.error) });
+
   const insertComment = async (text, parentId) => {
     const trimmed = text.trim();
     if (!trimmed) return false;
     setError("");
     if (!viewer.landlordId) { setError(L.error); return false; }
-    const { data: inserted, error: insErr } = await supabase.from("maintenance_comments").insert({
-      maintenance_request_id: request.id,
-      parent_comment_id: parentId || null,
-      landlord_id: viewer.landlordId,
-      body: trimmed,
-      author_type: viewer.authorType,
-      author_id: viewer.authorId,
-      author_name: viewer.authorName,
-    }).select().single();
-    if (insErr || !inserted) { setError(L.error); return false; }
-    const mapped = {
-      id: inserted.id, maintenanceRequestId: request.id, parentCommentId: parentId || null,
-      landlordId: viewer.landlordId, body: trimmed, bodyZh: "",
-      authorType: viewer.authorType, authorId: viewer.authorId, authorName: viewer.authorName,
-      deletedAt: null, createdAt: inserted.created_at,
-    };
-    setData(d => ({ ...d, maintenanceComments: [...(d.maintenanceComments || []), mapped] }));
-    return true;
+    try {
+      await mx.addComment({
+        requestId: request.id, parentId: parentId || null, landlordId: viewer.landlordId,
+        body: trimmed, authorType: viewer.authorType, authorId: viewer.authorId, authorName: viewer.authorName,
+      });
+      return true;
+    } catch { return false; }
   };
 
   const postTop = async () => { setPosting(true); const ok = await insertComment(body, null); if (ok) setBody(""); setPosting(false); };
@@ -2610,15 +2675,7 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
   const translate = async (c) => {
     setTranslating(s => ({ ...s, [c.id]: true }));
     try {
-      const res = await fetch("/api/maintenance/translate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: c.body, landlordId: viewer.landlordId }),
-      });
-      const json = await res.json();
-      if (res.ok && json.translation) {
-        await supabase.from("maintenance_comments").update({ body_zh: json.translation }).eq("id", c.id);
-        setData(d => ({ ...d, maintenanceComments: d.maintenanceComments.map(x => x.id === c.id ? { ...x, bodyZh: json.translation } : x) }));
-      }
+      await mx.translateComment(c);
     } finally {
       setTranslating(s => ({ ...s, [c.id]: false }));
     }
@@ -2627,14 +2684,7 @@ const CommentThread = ({ request, comments, viewer, setData, L }) => {
   const remove = async (c) => {
     setConfirmId(null);
     const hasReplies = !c.parentCommentId && repliesOf(c.id).length > 0;
-    if (hasReplies) {
-      const stamp = new Date().toISOString();
-      await supabase.from("maintenance_comments").update({ deleted_at: stamp }).eq("id", c.id);
-      setData(d => ({ ...d, maintenanceComments: d.maintenanceComments.map(x => x.id === c.id ? { ...x, deletedAt: stamp, body: "", bodyZh: "" } : x) }));
-    } else {
-      await supabase.from("maintenance_comments").delete().eq("id", c.id);
-      setData(d => ({ ...d, maintenanceComments: d.maintenanceComments.filter(x => x.id !== c.id) }));
-    }
+    await mx.deleteComment(c, hasReplies).catch(() => {});
   };
 
   // author_id is always auth.uid() (landlord: user.authId; tenant: user.id,
@@ -2794,6 +2844,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const [detailId, setDetailId] = useState(null);
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const fileInputRef = useRef(null);
+  const mx = useMaintenanceMutations(setData);
 
   // A few px of movement before a drag begins, so a click opens the card detail
   // and only an actual drag moves it between columns.
@@ -2810,23 +2861,15 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
     ? (data.units.find(u => u.id === selectedTenant.unitId)?.unitNumber || selectedTenant.unit || "—")
     : "—";
 
-  const updateStatus = async (id, status) => {
-    setData(d => ({ ...d, maintenance: d.maintenance.map(m => m.id === id ? { ...m, status } : m) }));
-    await supabase.from("maintenance_requests").update({ status }).eq("id", id);
-  };
+  const updateStatus = (id, status) => mx.setStatus(id, status).catch(() => {});
 
   const addType = async () => {
     if (!newTypeName.trim() || !user?.id) return;
     setAddingType(true);
-    const { data: newType, error } = await supabase
-      .from("maintenance_types")
-      .insert({ landlord_id: user.id, name: newTypeName.trim() })
-      .select()
-      .single();
-    if (!error && newType) {
-      setData(d => ({ ...d, maintenanceTypes: [...(d.maintenanceTypes || []), { id: newType.id, name: newType.name }].sort((a, b) => a.name.localeCompare(b.name)) }));
-      setF("type", newType.name);
-    }
+    try {
+      const ty = await mx.addType({ landlordId: user.id, name: newTypeName });
+      setF("type", ty.name);
+    } catch { /* error logged to console; reset the add-type form either way */ }
     setNewTypeName("");
     setShowAddType(false);
     setAddingType(false);
@@ -2889,9 +2932,9 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
     if (form.descriptionZh) fd.append("descriptionZh", form.descriptionZh);
     fd.append("landlordId", user.id);
     files.forEach(({ file }) => fd.append("files", file));
-    const res = await fetch("/api/maintenance/create", { method: "POST", body: fd });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) { setSubmitError(json.error || "Something went wrong."); setSubmitting(false); return; }
+    try {
+      await mx.createRequest(fd);
+    } catch (e) { setSubmitError(e.message || "Something went wrong."); setSubmitting(false); return; }
     await refresh();
     setShowModal(false);
     resetModal();
@@ -2956,16 +2999,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
                   onClick={async () => {
                     setCardTranslating(s => ({ ...s, [m.id]: true }));
                     try {
-                      const res = await fetch("/api/maintenance/translate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: m.description, landlordId: user.id }),
-                      });
-                      const json = await res.json();
-                      if (res.ok && json.translation) {
-                        await supabase.from("maintenance_requests").update({ description_zh: json.translation }).eq("id", m.id);
-                        setData(d => ({ ...d, maintenance: d.maintenance.map(x => x.id === m.id ? { ...x, descriptionZh: json.translation } : x) }));
-                      }
+                      await mx.translateRequest({ id: m.id, description: m.description, landlordId: user.id });
                     } finally {
                       setCardTranslating(s => ({ ...s, [m.id]: false }));
                     }
@@ -3356,6 +3390,7 @@ const PaymentPortal = ({ data, setData, user, refresh }) => {
 const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
   const [form, setForm] = useState({ description: "", priority: "medium" });
   const [success, setSuccess] = useState(false);
+  const mx = useMaintenanceMutations(setData);
   const tenant = data.tenants.find(t => t.id === user.id);
   const myReqs = data.maintenance.filter(m => m.tenantId === user.id);
   const commentViewer = { authorType: "tenant", authorId: user.id, landlordId: tenant?.landlordId || null, authorName: tenant ? tenantFullName(tenant) : (user.name || user.email) };
@@ -3369,16 +3404,16 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
   };
   const submit = async () => {
     if (!form.description) return;
-    const { error } = await supabase.from("maintenance_requests").insert({
-      tenant_id: user.id, property_id: tenant?.propertyId, unit: tenant?.unit,
-      description: form.description, priority: form.priority, status: "new",
-    });
-    if (!error) {
-      await refresh();
-      setForm({description:"",priority:"medium"});
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    }
+    try {
+      await mx.submitRequest({
+        tenantId: user.id, propertyId: tenant?.propertyId, unit: tenant?.unit,
+        description: form.description, priority: form.priority,
+      });
+    } catch { return; }
+    await refresh();
+    setForm({description:"",priority:"medium"});
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
   };
   return (
     <div>
@@ -3919,10 +3954,7 @@ export default function App() {
   const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id, notes: t.notes || "", securityDeposit: t.security_deposit || 0, securityDepositRefunded: t.security_deposit_refunded || false, landlordId: t.landlord_id || null, createdAt: t.created_at || null, updatedAt: t.updated_at || null });
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
-  const mapMaintenance = (m) => ({ id: m.id, tenantId: m.tenant_id, propertyId: m.property_id, unit: m.unit, description: m.description, descriptionZh: m.description_zh || "", type: m.type || "", priority: m.priority, status: m.status, date: (m.created_at || m.date || "").split("T")[0] });
-  const mapMaintenanceType = (t) => ({ id: t.id, name: t.name });
-  const mapMaintenanceAttachment = (a) => ({ id: a.id, maintenanceRequestId: a.maintenance_request_id, fileName: a.file_name, filePath: a.file_path, fileType: a.file_type || "", fileSize: a.file_size || 0 });
-  const mapMaintenanceComment = (c) => ({ id: c.id, maintenanceRequestId: c.maintenance_request_id, parentCommentId: c.parent_comment_id || null, landlordId: c.landlord_id, body: c.body, bodyZh: c.body_zh || "", authorType: c.author_type, authorId: c.author_id, authorName: c.author_name || "", deletedAt: c.deleted_at || null, createdAt: c.created_at });
+  // mapMaintenance / -Type / -Attachment / -Comment now live in lib/maintenance/mappers (imported at top) — one home for the aggregate's shape.
   const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
   const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, contractId: d.contract_id || null, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at, driveLink: d.drive_link || null })
   const mapEmailSettings = (e) => !e ? EMPTY_EMAIL_SETTINGS : ({

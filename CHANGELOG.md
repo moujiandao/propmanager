@@ -1,6 +1,12 @@
 # Changelog
 
-## [2026-06-25]
+## [2026-06-26]
+
+### Added
+- `lib/maintenance/` — isomorphic ESM module that is the persistence seam for the maintenance aggregate (request + comments + attachments + types). `core.js` (React-free write ops + the soft/hard-delete rule, adapter-injected), `adapter.js` (real adapter over the anon Supabase client + maintenance routes), `fake.js` (in-memory adapter for tests), `mappers.js` (the one home for the aggregate's camelCase shape). Unit-tested via `npm test`.
+
+### Changed
+- `property-management-app.jsx`: the ~10 scattered direct `supabase.from(...)` maintenance writes (status, comment add/translate/soft+hard-delete, type add, tenant submit, request translate, create) now go through a `useMaintenanceMutations(setData)` hook that wraps the core and owns optimistic update + **rollback** (previously absent — a failed status drag left the card in the wrong column silently; rollback now restores the touched slice). `fetchAllData` imports the four maintenance mappers from `lib/maintenance/mappers` instead of defining them inline. No behavior change for callers beyond the added rollback. First slice of a per-entity data-access seam (architecture review candidate 1).
 
 ### Changed
 - Landlord "Maintenance" page reskinned as a Trello-style **To Do List** kanban board (`property-management-app.jsx`). Three columns (New / In Progress / Closed) over the existing `maintenance_requests`; drag a card between columns to set its status (reuses the optimistic `updateStatus`). No schema change — stored status values (`new`/`in-progress`/`closed`, plus legacy `resolved`/`open`) are unchanged; `resolved`/`closed` and any unknown status map to the Closed/New columns respectively. Cards open a detail modal carrying the full description, metadata, attachments, status dropdown, the per-request "Translate to Chinese" action (moved off the card face), and the existing `CommentThread`.
