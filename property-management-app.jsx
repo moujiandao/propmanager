@@ -2654,10 +2654,11 @@ function useEmailSettingsMutations(setData) {
   const adapter = createPaymentReminderAdapter(supabase);
   return {
     setReminder: async (field, value) => {
-      let prev;
-      setData(d => { prev = d.emailSettings; return { ...d, emailSettings: { ...d.emailSettings, [field]: value } }; });
+      let prevValue;
+      setData(d => { prevValue = d.emailSettings[field]; return { ...d, emailSettings: { ...d.emailSettings, [field]: value } }; });
       try { await reminderOps.setReminderField(adapter, field, value); }
-      catch (e) { setData(d => ({ ...d, emailSettings: prev })); console.error("[payment-reminders]", e); }
+      // Roll back only this field, so a concurrent toggle of another field isn't clobbered.
+      catch (e) { setData(d => ({ ...d, emailSettings: { ...d.emailSettings, [field]: prevValue } })); console.error("[payment-reminders]", e); }
     },
     saveTemplates: (templates) => reminderOps.saveTemplates(adapter, templates),
   };
@@ -3223,8 +3224,8 @@ const EmailPage = ({ data, setData, t, refresh }) => {
   const updS = (k, v) => reminderMx.setReminder(k, v);
   const updT = (k, v) => setData(d => ({...d, emailSettings:{...d.emailSettings,templates:{...d.emailSettings.templates,[k]:v}}}));
   const saveTemplate = async () => {
-    try { await reminderMx.saveTemplates(s.templates); } catch (e) { console.error("[payment-reminders] saveTemplates", e); }
-    setEditing(null);
+    try { await reminderMx.saveTemplates(s.templates); setEditing(null); }
+    catch (e) { console.error("[payment-reminders] saveTemplates", e); } // leave the editor open on failure
   };
   const [editing, setEditing] = useState(null);
   const reminders = [
@@ -3337,14 +3338,13 @@ const PaymentPortal = ({ data, setData, user, refresh }) => {
   const tenant = data.tenants.find(t => t.id === user.id);
   const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const toggleRecurring = async () => {
-    await tenantMx.setRecurringPayment(user.id, !tenant.recurringPayment);
-    await refresh();
+    try { await tenantMx.setRecurringPayment(user.id, !tenant.recurringPayment); await refresh(); }
+    catch (e) { console.error("[tenant] setRecurringPayment", e); }
   };
   const connectBank = async () => {
     if(!bankForm.routingNumber||!bankForm.accountNumber) return;
-    await tenantMx.setBankConnected(user.id);
-    await refresh();
-    setStep("overview");
+    try { await tenantMx.setBankConnected(user.id); await refresh(); setStep("overview"); }
+    catch (e) { console.error("[tenant] setBankConnected", e); }
   };
   const makePayment = async () => {
     const res = await fetch("/api/payments/create", {
@@ -3626,9 +3626,9 @@ const DocumentsPage = ({ data, refresh }) => {
 
   const save = async () => {
     setSaving(true); setMsg("");
-    try { await propertyMx.setDriveLink(selectedId, link); await refresh(); setMsg("Saved."); }
-    catch { setMsg("Failed to save."); }
-    setSaving(false);
+    try { await propertyMx.setDriveLink(selectedId, link); }
+    catch { setMsg("Failed to save."); setSaving(false); return; }
+    await refresh(); setMsg("Saved."); setSaving(false);
   };
 
   const embedUrl = toEmbedUrl(link);
