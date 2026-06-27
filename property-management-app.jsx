@@ -15,6 +15,9 @@ import { createPaymentReminderAdapter } from '@/lib/payment-reminders/adapter';
 import { mapEmailSettings } from '@/lib/payment-reminders/mappers';
 import { EMPTY_EMAIL_SETTINGS } from '@/lib/payment-reminders/constants';
 import * as reminderOps from '@/lib/payment-reminders/core';
+import { createPropertyAdapter } from '@/lib/property/adapter';
+import { mapProperty } from '@/lib/property/mappers';
+import * as propertyOps from '@/lib/property/core';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -1219,6 +1222,7 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
 
 // ─── PROPERTIES PAGE ──────────────────────────────────────────────────────────
 const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedPropertyId }) => {
+  const propertyMx = usePropertyMutations();
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ address: "", city: "", state: "CA", zip: "", units: "1", type: "Single Family", status: "vacant" });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
@@ -1257,11 +1261,13 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
   };
   const add = async () => {
     if (!form.address) return;
-    const { error } = await supabase.from("properties").insert({
-      landlord_id: user.id, address: form.address, city: form.city, state: form.state, zip: form.zip,
-      units: +form.units, type: form.type, status: form.status,
-    });
-    if (!error) { await refresh(); setShow(false); }
+    try {
+      await propertyMx.create({
+        landlordId: user.id, address: form.address, city: form.city, state: form.state, zip: form.zip,
+        units: form.units, type: form.type, status: form.status,
+      });
+    } catch { return; }
+    await refresh(); setShow(false);
   };
   const openEdit = (p, e) => {
     e.stopPropagation();
@@ -1286,8 +1292,8 @@ const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedP
     setEditing(null);
   };
   const deleteProperty = async () => {
-    const { error } = await supabase.from("properties").delete().eq("id", confirmDelete.id);
-    if (!error) { await refresh(); setConfirmDelete(null); }
+    try { await propertyMx.remove(confirmDelete.id); } catch { return; }
+    await refresh(); setConfirmDelete(null);
   };
 
   return (
@@ -2657,6 +2663,18 @@ function useEmailSettingsMutations(setData) {
   };
 }
 
+// Property writes behind the lib/property seam (create / delete / drive-link).
+// Call sites refresh() after, so no optimistic state coupling here. Edit +
+// image-upload remain in their server routes.
+function usePropertyMutations() {
+  const adapter = createPropertyAdapter(supabase);
+  return {
+    create: (fields) => propertyOps.createProperty(adapter, fields),
+    remove: (id) => propertyOps.deleteProperty(adapter, id),
+    setDriveLink: (id, link) => propertyOps.setDriveLink(adapter, id, link),
+  };
+}
+
 // Tenant self-service profile writes behind the lib/tenant seam. These call
 // refresh()/setUser at the call site (not optimistic setData), so the hook just
 // builds the adapter and exposes the typed ops — no React state coupling.
@@ -3593,6 +3611,7 @@ const toEmbedUrl = (link) => {
 };
 
 const DocumentsPage = ({ data, refresh }) => {
+  const propertyMx = usePropertyMutations();
   const [selectedId, setSelectedId] = useState(data.properties[0]?.id || "");
   const [link, setLink] = useState("");
   const [saving, setSaving] = useState(false);
@@ -3607,9 +3626,8 @@ const DocumentsPage = ({ data, refresh }) => {
 
   const save = async () => {
     setSaving(true); setMsg("");
-    const { error } = await supabase.from("properties").update({ drive_link: link.trim() || null }).eq("id", selectedId);
-    if (error) { setMsg("Failed to save."); }
-    else { await refresh(); setMsg("Saved."); }
+    try { await propertyMx.setDriveLink(selectedId, link); await refresh(); setMsg("Saved."); }
+    catch { setMsg("Failed to save."); }
     setSaving(false);
   };
 
@@ -3980,7 +3998,7 @@ export default function App() {
   }, []);
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
-  const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "", imageUrl: p.image_url || null });
+  // mapProperty now lives in lib/property/mappers (imported at top).
   // mapTenant now lives in lib/tenant/mappers (imported at top) — the one home for the tenant read-shape.
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
