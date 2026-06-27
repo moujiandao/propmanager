@@ -8,6 +8,9 @@ import { createSupabaseAdapter } from '@/lib/maintenance/adapter';
 import { mapMaintenance, mapMaintenanceType, mapMaintenanceAttachment, mapMaintenanceComment } from '@/lib/maintenance/mappers';
 import * as maint from '@/lib/maintenance/core';
 import * as maintStatus from '@/lib/maintenance/status';
+import { createTenantAdapter } from '@/lib/tenant/adapter';
+import { mapTenant } from '@/lib/tenant/mappers';
+import * as tenantOps from '@/lib/tenant/core';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -2634,6 +2637,18 @@ function useMaintenanceMutations(setData, { onError } = {}) {
   };
 }
 
+// Tenant self-service profile writes behind the lib/tenant seam. These call
+// refresh()/setUser at the call site (not optimistic setData), so the hook just
+// builds the adapter and exposes the typed ops — no React state coupling.
+function useTenantMutations() {
+  const adapter = createTenantAdapter(supabase);
+  return {
+    setRecurringPayment: (id, value) => tenantOps.setRecurringPayment(adapter, id, value),
+    setBankConnected: (id) => tenantOps.setBankConnected(adapter, id),
+    updateDisplayName: (id, name) => tenantOps.updateDisplayName(adapter, id, name),
+  };
+}
+
 // Shared threaded-comment UI for a single maintenance request. Used by both the
 // landlord MaintenancePage and the tenant TenantMaintenancePage. `viewer` carries
 // the posting identity (author_id must equal auth.uid()); `L` is a localized label
@@ -3283,15 +3298,16 @@ const PaymentPortal = ({ data, setData, user, refresh }) => {
   const [step, setStep] = useState("overview");
   const [bankForm, setBankForm] = useState({ routingNumber: "", accountNumber: "", accountName: "", accountType: "checking" });
   const [success, setSuccess] = useState(false);
+  const tenantMx = useTenantMutations();
   const tenant = data.tenants.find(t => t.id === user.id);
   const contract = data.contracts.find(c => c.tenantIds.includes(user.id));
   const toggleRecurring = async () => {
-    await supabase.from("tenant_profiles").update({ recurring_payment: !tenant.recurringPayment }).eq("id", user.id);
+    await tenantMx.setRecurringPayment(user.id, !tenant.recurringPayment);
     await refresh();
   };
   const connectBank = async () => {
     if(!bankForm.routingNumber||!bankForm.accountNumber) return;
-    await supabase.from("tenant_profiles").update({ bank_connected: true }).eq("id", user.id);
+    await tenantMx.setBankConnected(user.id);
     await refresh();
     setStep("overview");
   };
@@ -3768,6 +3784,7 @@ const TenantProfilePage = ({ user, setUser }) => {
   const cardStyle = { background: "#fff", borderRadius: 14, padding: 28, border: "1px solid #f5f5f5", marginBottom: 20 };
   const headStyle = { margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#111111", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", paddingBottom: 14, borderBottom: "1px solid #f5f5f5" };
   const msgStyle = (err) => ({ fontSize: 13, marginTop: 8, color: err ? "#ef4444" : "#22c55e" });
+  const tenantMx = useTenantMutations();
 
   // ── Name ──
   const [name, setName] = useState(user.name);
@@ -3776,9 +3793,11 @@ const TenantProfilePage = ({ user, setUser }) => {
   const saveName = async () => {
     if (!name.trim()) return;
     setNameSaving(true); setNameMsg({ text: "", error: false });
-    const { error } = await supabase.from("tenant_profiles").update({ name: name.trim() }).eq("id", user.id);
-    if (error) { setNameMsg({ text: error.message, error: true }); }
-    else { setUser(u => ({ ...u, name: name.trim() })); setNameMsg({ text: "Name updated.", error: false }); }
+    try {
+      const saved = await tenantMx.updateDisplayName(user.id, name);
+      setUser(u => ({ ...u, name: saved }));
+      setNameMsg({ text: "Name updated.", error: false });
+    } catch (e) { setNameMsg({ text: e.message, error: true }); }
     setNameSaving(false);
   };
 
@@ -3954,7 +3973,7 @@ export default function App() {
 
   // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
   const mapProperty  = (p) => ({ id: p.id, address: p.address, city: p.city, state: p.state || "CA", zip: p.zip, units: p.units, type: p.type, status: p.status, driveLink: p.drive_link || "", imageUrl: p.image_url || null });
-  const mapTenant    = (t) => ({ id: t.id, name: t.name, lastName: t.last_name || "", email: t.email, phone: t.phone || "", propertyId: t.property_id, unit: t.unit, status: t.status === "active" ? "current tenant" : t.status === "inactive" ? "previous tenant" : t.status || "current tenant", bankConnected: t.bank_connected || false, recurringPayment: t.recurring_payment || false, monthlyRent: t.monthly_rent || 0, moveInDate: t.move_in_date, moveOutDate: t.move_out_date, hasCosigner: t.has_cosigner || false, studentStatus: t.student_status, studentYear: t.student_year, zelleName: t.zelle_name, homeAddress: t.home_address, age: t.age, unitId: t.unit_id, notes: t.notes || "", securityDeposit: t.security_deposit || 0, securityDepositRefunded: t.security_deposit_refunded || false, landlordId: t.landlord_id || null, createdAt: t.created_at || null, updatedAt: t.updated_at || null });
+  // mapTenant now lives in lib/tenant/mappers (imported at top) — the one home for the tenant read-shape.
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   // mapMaintenance / -Type / -Attachment / -Comment now live in lib/maintenance/mappers (imported at top) — one home for the aggregate's shape.

@@ -4,6 +4,7 @@
 
 ### Added
 - `lib/maintenance/` — isomorphic ESM module that is the persistence seam for the maintenance aggregate (request + comments + attachments + types). `core.js` (React-free write ops + the soft/hard-delete rule, adapter-injected), `adapter.js` (real adapter over the anon Supabase client + maintenance routes), `fake.js` (in-memory adapter for tests), `mappers.js` (the one home for the aggregate's camelCase shape). Unit-tested via `npm test`.
+- `lib/tenant/` — persistence seam for tenant self-service profile writes (second entity slice). `core.js` (`setRecurringPayment`, `setBankConnected`, `updateDisplayName`, React-free, adapter-injected), `adapter.js` (real `updateProfile` over the anon client), `fake.js`, `mappers.js` (`mapTenant` — the one home for the tenant read-shape, the app's highest-touchpoint mapper; `fetchAllData` imports it). The tenant portal's three direct `tenant_profiles` writes now go through a `useTenantMutations()` hook → the core; no direct tenant writes remain in the monolith. Unit-tested.
 - `lib/maintenance/status.js` — the home for the maintenance Status vocabulary (`WRITE_STATUSES`, `COLUMNS`, `columnOf`, `isOpen`, `isWritableStatus`, `normalizeWriteStatus`), React-free + isomorphic. The board's column mapping, the dashboard "open requests" counts (landlord + tenant), and the server create route now all consume it so they can't drift; the create route validates/normalizes the incoming status instead of accepting any string (architecture review candidate 3). Unit-tested.
 
 ### Changed
