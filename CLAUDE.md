@@ -47,7 +47,7 @@ Note: `email_settings` (payment reminders) is a separate, older feature — the 
 ## Key Conventions
 - Naming: Next.js App Router conventions (page.js, layout.js, route.js)
 - Files: pages in `app/`, API routes in `app/api/`, shared code in `lib/`
-- Data mappers convert snake_case (Supabase) to camelCase (UI) in `property-management-app.jsx`
+- Data mappers convert snake_case (Supabase) to camelCase (UI). For **seamed** entities (maintenance, tenant, property, payment-reminders) the mapper is the one home in `lib/<entity>/mappers.js` and `fetchAllData` imports it; the remaining (un-seamed) entities still define their mapper inline in `fetchAllData` in `property-management-app.jsx`
 - Reusable UI components: Modal, Inp, Sel, Btn, Badge, Icon, PageHeader, StatCard, Toggle
 - Bilingual support: English and Chinese via T object (landlord UI only)
 - **Translation rule**: Every user-facing string in landlord UI JSX must be added to both `T.en` and `T.zh` in the T object at the top of `property-management-app.jsx` before use. Reference it as `t.keyName` — never hardcode visible text directly in JSX. When adding a new page or feature, add all its strings to both language blocks as the first step. This applies to **every** visible string the landlord can see: page titles, table headers, button labels, modal titles and bodies, confirmation prompts, empty-state messages, error/toast messages, badge text, placeholders, and tooltips. The only exceptions are dynamic data values from the database, brand names, and currency/date output already shaped by `fmt` / `fmtDate`.
@@ -55,6 +55,7 @@ Note: `email_settings` (payment reminders) is a separate, older feature — the 
 
 ## Non-Obvious Decisions
 - **Two routing models, by surface.** The public surfaces (marketing + auth, in route groups `(marketing)`/`(auth)`) are real Next.js route files with URL routing. The authed app is the opposite: the entire landlord/tenant UI lives in one JSX file (`property-management-app.jsx`), mounted at `/dashboard`, with **state-driven** navigation (`page` state variable), not per-view URLs. So "add a public page" = new route file; "add a dashboard view" = new case in `renderPage()`.
+- **Per-entity data-access seam.** Newer entity writes don't call `supabase.from(...)` inline in the monolith — they go through a `lib/<entity>/` module: a React-free `core.js` (write ops, takes an injected adapter), `adapter.js` (real, over the anon client) + `fake.js` (in-memory, for tests), and `mappers.js` (read-shape). The monolith calls the core via a `use<Entity>Mutations()` hook that owns the optimistic update + rollback. Done for `maintenance`, `tenant`, `property`, `payment-reminders`; the rest (payments, contracts, documents, units — mostly already routed) still write directly. **New write code for a seamed entity goes through its seam; new direct `supabase.from(...)` writes in the monolith are the thing this replaced.** Hooks use plain consts (the React Compiler memoizes — manual `useMemo`/`useCallback` triggers a "memoization could not be preserved" lint error).
 - `lib/supabase/server.js` uses the service role key (not anon key) for admin operations like creating/updating auth users.
 - Google Drive links are stored per-property in `properties.drive_link` and embedded as iframes. Phase 2 adds Supabase Storage for direct file uploads.
 - Tenant accounts are created by landlords via API (not self-service signup).
@@ -66,9 +67,13 @@ Note: `email_settings` (payment reminders) is a separate, older feature — the 
 - **Add a public (marketing/auth) page**: Create a route file under `app/(marketing)/` or `app/(auth)/`; reuse tokens from `lib/theme.js` and the `Logo` from `app/_brand.jsx` (keep marketing pages as server components so they don't pull in the client monolith)
 - **Add an API route**: Create `app/api/<route>/route.js`
 - **Add a data entity**: Add Supabase table, mapper function, fetch in `fetchAllData()`, and entry in `data` state
+- **Add/change a write for a seamed entity** (maintenance, tenant, property, payment-reminders): add the op to that entity's `lib/<entity>/core.js` (+ a test against `fake.js`), expose it on the `use<Entity>Mutations()` hook, and call the hook from the component — don't add a direct `supabase.from(...)` write
+- **Seam a new entity**: mirror `lib/maintenance/` — `core.js` + `adapter.js` + `fake.js` + `mappers.js` + `*.test.mjs`, a `use<Entity>Mutations()` hook in the monolith, point `fetchAllData` at the mapper, and add the test glob to `package.json`
 
 ## Do Not
 - Do not create separate Next.js page files for **authed app views** - use the state-driven navigation pattern in the monolith (mounted at `/dashboard`). This does NOT apply to the public marketing/auth surfaces, which are intentionally real route files.
 - Do not use the anon key in server-side API routes that need admin access (use service role key via `lib/supabase/server.js`)
+- Do not add new direct `supabase.from(...)` writes (or duplicate a snake→camel mapper) in the monolith for a **seamed** entity — route them through the entity's `lib/<entity>` seam + `use<Entity>Mutations()` hook
+- Do not duplicate the `fmt`/`fmtDate`/`daysBetween` formatters — import them from `lib/format` (the canonical home)
 - Do not drop existing `unit` text columns when adding `unit_id` foreign keys - keep both for backward compatibility
 - Do not hardcode visible strings in JSX - always add to T.en and T.zh first, then reference via `t.keyName`. Before reporting any landlord-UI change complete, grep your diff for hardcoded English strings (quoted text inside JSX, including `title=`, `placeholder=`, modal copy, error messages, and confirm dialogs). If you find any, add matching entries to both `T.en` and `T.zh` and replace the literals with `t.keyName`.
