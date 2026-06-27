@@ -277,6 +277,7 @@ const T = {
     docAttach: "Attach", docRemove: "Remove",
     editProperty: "Edit Property", driveFolderUrl: "Google Drive Folder URL",
     failedCreateLease: "Failed to create lease.", failedCreateTenant: "Failed to create tenant.",
+    tenantNameMoveInRequired: "First name and move-in date are required.",
   },
   zh: {
     appName: "房产管理", landlord: "房东", tenant: "租客", signIn: "登录",
@@ -512,6 +513,7 @@ const T = {
     docAttach: "附加", docRemove: "删除",
     editProperty: "编辑房产", driveFolderUrl: "Google Drive 文件夹链接",
     failedCreateLease: "创建租约失败。", failedCreateTenant: "创建租客失败。",
+    tenantNameMoveInRequired: "请填写名字和入住日期。",
   }
 };
 
@@ -1472,7 +1474,10 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   };
 
   const add = async () => {
-    if (!form.name || !form.moveInDate) return;
+    if (!form.name || !form.moveInDate) {
+      setAddError(t.tenantNameMoveInRequired);
+      return;
+    }
     setAddError("");
     setSaving(true);
     const res = await fetch("/api/auth/create-tenant", {
