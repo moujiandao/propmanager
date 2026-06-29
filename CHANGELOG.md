@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-06-28]
+
+### Added
+- `AGENTS.md` — thin pointer to `CLAUDE.md` so `AGENTS.md`-aware tools (e.g. Codex) load the same project guide. Replaces a stale standalone copy that had drifted from `CLAUDE.md`; the two are now single-sourced. Documented the convention in `CLAUDE.md` Architecture.
+
 ## [2026-06-26]
 
 ### Added
