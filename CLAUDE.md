@@ -24,6 +24,7 @@ A property management web application built with Next.js and Supabase. Provides 
 - **API routes**: `app/api/` for auth, payments, webhooks, and document operations
 - **Supabase clients**: `lib/supabase/server.js` (service role), `lib/supabase/client.js` (anon key)
 - **Auth callback**: `app/auth/callback/route.js` handles Supabase recovery/magic link flows
+- **Agent instructions**: `AGENTS.md` is a thin pointer to this file (so `AGENTS.md`-aware tools like Codex find the same guide). This `CLAUDE.md` is the single source of truth — do not duplicate content into `AGENTS.md`.
 
 ## Database Tables
 - `landlord_profiles` - landlord accounts; one row per **team**, not per auth user. Carries commercialization plan state: `plan` (default `'free'`, CHECK free/pro/business) + nullable `subscription_status`/`stripe_customer_id`/`stripe_subscription_id` placeholders for Phase 2 Stripe subscription billing (`scripts/add-landlord-plan.sql`). Billing logic + plan gating are not built yet (Phase 2/3)
