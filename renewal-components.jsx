@@ -5,6 +5,9 @@ import { deriveRenewalTerm, pickOriginalLeaseDate } from './lib/docuseal/renewal
 import { fmtDate } from '@/lib/format'
 
 const card = { background: '#fff', borderRadius: 14, padding: 22, border: '1px solid #f5f5f5' }
+const emptyState = { ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }
+const sectionHeading = { fontSize: 17, fontWeight: 700, color: '#111111', margin: '0 0 14px', fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }
+const redChip = { fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#fee2e2', color: '#991b1b' }
 
 const PLACEHOLDER_DOMAIN = '@placeholder.local'
 
@@ -66,7 +69,7 @@ const SignerRow = ({ name, email, t }) => {
       <span style={{ fontWeight: 600 }}>{name}</span>
       <span style={{ color: bad ? '#991b1b' : '#6b7280' }}>{email || t.renewalNoEmail}</span>
       {bad && (
-        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#fee2e2', color: '#991b1b' }}>
+        <span style={redChip}>
           {t.renewalFixEmail}
         </span>
       )}
@@ -169,7 +172,7 @@ const DueCard = ({ due, t, onPrepare }) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#111111' }}>{due.propertyAddress || t.renewalUnknownProperty}</div>
           {due.urgent && (
-            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#fee2e2', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '.4px' }}>{t.renewalUrgent}</span>
+            <span style={{ ...redChip, textTransform: 'uppercase', letterSpacing: '.4px' }}>{t.renewalUrgent}</span>
           )}
         </div>
         <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 10 }}>
@@ -249,9 +252,8 @@ export const RenewalsPage = ({ data, t, user, refresh }) => {
     return contracts
       .filter(c => c.endDate && (c.status === 'active' || !c.status))
       .map(c => {
-        const end = toDate(c.endDate)
-        const daysLeft = daysBetween(today, end)
-        return { contract: c, end, daysLeft }
+        const daysLeft = daysBetween(today, toDate(c.endDate))
+        return { contract: c, daysLeft }
       })
       .filter(x => x.daysLeft >= 0 && x.daysLeft <= 150 && !hasActiveRenewal(x.contract))
       .map(x => {
@@ -300,9 +302,9 @@ export const RenewalsPage = ({ data, t, user, refresh }) => {
       </div>
 
       <div style={{ marginBottom: 32 }}>
-        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#111111', margin: '0 0 14px', fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.renewalsDueHeading}</h2>
+        <h2 style={sectionHeading}>{t.renewalsDueHeading}</h2>
         {due.length === 0 ? (
-          <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.renewalsDueEmpty}</div>
+          <div style={emptyState}>{t.renewalsDueEmpty}</div>
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             {due.map(d => <DueCard key={d.contract.id} due={d} t={t} onPrepare={setPreparing} />)}
@@ -311,9 +313,9 @@ export const RenewalsPage = ({ data, t, user, refresh }) => {
       </div>
 
       <div>
-        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#111111', margin: '0 0 14px', fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{t.renewalsInFlightHeading}</h2>
+        <h2 style={sectionHeading}>{t.renewalsInFlightHeading}</h2>
         {inFlight.length === 0 ? (
-          <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.renewalsInFlightEmpty}</div>
+          <div style={emptyState}>{t.renewalsInFlightEmpty}</div>
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             {inFlight.map(x => (

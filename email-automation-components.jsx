@@ -1,14 +1,23 @@
 'use client'
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader } from './property-management-app'
-import { MERGE_TAGS, renderTemplate, buildContext, sampleContext } from '@/lib/email/merge'
+import { Modal, Inp, Sel, Btn, Icon, PageHeader } from './property-management-app'
+import { MERGE_TAGS, renderTemplate, sampleContext } from '@/lib/email/merge'
 import { EVENT_TYPES } from '@/lib/email/events'
 import { fmtDate } from '@/lib/email/format'
 
 const supabase = createClient()
 
 const card = { background: '#fff', borderRadius: 14, padding: 22, border: '1px solid #f5f5f5' }
+const emptyCard = { ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }
+const dangerBtn = { padding: '10px 20px', borderRadius: 9, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 600, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }
+const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 6, display: 'inline-flex' }
+const footerRow = { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }
+const errText = { color: '#ef4444', fontSize: 13, margin: '8px 0 0' }
+
+const fullName = (x) => [x.name, x.lastName].filter(Boolean).join(' ')
+const nl2br = (s) => s ? s.replace(/\n/g, '<br>') : ''
+const isActiveTenant = (x) => x.status === 'current tenant' || x.status === 'future tenant'
 
 // Strip tags to safe plaintext (used for externally-authored inbound reply bodies).
 const stripTags = (s) => !s ? '' : String(s).replace(/<br\s*\/?>(?=\s*)/gi, '\n').replace(/<[^>]+>/g, '')
@@ -85,7 +94,7 @@ const TemplateEditor = ({ initial, user, t, onClose, onSaved }) => {
           <MergeTagBar onInsert={insertTag} t={t} />
           <textarea ref={bodyRef} value={body} onChange={e => setBody(e.target.value)}
             style={{ width: '100%', minHeight: 220, padding: '12px 14px', border: '1px solid #eaeaea', borderRadius: 9, fontSize: 13, color: '#374151', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', outline: 'none', lineHeight: 1.6 }} />
-          {err && <p style={{ color: '#ef4444', fontSize: 13, margin: '8px 0 0' }}>{err}</p>}
+          {err && <p style={errText}>{err}</p>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
             <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
             <Btn onClick={save} disabled={saving}>{saving ? t.saving : t.save}</Btn>
@@ -112,8 +121,8 @@ const TestSendModal = ({ template, eventType, data, user, t, onClose }) => {
   const [result, setResult] = useState(null)
 
   const tenantOptions = [{ value: '', label: t.testSampleData },
-    ...(data.tenants || []).filter(x => x.status === 'current tenant' || x.status === 'future tenant')
-      .map(x => ({ value: x.id, label: [x.name, x.lastName].filter(Boolean).join(' ') }))]
+    ...(data.tenants || []).filter(isActiveTenant)
+      .map(x => ({ value: x.id, label: fullName(x) }))]
 
   const send = async () => {
     if (!toEmail.trim()) { setResult({ error: t.testRecipientRequired }); return }
@@ -135,9 +144,9 @@ const TestSendModal = ({ template, eventType, data, user, t, onClose }) => {
       <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 14px' }}>{t.testSendDesc}</p>
       <Inp label={t.testRecipient} value={toEmail} onChange={setToEmail} type="email" />
       <Sel label={t.testUseTenant} value={tenantId} onChange={setTenantId} options={tenantOptions} />
-      {result?.error && <p style={{ color: '#ef4444', fontSize: 13, margin: '8px 0 0' }}>{result.error}</p>}
+      {result?.error && <p style={errText}>{result.error}</p>}
       {result?.ok && <p style={{ color: '#22c55e', fontSize: 13, margin: '8px 0 0' }}>{t.testSent}</p>}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+      <div style={footerRow}>
         <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
         <Btn onClick={send} disabled={sending}>{sending ? t.sending : t.send}</Btn>
       </div>
@@ -164,7 +173,7 @@ const TemplatesTab = ({ data, user, t, refresh }) => {
         <Btn icon="plus" onClick={() => setEditing({})}>{t.newTemplate}</Btn>
       </div>
       {templates.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.noTemplates}</div>
+        <div style={emptyCard}>{t.noTemplates}</div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {templates.map(tpl => (
@@ -176,8 +185,7 @@ const TemplatesTab = ({ data, user, t, refresh }) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                 <Btn size="sm" variant="secondary" icon="mail" onClick={() => setTesting(tpl)}>{t.sendTest}</Btn>
                 <Btn size="sm" variant="ghost" icon="edit" onClick={() => setEditing(tpl)}>{t.edit}</Btn>
-                <button onClick={() => setConfirmDel(tpl)} title={t.deleteTemplate}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 6, display: 'inline-flex' }}>
+                <button onClick={() => setConfirmDel(tpl)} title={t.deleteTemplate} style={iconBtn}>
                   <Icon name="trash" size={16} />
                 </button>
               </div>
@@ -193,7 +201,7 @@ const TemplatesTab = ({ data, user, t, refresh }) => {
           <p style={{ fontSize: 14, color: '#374151', margin: '0 0 20px' }}>{t.confirmDeleteTemplate} <strong>{confirmDel.name}</strong>?</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <Btn variant="secondary" onClick={() => setConfirmDel(null)}>{t.cancel}</Btn>
-            <button onClick={del} style={{ padding: '10px 20px', borderRadius: 9, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 600, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>{t.deleteTemplate}</button>
+            <button onClick={del} style={dangerBtn}>{t.deleteTemplate}</button>
           </div>
         </Modal>
       )}
@@ -222,7 +230,7 @@ const BatchSendModal = ({ automation, data, user, t, onClose, refresh }) => {
   const tenants = data.tenants || []
   const tenantName = (id) => {
     const x = tenants.find(v => v.id === id)
-    return x ? ([x.name, x.lastName].filter(Boolean).join(' ') || t.batchNoName) : t.batchNoName
+    return x ? (fullName(x) || t.batchNoName) : t.batchNoName
   }
 
   // POST /api/email/batches — idempotent: resumes an existing draft if present.
@@ -273,7 +281,7 @@ const BatchSendModal = ({ automation, data, user, t, onClose, refresh }) => {
   // Persist subject and body independently so the two blur events fired by one
   // tab-out (body → subject) touch disjoint fields and can't stomp each other.
   const persistSubject = (m) => patch({ upserts: [{ id: m.id, subject: m.subject }] })
-  const persistBody = (m) => patch({ upserts: [{ id: m.id, bodyText: m.body_text, bodyHtml: m.body_text ? m.body_text.replace(/\n/g, '<br>') : '' }] })
+  const persistBody = (m) => patch({ upserts: [{ id: m.id, bodyText: m.body_text, bodyHtml: nl2br(m.body_text) }] })
 
   const removeRow = (id) => patch({ deleteIds: [id] })
 
@@ -303,13 +311,13 @@ const BatchSendModal = ({ automation, data, user, t, onClose, refresh }) => {
   }
 
   const first = messages[0]
-  const renderBody = (m) => m.body_html || (m.body_text ? m.body_text.replace(/\n/g, '<br>') : '')
+  const renderBody = (m) => m.body_html || nl2br(m.body_text)
 
   // Tenants not already in the batch, restricted to current/future like elsewhere.
   const inBatch = new Set(messages.map(m => m.tenant_id).filter(Boolean))
   const addOptions = [{ value: '', label: t.batchAddTenantPlaceholder },
-    ...tenants.filter(x => (x.status === 'current tenant' || x.status === 'future tenant') && !inBatch.has(x.id))
-      .map(x => ({ value: x.id, label: [x.name, x.lastName].filter(Boolean).join(' ') || t.batchNoName }))]
+    ...tenants.filter(x => isActiveTenant(x) && !inBatch.has(x.id))
+      .map(x => ({ value: x.id, label: fullName(x) || t.batchNoName }))]
 
   // ── Loading / error ─────────────────────────────────────────────────────────
   if (step === 'loading') {
@@ -337,7 +345,7 @@ const BatchSendModal = ({ automation, data, user, t, onClose, refresh }) => {
         <p style={{ fontSize: 15, color: '#111111', margin: '0 0 8px', fontWeight: 600 }}>
           {t.batchResultSummary(result.sent, result.failed, result.skipped)}
         </p>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+        <div style={footerRow}>
           <Btn onClick={onClose}>{t.batchDone}</Btn>
         </div>
       </Modal>
@@ -363,7 +371,7 @@ const BatchSendModal = ({ automation, data, user, t, onClose, refresh }) => {
           <div style={{ padding: '10px 14px', background: '#fafafa', borderBottom: '1px solid #eaeaea', fontSize: 13, fontWeight: 600, color: '#111111' }}>{first.subject || t.batchPreviewNoSubject}</div>
           <div style={{ padding: '16px 14px', fontSize: 14, color: '#111111', minHeight: 160 }} dangerouslySetInnerHTML={{ __html: renderBody(first) }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+        <div style={footerRow}>
           <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
           <Btn onClick={() => setStep('review')}>{t.batchContinue}</Btn>
         </div>
@@ -412,7 +420,7 @@ const BatchSendModal = ({ automation, data, user, t, onClose, refresh }) => {
 
       {errMsg && <p style={{ color: '#ef4444', fontSize: 13, margin: '4px 0 0' }}>{errMsg}</p>}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+      <div style={footerRow}>
         <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
         <Btn onClick={() => { setErrMsg(null); setConfirming(true) }} disabled={messages.length === 0 || saving}>{t.batchSendEmails}</Btn>
       </div>
@@ -428,8 +436,8 @@ const BatchSendModal = ({ automation, data, user, t, onClose, refresh }) => {
               </div>
             ))}
           </div>
-          {errMsg && <p style={{ color: '#ef4444', fontSize: 13, margin: '8px 0 0' }}>{errMsg}</p>}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+          {errMsg && <p style={errText}>{errMsg}</p>}
+          <div style={footerRow}>
             <Btn variant="secondary" onClick={() => setConfirming(false)} disabled={sending}>{t.cancel}</Btn>
             <Btn onClick={send} disabled={sending}>{sending ? t.batchSending : t.batchConfirmSend}</Btn>
           </div>
@@ -481,8 +489,8 @@ const AutomationEditor = ({ initial, data, user, t, onClose, onSaved }) => {
       <Sel label={t.automationTemplate} value={templateId} onChange={setTemplateId} options={templateOpts} />
       <Sel label={t.automationScopeProperty} value={propertyId} onChange={setPropertyId} options={propertyOpts} />
       <Sel label={t.automationScopeStatus} value={status} onChange={setStatus} options={statusOpts} />
-      {err && <p style={{ color: '#ef4444', fontSize: 13, margin: '8px 0 0' }}>{err}</p>}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+      {err && <p style={errText}>{err}</p>}
+      <div style={footerRow}>
         <Btn variant="secondary" onClick={onClose}>{t.cancel}</Btn>
         <Btn onClick={save} disabled={saving}>{saving ? t.saving : t.save}</Btn>
       </div>
@@ -507,7 +515,7 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
   const del = async () => { await supabase.from('email_automations').delete().eq('id', confirmDel.id); setConfirmDel(null); refresh() }
 
   if (templates.length === 0) {
-    return <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.automationsNeedTemplate}</div>
+    return <div style={emptyCard}>{t.automationsNeedTemplate}</div>
   }
 
   return (
@@ -516,7 +524,7 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
         <Btn icon="plus" onClick={() => setEditing({})}>{t.newAutomation}</Btn>
       </div>
       {automations.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.noAutomations}</div>
+        <div style={emptyCard}>{t.noAutomations}</div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {automations.map(a => (
@@ -531,7 +539,7 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
                 <Btn size="sm" icon="mail" onClick={() => setRunning(a)}>{t.runNow}</Btn>
                 <Btn size="sm" variant="secondary" icon="mail" onClick={() => setTesting(a)}>{t.sendTest}</Btn>
                 <Btn size="sm" variant="ghost" icon="edit" onClick={() => setEditing(a)}>{t.edit}</Btn>
-                <button onClick={() => setConfirmDel(a)} title={t.deleteAutomation} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 6, display: 'inline-flex' }}><Icon name="trash" size={16} /></button>
+                <button onClick={() => setConfirmDel(a)} title={t.deleteAutomation} style={iconBtn}><Icon name="trash" size={16} /></button>
                 <Toggle value={a.enabled} onChange={v => toggle(a, v)} />
               </div>
             </div>
@@ -547,7 +555,7 @@ const AutomationsTab = ({ data, user, t, refresh }) => {
           <p style={{ fontSize: 14, color: '#374151', margin: '0 0 20px' }}>{t.confirmDeleteAutomation} <strong>{confirmDel.name}</strong>?</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <Btn variant="secondary" onClick={() => setConfirmDel(null)}>{t.cancel}</Btn>
-            <button onClick={del} style={{ padding: '10px 20px', borderRadius: 9, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 600, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>{t.deleteAutomation}</button>
+            <button onClick={del} style={dangerBtn}>{t.deleteAutomation}</button>
           </div>
         </Modal>
       )}
@@ -576,7 +584,7 @@ const InboxTab = ({ data, t }) => {
   const [showTests, setShowTests] = useState(false)
   const messages = data.emailMessages || []
   const tenants = data.tenants || []
-  const tenantName = (id) => { const x = tenants.find(v => v.id === id); return x ? [x.name, x.lastName].filter(Boolean).join(' ') : '—' }
+  const tenantName = (id) => { const x = tenants.find(v => v.id === id); return x ? fullName(x) : '—' }
   const statusLabel = (s) => t[`st_${s}`] || s
 
   const outbound = messages.filter(m => m.direction === 'outbound' && (showTests || !m.isTest))
@@ -589,7 +597,7 @@ const InboxTab = ({ data, t }) => {
         <span style={{ fontSize: 13, color: '#6b7280' }}>{t.inboxShowTests}</span>
       </div>
       {outbound.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: 40 }}>{t.inboxEmpty}</div>
+        <div style={emptyCard}>{t.inboxEmpty}</div>
       ) : (
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #f5f5f5', overflow: 'hidden' }}>
           {outbound.map(m => {

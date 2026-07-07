@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-07-07]
+
+### Changed
+- Conservative, behavior-preserving simplification pass across the four UI files (`property-management-app.jsx`, `phase2-components.jsx`, `email-automation-components.jsx`, `renewal-components.jsx`) — 28 edits, +90/−77. Removed dead code (unused `daysUntilStart`, `setData` props on `ContractsPage`/`PropertiesPage`, unused `Badge`/`buildContext` imports, duplicate `T.en`/`T.zh` keys `st_failed`/`saving`, unread `due.end` field); collapsed no-op `cond ? "#111111" : "#111111"` ternaries and a needless template literal; hoisted repeated inline-style objects to file-level consts (`dangerIconBtnStyle`, `PRIORITY_COLORS`, `emptyCard`, `dangerBtn`, `iconBtn`, `footerRow`, `errText`, `docTypeBadgeColor`, `emptyState`, `sectionHeading`, `redChip`, etc.); extracted small local helpers (`fullName`, `nl2br`, `isActiveTenant`); replaced two local currency formatters in `phase2-components.jsx` with `import { fmt } from 'lib/format'`. No behavior change. Verified: `npm test` 72/72, `npm run build` clean, lint delta zero vs `main`. Writeup in `docs/simplification-pass-2026-07.md`.
+
+### Documentation
+- `CLAUDE.md` Key Conventions: added the inline-style dedupe convention (hoist repeated style objects to file-level consts; note that `<Btn style>` is silently dropped).
+
 ## [2026-06-28]
 
 ### Added

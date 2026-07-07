@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader } from './property-management-app'
+import { fmt } from '@/lib/format'
 
 const PdfViewer = dynamic(() => import('./components/pdf-viewer'), {
   ssr: false,
@@ -10,6 +11,8 @@ const PdfViewer = dynamic(() => import('./components/pdf-viewer'), {
 })
 
 const supabase = createClient()
+
+const docTypeBadgeColor = { application: '#0ea5e9', lease: '#111111', other: '#6b7280' }
 
 // ─── toEmbedUrl — converts Google Drive share URL to an embeddable URL ────────
 const toEmbedUrlDrive = (link) => {
@@ -70,8 +73,6 @@ export const DocViewer = ({ doc, onClose }) => {
     </div>
   )
 }
-
-const fmt = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n)
 
 const EMPTY_UNIT_FORM = { unitNumber: "", bedrooms: "1", bathrooms: "1", monthlyRent: "", status: "vacant" }
 
@@ -430,7 +431,9 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
   if (filterTenant) docs = docs.filter(d => d.tenantId === filterTenant)
   if (filterType) docs = docs.filter(d => d.documentType === filterType)
 
-  const docTypeBadgeColor = { application: '#0ea5e9', lease: '#111111', other: '#6b7280' }
+  const filterSelectStyle = { background: '#fff', color: '#111111', border: '1px solid #eaeaea', borderRadius: 8, padding: '8px 12px', fontSize: 14 }
+  const uploadLabelStyle = { display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }
+  const uploadSelectStyle = { width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #eaeaea', background: '#fff', color: '#111111', fontSize: 15 }
 
   return (
     <div style={{ padding: '24px 32px' }}>
@@ -443,15 +446,15 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={filterProperty} onChange={e => { setFilterProperty(e.target.value); setSyncResult(null); setSyncError(null); }} style={{ background: '#fff', color: '#111111', border: '1px solid #eaeaea', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
+        <select value={filterProperty} onChange={e => { setFilterProperty(e.target.value); setSyncResult(null); setSyncError(null); }} style={filterSelectStyle}>
           <option value="">All Properties</option>
           {(data.properties || []).map(p => <option key={p.id} value={p.id}>{p.address}</option>)}
         </select>
-        <select value={filterTenant} onChange={e => setFilterTenant(e.target.value)} style={{ background: '#fff', color: '#111111', border: '1px solid #eaeaea', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
+        <select value={filterTenant} onChange={e => setFilterTenant(e.target.value)} style={filterSelectStyle}>
           <option value="">All Tenants</option>
           {(data.tenants || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ background: '#fff', color: '#111111', border: '1px solid #eaeaea', borderRadius: 8, padding: '8px 12px', fontSize: 14 }}>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={filterSelectStyle}>
           <option value="">All Types</option>
           <option value="application">Application</option>
           <option value="lease">Lease</option>
@@ -653,26 +656,26 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
         <Modal onClose={() => setShowUploadModal(false)}>
           <h3 style={{ color: '#111111', marginTop: 0 }}>Upload Document</h3>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>File (PDF or DOCX)</label>
+            <label style={uploadLabelStyle}>File (PDF or DOCX)</label>
             <input type="file" accept=".pdf,.docx,.doc" onChange={e => setUploadFile(e.target.files[0])} style={{ color: '#111111', width: '100%' }} />
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Tenant (optional)</label>
-            <select value={uploadTenantId} onChange={e => setUploadTenantId(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #eaeaea', background: '#fff', color: '#111111', fontSize: 15 }}>
+            <label style={uploadLabelStyle}>Tenant (optional)</label>
+            <select value={uploadTenantId} onChange={e => setUploadTenantId(e.target.value)} style={uploadSelectStyle}>
               <option value="">None</option>
               {(data.tenants || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Property (optional)</label>
-            <select value={uploadPropertyId} onChange={e => setUploadPropertyId(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #eaeaea', background: '#fff', color: '#111111', fontSize: 15 }}>
+            <label style={uploadLabelStyle}>Property (optional)</label>
+            <select value={uploadPropertyId} onChange={e => setUploadPropertyId(e.target.value)} style={uploadSelectStyle}>
               <option value="">None</option>
               {(data.properties || []).map(p => <option key={p.id} value={p.id}>{p.address}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Document Type</label>
-            <select value={uploadDocType} onChange={e => setUploadDocType(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #eaeaea', background: '#fff', color: '#111111', fontSize: 15 }}>
+            <label style={uploadLabelStyle}>Document Type</label>
+            <select value={uploadDocType} onChange={e => setUploadDocType(e.target.value)} style={uploadSelectStyle}>
               <option value="application">Application</option>
               <option value="lease">Lease</option>
               <option value="other">Other</option>
@@ -689,8 +692,6 @@ export const DocumentsPageV2 = ({ data, setData, refresh, user }) => {
 }
 
 // ─── TENANT CONTACT PAGE ──────────────────────────────────────────────────────
-const fmt2 = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n)
-
 const InfoRow = ({ label, value, children }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 14 }}>
     <span style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".5px" }}>{label}</span>
@@ -768,7 +769,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
   const linkedUnit = (data.units || []).find(u => u.id === tenant.unitId)
   const housemates = (data.tenants || []).filter(t => t.unitId && t.unitId === tenant.unitId && t.id !== tenantId && t.status === "current tenant")
   const tenantDocs = (data.documents || []).filter(d => d.tenantId === tenantId)
-  const parsableDocs = tenantDocs.filter(d => d.aiExtracted !== null && d.aiExtracted !== undefined)
+  const parsableDocs = tenantDocs.filter(d => d.aiExtracted != null)
 
   const selectedParsedDoc = parsableDocs.find(d => d.id === selectedDocId)
 
@@ -847,7 +848,6 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
 
   const handleViewDoc = (doc) => setViewingDoc(doc)
 
-  const docTypeBadgeColor = { application: '#0ea5e9', lease: '#111111', other: '#6b7280' }
   const displayRent = linkedUnit?.monthlyRent || tenant.monthlyRent
 
   return (
@@ -1005,13 +1005,13 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
               <InfoRow label="Move-in Date" value={tenant.moveInDate} />
               <InfoRow label="Move-out Date" value={tenant.moveOutDate} />
               <InfoRow label="Monthly Rent">
-                <span style={{ fontSize: 15, fontWeight: 700, color: displayRent ? "#9ca3af" : "#9ca3af" }}>
-                  {displayRent ? fmt2(displayRent) + "/mo" : "—"}
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#9ca3af" }}>
+                  {displayRent ? fmt(displayRent) + "/mo" : "—"}
                 </span>
               </InfoRow>
               <InfoRow label="Security Deposit">
                 {tenant.securityDeposit && +tenant.securityDeposit > 0 ? (
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#9ca3af" }}>{fmt2(+tenant.securityDeposit)}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#9ca3af" }}>{fmt(+tenant.securityDeposit)}</span>
                 ) : (
                   <span style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>Not received</span>
                 )}
