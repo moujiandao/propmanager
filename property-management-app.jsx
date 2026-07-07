@@ -157,7 +157,7 @@ const T = {
     preview: "Preview", previewNoSubject: "(no subject)", previewEmpty: "Your message preview appears here.",
     previewSampleNote: "Preview uses sample data; real tenant values are filled in when sent.",
     templateNameSubjectRequired: "Name and subject are required.",
-    save: "Save", saving: "Saving…", edit: "Edit", deleteTemplate: "Delete Template",
+    save: "Save", edit: "Edit", deleteTemplate: "Delete Template",
     confirmDeleteTemplate: "Delete this template?", noTemplates: "No templates yet. Create your first reminder template.",
     sendTest: "Send Test", testSendTitle: "Send Test Email",
     testSendDesc: "Send this template to a test address so you can check how it looks before going live.",
@@ -224,7 +224,7 @@ const T = {
     reminder1Day: "1 Day Overdue", reminder1DayDesc: "Urgent follow-up",
     reminder3Day: "3 Days Overdue", reminder3DayDesc: "Escalated reminder",
     reminder7Day: "7 Days Overdue", reminder7DayDesc: "Final notice before action",
-    st_completed: "Completed", st_pending: "Pending", st_overdue: "Overdue", st_failed: "Failed",
+    st_completed: "Completed", st_pending: "Pending", st_overdue: "Overdue",
     st_active: "Active", st_open: "Open", "st_in-progress": "In Progress", st_resolved: "Resolved", st_new: "New", st_closed: "Closed",
     "st_current tenant": "Current Tenant", "st_future tenant": "Future Tenant", "st_previous tenant": "Previous Tenant",
     st_occupied: "Occupied", st_vacant: "Vacant",
@@ -393,7 +393,7 @@ const T = {
     preview: "预览", previewNoSubject: "（无主题）", previewEmpty: "邮件预览将显示在此处。",
     previewSampleNote: "预览使用示例数据；发送时会填入真实租户的信息。",
     templateNameSubjectRequired: "请填写名称和主题。",
-    save: "保存", saving: "保存中…", edit: "编辑", deleteTemplate: "删除模板",
+    save: "保存", edit: "编辑", deleteTemplate: "删除模板",
     confirmDeleteTemplate: "确定删除此模板？", noTemplates: "暂无模板。创建你的第一个提醒模板。",
     sendTest: "发送测试", testSendTitle: "发送测试邮件",
     testSendDesc: "将此模板发送到测试地址，以便在正式发送前查看效果。",
@@ -460,7 +460,7 @@ const T = {
     reminder1Day: "逾期1天", reminder1DayDesc: "紧急跟进",
     reminder3Day: "逾期3天", reminder3DayDesc: "升级提醒",
     reminder7Day: "逾期7天", reminder7DayDesc: "最终警告",
-    st_completed: "已完成", st_pending: "待处理", st_overdue: "已逾期", st_failed: "失败",
+    st_completed: "已完成", st_pending: "待处理", st_overdue: "已逾期",
     st_active: "有效", st_open: "待处理", "st_in-progress": "处理中", st_resolved: "已解决", st_new: "新建", st_closed: "已关闭",
     "st_current tenant": "现租客", "st_future tenant": "待入住租客", "st_previous tenant": "前租客",
     st_occupied: "已出租", st_vacant: "空置",
@@ -1056,7 +1056,7 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 13, color: "#9ca3af", userSelect: "none" }}>{expandedTransitions.has(row.key) ? "▾" : "▸"}</span>
                   <div
-                    style={{ fontSize: 16, fontWeight: 700, color: row.propertyId && setPage ? "#111111" : "#111111", cursor: row.propertyId && setPage ? "pointer" : "default" }}
+                    style={{ fontSize: 16, fontWeight: 700, color: "#111111", cursor: row.propertyId && setPage ? "pointer" : "default" }}
                     onClick={e => { e.stopPropagation(); if (row.propertyId && setPage && setSelectedPropertyId) { setSelectedPropertyId(row.propertyId); setPage("property-detail"); } }}
                     onMouseEnter={e => { if (row.propertyId && setPage) e.currentTarget.style.textDecoration = "underline"; }}
                     onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
@@ -1092,7 +1092,7 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
                           <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#fb923c,#ea580c)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
                           <div>
                             <div
-                              style={{ fontSize: 15, fontWeight: 600, color: setPage ? "#111111" : "#111111", cursor: setPage ? "pointer" : "default" }}
+                              style={{ fontSize: 15, fontWeight: 600, color: "#111111", cursor: setPage ? "pointer" : "default" }}
                               onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
                               onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
@@ -1117,7 +1117,7 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
                           <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#22c55e,#16a34a)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
                           <div>
                             <div
-                              style={{ fontSize: 15, fontWeight: 600, color: setPage ? "#111111" : "#111111", cursor: setPage ? "pointer" : "default" }}
+                              style={{ fontSize: 15, fontWeight: 600, color: "#111111", cursor: setPage ? "pointer" : "default" }}
                               onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
                               onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
@@ -1218,7 +1218,7 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
 };
 
 // ─── PROPERTIES PAGE ──────────────────────────────────────────────────────────
-const PropertiesPage = ({ data, setData, t, refresh, user, setPage, setSelectedPropertyId }) => {
+const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId }) => {
   const propertyMx = usePropertyMutations();
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ address: "", city: "", state: "CA", zip: "", units: "1", type: "Single Family", status: "vacant" });
@@ -1591,7 +1591,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <td style={{ padding: "14px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#111111,#000000)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
-            <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: setPage ? "#111111" : "#111111", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{tenantFullName(ten)}</button>
+            <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: "#111111", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{tenantFullName(ten)}</button>
           </div>
         </td>
         <td style={{ padding: "14px 20px" }}>
@@ -1625,7 +1625,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <button onClick={() => openEdit(ten)} style={{ background: "#fafafa", border: "1px solid #eaeaea", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
               <Icon name="edit" size={13} /> {t.editBtn}
             </button>
-            <button onClick={() => setDeleteTarget(ten)} style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" }}>
+            <button onClick={() => setDeleteTarget(ten)} style={{ ...dangerIconBtnStyle, fontSize: 12 }}>
               <Icon name="trash" size={13} />
             </button>
           </div>
@@ -1899,7 +1899,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 };
 
 // ─── CONTRACTS PAGE ───────────────────────────────────────────────────────────
-const ContractsPage = ({ data, setData, t, refresh, user }) => {
+const ContractsPage = ({ data, t, refresh, user }) => {
   const EMPTY_FORM = { tenantIds: [], propertyId: "", unit: "", startDate: "", endDate: "", rentAmount: "", dueDay: "1" };
   const [show, setShow] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -2022,7 +2022,6 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
           const startDate = c.startDate ? new Date(`${c.startDate}T00:00:00`) : null;
           const endDate = c.endDate ? new Date(`${c.endDate}T00:00:00`) : null;
           const notStartedYet = startDate && startDate > today;
-          const daysUntilStart = notStartedYet ? Math.ceil((startDate - today) / 86400000) : 0;
           const daysLeft = endDate ? Math.ceil((endDate - today) / 86400000) : NaN;
           const firstDoc = (data.documents || []).find(d => d.contractId === c.id);
           return (
@@ -2069,7 +2068,7 @@ const ContractsPage = ({ data, setData, t, refresh, user }) => {
                   <Btn variant="secondary" size="sm" icon="edit" onClick={(e) => { e.stopPropagation(); openEdit(c); }}>{t.editBtn}</Btn>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
-                    style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" }}
+                    style={{ ...dangerIconBtnStyle, fontSize: 13 }}
                     aria-label="Delete lease"
                   >
                     <Icon name="trash" size={14} />
@@ -2827,6 +2826,9 @@ const commentLinkStyle = { background: "none", border: "none", padding: 0, curso
 const commentInputStyle = { flex: 1, padding: "8px 12px", border: "1px solid #eaeaea", borderRadius: 8, fontSize: 13, color: "#111111", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
 const commentSendStyle = (disabled) => ({ padding: "8px 16px", borderRadius: 8, border: "none", background: disabled ? "#eaeaea" : "#111111", color: disabled ? "#9ca3af" : "#fff", fontSize: 13, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 });
 
+// Outlined red icon-button for row-level delete actions. Call sites override fontSize.
+const dangerIconBtnStyle = { background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" };
+
 // ─── TO DO LIST (kanban) ────────────────────────────────────────────────────
 // Board over the existing maintenance_requests. Stored status values are unchanged
 // (new / in-progress / closed, plus legacy resolved/open); these map onto three
@@ -2840,6 +2842,9 @@ const TODO_COLUMNS = [
   { key: "closed", tKey: "statusClosed" },
 ];
 const todoColumnOf = maintStatus.columnOf;
+
+// Priority → accent color, shared by the landlord board and the tenant request list.
+const PRIORITY_COLORS = { high: "#ef4444", medium: "#f59e0b", low: "#3b82f6" };
 
 const TodoCard = ({ request, tenantName, sub, typeText, priorityColor, commentCount, attachmentCount, onOpen }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: request.id });
@@ -2998,7 +3003,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
     setSubmitting(false);
   };
 
-  const pColors = { high: "#ef4444", medium: "#f59e0b", low: "#3b82f6" };
+  const pColors = PRIORITY_COLORS;
   const pLabels = { high: t.priorityHigh, medium: t.priorityMedium, low: t.priorityLow };
 
   const commentViewer = { authorType: "landlord", authorId: user.authId, landlordId: user.id, authorName: user.name };
@@ -3122,7 +3127,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
 
           {/* Status + Type */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 4 }}>
-            <Sel label={`${t.colStatus}`} value={form.status} onChange={v => setF("status", v)} options={[
+            <Sel label={t.colStatus} value={form.status} onChange={v => setF("status", v)} options={[
               { value: "new", label: t.statusNew },
               { value: "in-progress", label: t.statusInProgress },
               { value: "closed", label: t.statusClosed },
@@ -3488,10 +3493,9 @@ const TenantMaintenancePage = ({ data, setData, user, refresh }) => {
           <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#111111", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>My Requests</h3>
           <div style={{ display: "grid", gap: 12 }}>
             {myReqs.map(m => {
-              const pC = { high:"#ef4444",medium:"#f59e0b",low:"#3b82f6" };
               return (
                 <div key={m.id} style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", border: "1px solid #f5f5f5", display: "flex", gap: 12 }}>
-                  <div style={{ width: 3, borderRadius: 3, background: pC[m.priority], flexShrink: 0 }} />
+                  <div style={{ width: 3, borderRadius: 3, background: PRIORITY_COLORS[m.priority], flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, color: "#111111", marginBottom: 6 }}>{m.description}</div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -3521,7 +3525,6 @@ const TenantLeasePage = ({ data, user }) => {
   const startDate = contract.startDate ? new Date(`${contract.startDate}T00:00:00`) : null;
   const endDate = contract.endDate ? new Date(`${contract.endDate}T00:00:00`) : null;
   const notStartedYet = startDate && startDate > today;
-  const daysUntilStart = notStartedYet ? Math.ceil((startDate - today) / 86400000) : 0;
   const daysLeft = endDate ? Math.ceil((endDate - today) / 86400000) : 0;
   return (
     <div>
@@ -3649,7 +3652,7 @@ const DocumentsPage = ({ data, refresh }) => {
           {data.properties.map(p => (
             <button key={p.id} onClick={() => setSelectedId(p.id)}
               style={{ width: "100%", padding: "14px 16px", border: "none", borderBottom: "1px solid #fafafa", background: p.id === selectedId ? "rgba(17,17,17,.08)" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: p.id === selectedId ? "#111111" : "#111111" }}>{p.address}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#111111" }}>{p.address}</div>
               <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{p.city} · {p.driveLink ? "✓ Linked" : "No folder"}</div>
             </button>
           ))}
