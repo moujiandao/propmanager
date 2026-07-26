@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-07-26]
+
+### Added
+- `lib/tenant/status.js` — the home for the tenant Status vocabulary, mirroring `lib/maintenance/status.js`. Tenant status is now **derived** from `move_in_date`/`move_out_date` rather than stored and read: `statusFor()` (camelCase), `statusForRow()` (raw snake_case rows), `isCurrentRow()` (the occupancy predicate), plus the `FUTURE`/`CURRENT`/`PREVIOUS` constants. Rule: move-out already past → previous; move-in still ahead → future; otherwise current. A tenant stays current through the whole of their move-out day and becomes current on their move-in day; a null move-in means already resident. Built on `daysBetween` from `lib/format` so the YYYY-MM-DD local-midnight rule doesn't drift. Unit-tested (10 cases) via `npm test`.
+- `scripts/backfill-tenant-status-dates.sql` — one-time backfill for the change. Stamps `move_out_date = updated_at::date` on rows stored as `previous tenant`/`inactive` with a null move-out date, which would otherwise derive as current and reappear in active lists. SELECT-first; the UPDATE is commented out until reviewed. Also reports `future tenant` rows with a null move-in date, which need a manual date (no honest value can be inferred).
+
+### Changed
+- Tenant status is no longer a landlord-editable field. The status `<Sel>` is gone from the add and edit tenant modals (`property-management-app.jsx`), replaced by a read-only `DerivedStatusField` showing what the entered dates resolve to, live. `status` is no longer sent in the create/update payloads or held in form state, and `TenantContactPage` (`phase2-components.jsx`) no longer carries the dead field. New `T.en`/`T.zh` key `tenStatusDerived`.
+- `tenant_profiles.status` is now a **write-only legacy column**: still written on create/update so external SQL and the ops scripts don't see nulls, but never read back by the app. `mapTenant` (`lib/tenant/mappers.js`) and `mapTenantRow` (`lib/email/context.js`) both derive instead, which also removes the duplicated legacy `active`/`inactive` normalize expression that let the cron and the UI disagree.
+- Occupancy is no longer filtered in Postgres. The `.eq('status', 'current tenant')` predicate in `create-tenant`, `update-tenant`, `delete-tenant`, and `delete-user` is replaced by selecting the two date columns and filtering through `isCurrentRow` — a derived status can't be expressed in SQL, and a Postgres `GENERATED` column can't help because the value has to change at midnight without a write. Same change in the client-side occupancy computation in `fetchAllData`, and in `scripts/recompute-occupancy.mjs`, `scripts/import-tenants.mjs`, `scripts/upsert-tenants.mjs`.
+- `update-tenant` recomputes occupancy when the *derived* status changes (comparing the incoming dates against the stored ones) rather than when a submitted status field differs.
+- `app/api/dashboard/summary/route.js` derives status once at the top of `buildFacts`, so its nine `t.status === ...` comparisons agree with what the UI shows for the same tenant.
+- `lib/email/audience.js`: the `move_in` automation no longer gates on `status === 'future tenant'`. Under derived status a tenant flips to current at midnight on their move-in day, so an offset-0 move-in reminder would have found nobody by the time the 15:00 UTC cron ran. Now gated on `status !== 'previous tenant'`; `offsetsDueToday()` already selects the correct day. The other event types use the shared status constants.
+- `scripts/recompute-occupancy.mjs` step 1 now resyncs the legacy `status` column to the derived value for every row that disagrees, replacing the old one-way `active`→`current tenant` normalize.
+
+### Fixed
+- Dashboard "Unpaid Rent" no longer flags tenants whose move-in date is in the future (`property-management-app.jsx`). The filter checked status only, while its server-side twin `wasActiveLastMonth` in `app/api/dashboard/summary/route.js` also guarded on move-in date; the add-tenant form's `current tenant` default made the gap visible for anyone added ahead of their move-in.
+
+### Added
+- Property filter on the Payments page, matching the Tenants page (`property-management-app.jsx`). Extracted the shared chip row into a `PropertyFilterBar` component used by both, rather than duplicating the markup. Persists to its own `propmanager_payment_hidden_props` key so narrowing the payment view doesn't narrow the tenant roster. Reuses the existing `tenFilterProperties`/`tenShowAll`/`tenHideAll`/`tenNoProperty` strings, so no new translation entries.
+
 ## [2026-07-07]
 
 ### Changed

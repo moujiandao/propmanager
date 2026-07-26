@@ -9,6 +9,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { isCurrentRow } from "../lib/tenant/status.js";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -133,8 +134,9 @@ async function main() {
 
   // Recompute occupancy for all units after import
   console.log("\nRecomputing unit occupancy...");
-  const { data: allTenants } = await supabase.from("tenant_profiles").select("unit_id").eq("status", "current tenant").not("unit_id", "is", null);
-  const occupiedUnitIds = new Set((allTenants || []).map(t => t.unit_id));
+  // Status is derived from the dates — filter in JS, not SQL. See lib/tenant/status.js.
+  const { data: allTenants } = await supabase.from("tenant_profiles").select("unit_id, move_in_date, move_out_date").not("unit_id", "is", null);
+  const occupiedUnitIds = new Set((allTenants || []).filter(t => isCurrentRow(t)).map(t => t.unit_id));
   for (const unit of units) {
     const newStatus = occupiedUnitIds.has(unit.id) ? "occupied" : "vacant";
     await supabase.from("units").update({ status: newStatus }).eq("id", unit.id);

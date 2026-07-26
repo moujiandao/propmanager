@@ -707,7 +707,8 @@ const TenantCard = ({ title, children }) => (
 )
 
 const EMPTY_TENANT_FORM = {
-  name: "", phone: "", propertyId: "", unit: "", status: "current tenant", monthlyRent: "",
+  // No `status`: it derives from the move-in/move-out dates (lib/tenant/status.js).
+  name: "", phone: "", propertyId: "", unit: "", monthlyRent: "",
   moveInDate: "", moveOutDate: "", hasCosigner: false, studentStatus: "", studentYear: "",
   zelleName: "", homeAddress: "", age: "", unitId: "", notes: "", securityDeposit: "", securityDepositRefunded: false,
 }
@@ -732,7 +733,6 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
         phone: tenant.phone || "",
         propertyId: tenant.propertyId || "",
         unit: tenant.unit || "",
-        status: tenant.status || "current tenant",
         monthlyRent: tenant.monthlyRent ? String(tenant.monthlyRent) : "",
         moveInDate: tenant.moveInDate || "",
         moveOutDate: tenant.moveOutDate || "",
@@ -785,7 +785,6 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
         phone: form.phone,
         propertyId: form.propertyId || null,
         unit: form.unit,
-        status: form.status,
         monthlyRent: form.monthlyRent || null,
         moveInDate: form.moveInDate || null,
         moveOutDate: form.moveOutDate || null,
@@ -818,7 +817,6 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
       phone: extracted.phone || tenant.phone || null,
       propertyId: tenant.propertyId || null,
       unit: extracted.unit || tenant.unit || null,
-      status: tenant.status,
       monthlyRent: extracted.monthly_rent || extracted.monthlyRent || tenant.monthlyRent || null,
       moveInDate: extracted.move_in_date || extracted.moveInDate || tenant.moveInDate || null,
       moveOutDate: extracted.move_out_date || extracted.moveOutDate || tenant.moveOutDate || null,

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { statusFor, isCurrentRow, CURRENT } from '@/lib/tenant/status'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -9,7 +10,9 @@ export async function POST(request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-  const { name, lastName, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, status, moveInDate, moveOutDate, notes, securityDeposit, securityDepositRefunded } = await request.json()
+  // No `status` here on purpose: it derives from the move-in/move-out dates, so the
+  // client can't set it. See lib/tenant/status.js.
+  const { name, lastName, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, moveInDate, moveOutDate, notes, securityDeposit, securityDepositRefunded } = await request.json()
 
   // Use provided email or generate a placeholder so auth user can be created without one
   const authEmail = email?.trim() || `${name.trim().toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@placeholder.local`
@@ -75,7 +78,9 @@ export async function POST(request) {
     resolvedUnitId = matchedUnit?.id || null
   }
 
-  const tenantStatus = status || 'current tenant'
+  // Written to the legacy `status` column so external SQL and the ops scripts don't see
+  // nulls, but never read back — every reader derives it from the dates instead.
+  const tenantStatus = statusFor({ moveInDate, moveOutDate })
 
   const { error: profileError } = await supabaseAdmin
     .from('tenant_profiles')
@@ -107,7 +112,7 @@ export async function POST(request) {
   }
 
   // If the new tenant occupies a unit, recompute occupancy for the entire property
-  if (resolvedUnitId && tenantStatus === 'current tenant' && propertyId) {
+  if (resolvedUnitId && tenantStatus === CURRENT && propertyId) {
     const { data: propertyUnits } = await supabaseAdmin
       .from('units')
       .select('id')
@@ -115,13 +120,16 @@ export async function POST(request) {
 
     if (propertyUnits?.length) {
       const unitIds = propertyUnits.map(u => u.id)
-      const { data: occupiedTenants } = await supabaseAdmin
+      // Occupancy can't be filtered in SQL anymore — status is derived, so we pull the
+      // dates back and apply isCurrentRow here. Bounded by the units of one property.
+      const { data: unitTenants } = await supabaseAdmin
         .from('tenant_profiles')
-        .select('unit_id')
+        .select('unit_id, move_in_date, move_out_date')
         .in('unit_id', unitIds)
-        .eq('status', 'current tenant')
 
-      const occupiedUnitIds = new Set((occupiedTenants || []).map(t => t.unit_id))
+      // NB: `t => isCurrentRow(t)`, not a bare reference — filter would pass the array
+      // index as the `today` argument.
+      const occupiedUnitIds = new Set((unitTenants || []).filter(t => isCurrentRow(t)).map(t => t.unit_id))
       for (const u of propertyUnits) {
         const newStatus = occupiedUnitIds.has(u.id) ? 'occupied' : 'vacant'
         await supabaseAdmin.from('units').update({ status: newStatus }).eq('id', u.id)

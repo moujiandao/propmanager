@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { statusForRow } from '@/lib/tenant/status'
 
 const client = new Anthropic()
 
@@ -7,7 +8,12 @@ const isoDate = (d) => d.toISOString().slice(0, 10)
 const daysBetween = (a, b) => Math.round((new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / 86400000)
 const fullName = (t) => [t.name, t.last_name].filter(Boolean).join(' ').trim() || 'Unnamed tenant'
 
-function buildFacts({ tenants, contracts, payments, maintenance, properties, units, now }) {
+function buildFacts({ tenants: rawTenants, contracts, payments, maintenance, properties, units, now }) {
+  // Tenant status is DERIVED from the move-in/move-out dates (lib/tenant/status.js), not read
+  // from the stored column. Normalize once here so the `t.status === ...` comparisons below
+  // stay as they are, and so they agree with what the UI shows for the same tenant.
+  const tenants = rawTenants.map(t => ({ ...t, status: statusForRow(t, now) }))
+
   const today = isoDate(now)
   const in30 = isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30))
   const in60 = isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60))

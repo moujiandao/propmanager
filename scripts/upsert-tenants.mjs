@@ -9,6 +9,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { isCurrentRow } from "../lib/tenant/status.js";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -201,12 +202,13 @@ async function main() {
 
   // ── Recompute unit occupancy ─────────────────────────────────────────────────
   console.log("\nRecomputing unit occupancy...");
+  // Status is derived from the dates, so it can't be filtered in SQL — pull the dates
+  // back and apply isCurrentRow here. See lib/tenant/status.js.
   const { data: activeTenants } = await supabase
     .from("tenant_profiles")
-    .select("unit_id")
-    .eq("status", "current tenant")
+    .select("unit_id, move_in_date, move_out_date")
     .not("unit_id", "is", null);
-  const occupiedIds = new Set((activeTenants || []).map(t => t.unit_id));
+  const occupiedIds = new Set((activeTenants || []).filter(t => isCurrentRow(t)).map(t => t.unit_id));
   for (const u of units) {
     await supabase.from("units").update({ status: occupiedIds.has(u.id) ? "occupied" : "vacant" }).eq("id", u.id);
   }

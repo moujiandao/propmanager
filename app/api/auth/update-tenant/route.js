@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
+import { statusFor, statusForRow, isCurrentRow } from '@/lib/tenant/status'
 
 export async function POST(request) {
-  const { tenantId, name, lastName, email, phone, propertyId, unit, status, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId, notes, securityDeposit, securityDepositRefunded } = await request.json()
+  // No `status` here on purpose: it derives from the move-in/move-out dates, so the
+  // client can't set it. See lib/tenant/status.js.
+  const { tenantId, name, lastName, email, phone, propertyId, unit, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId, notes, securityDeposit, securityDepositRefunded } = await request.json()
 
   if (!tenantId) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
@@ -13,10 +16,11 @@ export async function POST(request) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  // Capture the tenant's previous unit_id and status so we can recompute occupancy when either changes
+  // Capture the tenant's previous unit and dates so we can recompute occupancy when either
+  // the assigned unit or the DERIVED status changes.
   const { data: prevTenant } = await supabase
     .from('tenant_profiles')
-    .select('unit_id, property_id, status')
+    .select('unit_id, property_id, move_in_date, move_out_date')
     .eq('id', tenantId)
     .single()
 
@@ -37,7 +41,8 @@ export async function POST(request) {
     phone,
     property_id: propertyId || null,
     unit,
-    status,
+    // Legacy column: written so external SQL isn't looking at nulls, never read back.
+    status: statusFor({ moveInDate, moveOutDate }),
     monthly_rent: monthlyRent ? +monthlyRent : null,
     move_in_date: moveInDate || null,
     move_out_date: moveOutDate || null,
@@ -92,7 +97,9 @@ export async function POST(request) {
   // a tenant flipping current → previous should free the unit even if unit_id stays the same.
   const affectedPropertyId = propertyId || prevTenant?.property_id
   const unitIdChanged = unitId !== undefined && unitId !== prevTenant?.unit_id
-  const statusChanged = status !== undefined && status !== prevTenant?.status
+  // Derived-status change = the dates moved the tenant across a boundary (e.g. a move-out
+  // date was backdated into the past), which frees the unit even when unit_id is unchanged.
+  const statusChanged = statusFor({ moveInDate, moveOutDate }) !== statusForRow(prevTenant)
 
   if ((unitIdChanged || statusChanged) && affectedPropertyId) {
     const { data: propertyUnits } = await supabase
@@ -102,14 +109,15 @@ export async function POST(request) {
 
     if (propertyUnits && propertyUnits.length > 0) {
       const unitIds = propertyUnits.map(u => u.id)
-      // Only "current tenant" rows count toward occupancy
-      const { data: occupiedTenants } = await supabase
+      // Occupancy can't be filtered in SQL anymore — status is derived, so pull the dates
+      // back and apply isCurrentRow here. NB: `t => isCurrentRow(t)`, not a bare reference —
+      // filter would pass the array index as the `today` argument.
+      const { data: unitTenants } = await supabase
         .from('tenant_profiles')
-        .select('unit_id')
+        .select('unit_id, move_in_date, move_out_date')
         .in('unit_id', unitIds)
-        .eq('status', 'current tenant')
 
-      const occupiedUnitIds = new Set((occupiedTenants || []).map(t => t.unit_id))
+      const occupiedUnitIds = new Set((unitTenants || []).filter(t => isCurrentRow(t)).map(t => t.unit_id))
 
       for (const unit of propertyUnits) {
         const newStatus = occupiedUnitIds.has(unit.id) ? 'occupied' : 'vacant'

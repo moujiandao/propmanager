@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { isCurrentRow } from '@/lib/tenant/status'
 
 export async function POST(request) {
   const { tenantId } = await request.json()
@@ -38,13 +39,15 @@ export async function POST(request) {
 
     if (propertyUnits?.length) {
       const unitIds = propertyUnits.map(u => u.id)
+      // Status is derived, so occupancy can't be filtered in SQL — pull the dates back and
+      // apply isCurrentRow here. NB: `t => isCurrentRow(t)`, not a bare reference, or filter
+      // would pass the array index as the `today` argument.
       const { data: remaining } = await supabase
         .from('tenant_profiles')
-        .select('unit_id')
+        .select('unit_id, move_in_date, move_out_date')
         .in('unit_id', unitIds)
-        .eq('status', 'current tenant')
 
-      const occupiedIds = new Set((remaining || []).map(t => t.unit_id))
+      const occupiedIds = new Set((remaining || []).filter(t => isCurrentRow(t)).map(t => t.unit_id))
       for (const u of propertyUnits) {
         await supabase.from('units').update({ status: occupiedIds.has(u.id) ? 'occupied' : 'vacant' }).eq('id', u.id)
       }
