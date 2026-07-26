@@ -10,6 +10,7 @@ import * as maint from '@/lib/maintenance/core';
 import * as maintStatus from '@/lib/maintenance/status';
 import { createTenantAdapter } from '@/lib/tenant/adapter';
 import { mapTenant } from '@/lib/tenant/mappers';
+import { statusFor, isCurrentRow } from '@/lib/tenant/status';
 import * as tenantOps from '@/lib/tenant/core';
 import { createPaymentReminderAdapter } from '@/lib/payment-reminders/adapter';
 import { mapEmailSettings } from '@/lib/payment-reminders/mappers';
@@ -273,6 +274,7 @@ const T = {
     adminErrFields: "All fields are required.", adminErrPassword: "Password must be at least 8 characters.",
     navPaymentPortal: "Payment Portal", navPaymentHistory: "Payment History", navMyProfile: "My Profile",
     statusCurrentTenant: "Current Tenant", statusFutureTenant: "Future Tenant", statusPreviousTenant: "Previous Tenant",
+    tenStatusDerived: "Set automatically from the move-in and move-out dates.",
     docSectionTitle: "Documents", docUploadPdf: "Upload PDF", docAddDriveLink: "Add Drive Link",
     docView: "View", docNoDocuments: "No documents attached", docDriveLinkPlaceholder: "Paste Google Drive share URL",
     docAttach: "Attach", docRemove: "Remove",
@@ -509,6 +511,7 @@ const T = {
     adminErrFields: "所有字段均为必填项。", adminErrPassword: "密码至少需要8位字符。",
     navPaymentPortal: "付款门户", navPaymentHistory: "付款记录", navMyProfile: "我的资料",
     statusCurrentTenant: "现租客", statusFutureTenant: "待入住租客", statusPreviousTenant: "前租客",
+    tenStatusDerived: "根据入住和搬出日期自动设置。",
     docSectionTitle: "文件", docUploadPdf: "上传 PDF", docAddDriveLink: "添加 Drive 链接",
     docView: "查看", docNoDocuments: "暂无附件", docDriveLinkPlaceholder: "粘贴 Google Drive 分享链接",
     docAttach: "附加", docRemove: "删除",
@@ -616,6 +619,19 @@ export const Sel = ({ label, value, onChange, options }) => (
       style={{ width: "100%", padding: "10px 14px", border: "1px solid #eaeaea", borderRadius: 8, fontSize: 14, color: "#111111", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}>
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
+  </div>
+);
+
+// Read-only replacement for what used to be a status dropdown. Status derives from the
+// move-in/move-out dates (lib/tenant/status.js), so there is nothing to pick — this shows
+// what the dates currently in the form resolve to, and updates live as they are edited.
+export const DerivedStatusField = ({ moveInDate, moveOutDate, t }) => (
+  <div style={{ marginBottom: 16 }}>
+    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.colStatus}</label>
+    <div style={{ display: "flex", alignItems: "center", width: "100%", padding: "10px 14px", border: "1px solid #eaeaea", borderRadius: 8, background: "#fafafa", boxSizing: "border-box", minHeight: 42 }}>
+      <Badge status={statusFor({ moveInDate: moveInDate || null, moveOutDate: moveOutDate || null })} t={t} />
+    </div>
+    <p style={{ margin: "5px 0 0", fontSize: 11, color: "#9ca3af", lineHeight: 1.4 }}>{t.tenStatusDerived}</p>
   </div>
 );
 
@@ -734,6 +750,38 @@ export const PageHeader = ({ title, subtitle, action }) => (
     {action}
   </div>
 );
+
+// Property filter chip row, shared by the Tenants and Payments pages. `hidden` is a Set of
+// HIDDEN chip ids (not shown ones) so a newly-added property is visible by default without
+// needing to touch stored state. Callers own persistence; this is presentation only.
+const filterChipBase = { display: "flex", alignItems: "center", gap: 7, padding: "5px 12px", borderRadius: 7, border: "1px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" };
+const filterLinkBase = { marginLeft: 4, fontSize: 12, fontWeight: 600, background: "transparent", border: "none", cursor: "pointer", padding: 0 };
+const filterBarLabel = { fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".5px" };
+
+export const PropertyFilterBar = ({ chips, hidden, setHidden, t }) => {
+  if (chips.length <= 1) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+      <span style={filterBarLabel}>{t.tenFilterProperties}</span>
+      {chips.map(({ id, label }) => {
+        const shown = !hidden.has(id);
+        return (
+          <button key={id}
+            onClick={() => setHidden(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; })}
+            style={{ ...filterChipBase, borderColor: shown ? "#111111" : "#eaeaea", background: shown ? "#f5f5f5" : "#fff", color: shown ? "#111111" : "#9ca3af" }}>
+            <span style={{ width: 15, height: 15, borderRadius: 4, border: "1px solid", borderColor: shown ? "#111111" : "#cbd5e1", background: shown ? "#111111" : "#fff", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {shown && <Icon name="check" size={10} />}
+            </span>
+            {label}
+          </button>
+        );
+      })}
+      {hidden.size > 0
+        ? <button onClick={() => setHidden(new Set())} style={{ ...filterLinkBase, color: "#111111" }}>{t.tenShowAll}</button>
+        : <button onClick={() => setHidden(new Set(chips.map(c => c.id)))} style={{ ...filterLinkBase, color: "#9ca3af" }}>{t.tenHideAll}</button>}
+    </div>
+  );
+};
 
 const StatCard = ({ label, value, sub, icon, color = "#111111" }) => (
   <div style={{ background: "#fff", borderRadius: 14, padding: "20px 22px", border: "1px solid #f5f5f5", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
@@ -864,17 +912,21 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
   const now = new Date();
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const currentMonthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const todayStr = now.toISOString().split("T")[0];
   const paidTenantIds = new Set(
     payments
       .filter(p => p.status === "completed" && p.dueDate && p.dueDate.startsWith(currentMonthKey))
       .map(p => p.tenantId)
   );
   // Only flag rent as unpaid once we're at the 5th of the month or later — gives tenants a grace window through the 4th.
+  // A tenant who hasn't moved in yet owes nothing, so a future move-in date excludes them regardless of
+  // stored status (the add-tenant form defaults status to "current tenant" even for a future move-in).
+  // Mirrors wasActiveLastMonth() in app/api/dashboard/summary/route.js.
   const unpaidTenants = now.getDate() < 5
     ? []
-    : tenants.filter(ten => ten.status === "current tenant" && !paidTenantIds.has(ten.id));
-
-  const todayStr = now.toISOString().split("T")[0];
+    : tenants.filter(ten => ten.status === "current tenant"
+                            && (!ten.moveInDate || ten.moveInDate <= todayStr)
+                            && !paidTenantIds.has(ten.id));
   const activeContracts = contracts.filter(c =>
     c.status === "active" &&
     (!c.startDate || c.startDate <= todayStr) &&
@@ -1408,7 +1460,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addError, setAddError] = useState("");
-  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
+  // No `status` field: it derives from moveInDate/moveOutDate (lib/tenant/status.js).
+  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
   const [editTenant, setEditTenant] = useState(null);
@@ -1432,7 +1485,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", status: ten.status || "current tenant", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "", notes: ten.notes || "", securityDeposit: ten.securityDeposit || "", securityDepositRefunded: ten.securityDepositRefunded || false });
+    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "", notes: ten.notes || "", securityDeposit: ten.securityDeposit || "", securityDepositRefunded: ten.securityDepositRefunded || false });
   };
 
   const saveEdit = async () => {
@@ -1450,7 +1503,6 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         propertyId: editForm.propertyId || null,
         unit: editForm.unit,
         unitId: editForm.unitId || null,
-        status: editForm.status,
         monthlyRent: editForm.monthlyRent || null,
         password: editForm.password || null,
         zelleName: editForm.zelleName || null,
@@ -1483,7 +1535,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         email: form.email?.trim() || null,
         password: form.createLogin ? form.password : null,
         propertyId: form.propertyId, unit: form.unit,
-        zelleName: form.zelleName, status: form.status, landlordId: user.id,
+        zelleName: form.zelleName, landlordId: user.id,
         moveInDate: form.moveInDate, moveOutDate: form.moveOutDate || null,
         notes: form.notes || null,
         securityDeposit: form.securityDeposit === "" ? null : form.securityDeposit,
@@ -1498,7 +1550,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     }
     await refresh();
     setShow(false);
-    setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", status: "current tenant", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
+    setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
     setSaving(false);
   };
 
@@ -1653,28 +1705,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       </div>
 
       {/* Property filter (persisted across sessions) */}
-      {filterChips.length > 1 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".5px" }}>{t.tenFilterProperties}</span>
-          {filterChips.map(({ id, label }) => {
-            const shown = !hiddenProps.has(id);
-            return (
-              <button key={id}
-                onClick={() => setHiddenProps(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; })}
-                style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 12px", borderRadius: 7, border: "1px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .15s",
-                  borderColor: shown ? "#111111" : "#eaeaea", background: shown ? "#f5f5f5" : "#fff", color: shown ? "#111111" : "#9ca3af" }}>
-                <span style={{ width: 15, height: 15, borderRadius: 4, border: "1px solid", borderColor: shown ? "#111111" : "#cbd5e1", background: shown ? "#111111" : "#fff", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {shown && <Icon name="check" size={10} />}
-                </span>
-                {label}
-              </button>
-            );
-          })}
-          {hiddenProps.size > 0
-            ? <button onClick={() => setHiddenProps(new Set())} style={{ marginLeft: 4, fontSize: 12, fontWeight: 600, color: "#111111", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>{t.tenShowAll}</button>
-            : <button onClick={() => setHiddenProps(new Set(filterChips.map(c => c.id)))} style={{ marginLeft: 4, fontSize: 12, fontWeight: 600, color: "#9ca3af", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>{t.tenHideAll}</button>}
-        </div>
-      )}
+      <PropertyFilterBar chips={filterChips} hidden={hiddenProps} setHidden={setHiddenProps} t={t} />
 
       {/* Display by toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
@@ -1766,7 +1797,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
             <Inp label={t.zelleNameLabel} value={form.zelleName} onChange={v => setF("zelleName",v)} placeholder={t.zelleNamePlaceholder} />
-            <Sel label={t.colStatus} value={form.status} onChange={v => setF("status",v)} options={[{value:"current tenant",label:t.statusCurrentTenant},{value:"future tenant",label:t.statusFutureTenant},{value:"previous tenant",label:t.statusPreviousTenant}]} />
+            <DerivedStatusField moveInDate={form.moveInDate} moveOutDate={form.moveOutDate} t={t} />
             <Inp label={t.moveInDateReq} value={form.moveInDate} onChange={v => setF("moveInDate",v)} type="date" />
             <Inp label={t.moveOutDate} value={form.moveOutDate||""} onChange={v => setF("moveOutDate",v)} type="date" />
             <Inp label={t.securityDepositLabel} value={form.securityDeposit} onChange={v => setF("securityDeposit",v)} type="number" placeholder="0" />
@@ -1846,7 +1877,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
               })()}
             </div>
             <Inp label={t.monthlyPaymentLabel} value={editForm.monthlyRent} onChange={v => setEF("monthlyRent",v)} type="number" placeholder="0" />
-            <Sel label={t.colStatus} value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"current tenant",label:t.statusCurrentTenant},{value:"future tenant",label:t.statusFutureTenant},{value:"previous tenant",label:t.statusPreviousTenant}]} />
+            <DerivedStatusField moveInDate={editForm.moveInDate} moveOutDate={editForm.moveOutDate} t={t} />
             <Inp label={t.zelleNameLabel} value={editForm.zelleName} onChange={v => setEF("zelleName",v)} placeholder={t.zelleNamePlaceholder} />
             <Inp label={t.moveInDate} value={editForm.moveInDate} onChange={v => setEF("moveInDate",v)} type="date" />
             <Inp label={t.moveOutDate} value={editForm.moveOutDate} onChange={v => setEF("moveOutDate",v)} type="date" />
@@ -2305,11 +2336,37 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
     return false;
   }, [saved, checked]);
 
+  // Persisted property filter — same pattern as the Tenants page: store HIDDEN ids so a newly
+  // added property shows by default. Its own storage key, so narrowing the payment view doesn't
+  // silently narrow the tenant roster as well.
+  // Read lazily rather than via an effect: the whole dashboard is gated behind authLoading, so
+  // this never runs during SSR or hydration. That also removes the "ready" flag the Tenants page
+  // needs to stop its write effect clobbering storage before the read lands.
+  const [hiddenProps, setHiddenProps] = useState(() => {
+    try {
+      const raw = typeof window !== "undefined" && localStorage.getItem("propmanager_payment_hidden_props");
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); /* ignore malformed storage */ }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("propmanager_payment_hidden_props", JSON.stringify([...hiddenProps]));
+    } catch { /* ignore quota / private-mode failures */ }
+  }, [hiddenProps]);
+
+  const filterChips = [
+    ...data.properties.map(p => ({ id: p.id, label: p.address })),
+    ...(data.tenants.some(ten => ten.status === "current tenant" && !ten.propertyId)
+      ? [{ id: "__none__", label: t.tenNoProperty }] : []),
+  ];
+
   // Group tenants by unit
   const grouped = useMemo(() => {
     const unitMap = {};
     const noUnit = [];
-    for (const tenant of data.tenants.filter(t => t.status === "current tenant")) {
+    const visible = data.tenants.filter(ten =>
+      ten.status === "current tenant" && !hiddenProps.has(ten.propertyId || "__none__"));
+    for (const tenant of visible) {
       if (tenant.unitId) {
         if (!unitMap[tenant.unitId]) {
           unitMap[tenant.unitId] = { unit: data.units.find(u => u.id === tenant.unitId), tenants: [] };
@@ -2324,7 +2381,7 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
     );
     if (noUnit.length > 0) groups.push({ unit: null, tenants: noUnit });
     return groups;
-  }, [data.tenants, data.units]);
+  }, [data.tenants, data.units, hiddenProps]);
 
   const allTenants = useMemo(() => grouped.flatMap(g => g.tenants), [grouped]);
 
@@ -2437,6 +2494,8 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
     <div>
       <PageHeader title={t.payTitle} subtitle={t.paySubtitleTracker} />
       {payError && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontSize: 13, color: "#dc2626" }}>{payError}</div>}
+      {/* Property filter (persisted across sessions) */}
+      <PropertyFilterBar chips={filterChips} hidden={hiddenProps} setHidden={setHiddenProps} t={t} />
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <button onClick={saveChanges} disabled={saving || !hasChanges}
           style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: hasChanges ? "#111111" : "#eaeaea", color: hasChanges ? "#fff" : "#9ca3af", fontSize: 14, fontWeight: 600, cursor: (saving || !hasChanges) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
@@ -4041,10 +4100,8 @@ export default function App() {
         const today = new Date().toISOString().split("T")[0];
         const units = (unitRes.data || []).map(mapUnit).map(unit => {
           const tenantsInUnit = (tenRes.data || []).filter(t => t.unit_id === unit.id);
-          const isOccupied = tenantsInUnit.some(t => {
-            const status = t.status === "active" ? "current tenant" : t.status;
-            return status === "current tenant";
-          });
+          // Occupancy follows the DERIVED status, same rule the server routes apply.
+          const isOccupied = tenantsInUnit.some(t => isCurrentRow(t));
           return { ...unit, status: isOccupied ? "occupied" : "vacant" };
         });
 
