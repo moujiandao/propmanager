@@ -23,6 +23,7 @@ import { createParkingAdapter } from '@/lib/parking/adapter';
 import { mapParkingSpot, mapParkingRenter, mapParkingLease } from '@/lib/parking/mappers';
 import * as parkingOps from '@/lib/parking/core';
 import { activeLeaseForSpot, SPOT_TYPES } from '@/lib/parking/status';
+import { lotLayout } from '@/lib/parking/layout';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -293,6 +294,9 @@ const T = {
     parkSpotType: "Type (optional)", parkSpotTypeNone: "— None —",
     parkVehicle: "Vehicle", parkCarMake: "Car Make", parkCarModel: "Car Model", parkCarYear: "Car Year",
     parkEditSpot: "Edit Spot", parkEditSpotTitle: "Edit Parking Spot", parkFailedUpdateSpot: "Failed to update spot.",
+    parkLotDiagram: "Lot Diagram", parkSpotDetailTitle: (label) => `Spot ${label}`,
+    parkOngoing: "Ongoing", parkSpotVacantHint: "This spot is not currently leased.",
+    parkUnplaced: (labels) => `Not shown above (no type set): ${labels}`,
     parkNoSpots: "No parking spots yet. Add the first one for a property.",
     parkUnknownProperty: "Unknown property",
     parkAddLease: "Add Lease", parkAddLeaseTitle: "Lease This Spot",
@@ -554,6 +558,9 @@ const T = {
     parkSpotType: "类型（可选）", parkSpotTypeNone: "— 无 —",
     parkVehicle: "车辆", parkCarMake: "汽车品牌", parkCarModel: "汽车型号", parkCarYear: "汽车年份",
     parkEditSpot: "编辑车位", parkEditSpotTitle: "编辑停车位", parkFailedUpdateSpot: "更新车位失败。",
+    parkLotDiagram: "车位平面图", parkSpotDetailTitle: (label) => `车位 ${label}`,
+    parkOngoing: "长期", parkSpotVacantHint: "此车位当前未出租。",
+    parkUnplaced: (labels) => `未显示在上图中（未设置类型）：${labels}`,
     parkNoSpots: "暂无停车位 — 请先为某个房产添加车位。",
     parkUnknownProperty: "未知房产",
     parkAddLease: "添加租约", parkAddLeaseTitle: "出租此车位",
@@ -2409,6 +2416,65 @@ const ContractsPage = ({ data, t, refresh, user }) => {
 const EMPTY_SPOT_FORM = { propertyId: "", label: "", type: "", monthlyRate: "", carMake: "", carModel: "", carYear: "" };
 const EMPTY_LEASE_FORM = { renterType: "tenant", tenantId: "", renterName: "", renterEmail: "", renterPhone: "", rate: "", startDate: "", endDate: "" };
 
+// Label/value row for the spot detail modal. Renders an em-dash for anything empty so
+// the rows stay aligned instead of collapsing when a field is unset.
+const detailRowStyle = { display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", fontSize: 13 };
+const DetailRow = ({ label, value }) => (
+  <div style={detailRowStyle}>
+    <span style={{ color: "#9ca3af" }}>{label}</span>
+    <span style={{ color: value ? "#111111" : "#9ca3af", fontWeight: value ? 600 : 400, textAlign: "right" }}>{value || "—"}</span>
+  </div>
+);
+
+// Interactive lot diagram. Geometry comes from lib/parking/layout.js so the math stays
+// pure and unit-tested; this only paints what that returns and wires up clicks. Fills
+// reuse the Badge palette so a stall reads the same as its card's occupied/vacant chip.
+const stallFill = (occupied) => (occupied ? statusColors.occupied : statusColors.vacant);
+
+const ParkingLotDiagram = ({ spots, occBySpotId, onSelect, t }) => {
+  const { width, height, outline, stalls, unplaced } = lotLayout(spots);
+  if (!stalls.length) return null;
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #eaeaea", borderRadius: 12, padding: 16, marginBottom: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>
+        {t.parkLotDiagram}
+      </div>
+      {/* viewBox + preserveAspectRatio hold the lot's proportions at any width. */}
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="group"
+        aria-label={t.parkLotDiagram}
+        style={{ width: "100%", height: "auto", maxWidth: 520, display: "block", margin: "0 auto" }}
+      >
+        <rect x={outline.x} y={outline.y} width={outline.w} height={outline.h} fill="#fafafa" stroke="#eaeaea" strokeWidth="2" rx="4" />
+        {stalls.map(stall => {
+          const occ = occBySpotId.get(stall.id);
+          const c = stallFill(!!occ);
+          return (
+            <g key={stall.id} onClick={() => onSelect(stall.id)} style={{ cursor: "pointer" }}
+               role="button" tabIndex={0} aria-label={`${t.parkSpotLabel} ${stall.label}`}
+               onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(stall.id); } }}>
+              <title>{`${stall.label} · ${occ ? occ.name : t.st_vacant}`}</title>
+              <polygon points={stall.points} fill={c.bg} stroke={c.dot} strokeWidth="1.5" />
+              <text x={stall.labelX} y={stall.labelY} textAnchor="middle" dominantBaseline="central"
+                    fontSize="15" fontWeight="700" fill={c.text} style={{ pointerEvents: "none", userSelect: "none" }}>
+                {stall.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {unplaced.length > 0 && (
+        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 10, textAlign: "center" }}>
+          {t.parkUnplaced(unplaced.map(s => s.label).join(", "))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ParkingPage = ({ data, t, refresh, user }) => {
   const mx = useParkingMutations();
   const todayStr = () => new Date().toISOString().split("T")[0];
@@ -2431,6 +2497,11 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Spot clicked in the lot diagram. Holds the id rather than the spot object so the
+  // modal re-reads from fresh data after an edit or a lease change instead of showing
+  // a stale snapshot captured at click time.
+  const [detailSpotId, setDetailSpotId] = useState(null);
 
   const openAddSpot = () => {
     setEditingSpot(null);
@@ -2538,16 +2609,23 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   const leases = data.parkingLeases || [];
   const renters = data.parkingRenters || [];
 
+  // Returns null when vacant, otherwise { lease, name, kind, person }. `person` is the
+  // underlying tenant or renter row so the detail modal can show contact details —
+  // the cards only ever needed `name`, but a diagram click should surface who to call.
   const occupantFor = (spot) => {
     const lease = activeLeaseForSpot(leases.filter(l => l.parkingSpotId === spot.id));
     if (!lease) return null;
     if (lease.tenantId) {
       const ten = data.tenants.find(x => x.id === lease.tenantId);
-      return { lease, name: ten ? tenantFullName(ten) : t.parkUnknownTenant };
+      return { lease, name: ten ? tenantFullName(ten) : t.parkUnknownTenant, kind: "tenant", person: ten || null };
     }
     const renter = renters.find(r => r.id === lease.renterId);
-    return { lease, name: renter ? renter.name : t.parkUnknownRenter };
+    return { lease, name: renter ? renter.name : t.parkUnknownRenter, kind: "renter", person: renter || null };
   };
+
+  // Resolved once per spot and shared by the diagram and the cards — occupantFor scans
+  // every lease, so calling it from both render paths would double that work.
+  const occBySpotId = new Map(spots.map(s => [s.id, occupantFor(s)]));
 
   const byProperty = new Map();
   for (const s of spots) {
@@ -2569,9 +2647,14 @@ const ParkingPage = ({ data, t, refresh, user }) => {
               <div style={{ fontSize: 13, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>
                 {prop?.address || t.parkUnknownProperty}
               </div>
+              {/* Only lots whose spots carry a type can be drawn — placement is derived
+                  from it, so an untyped property just gets its cards as before. */}
+              {propSpots.some(s => s.type) && (
+                <ParkingLotDiagram spots={propSpots} occBySpotId={occBySpotId} onSelect={setDetailSpotId} t={t} />
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
                 {[...propSpots].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })).map(spot => {
-                  const occ = occupantFor(spot);
+                  const occ = occBySpotId.get(spot.id);
                   return (
                     <div key={spot.id} style={{ background: "#fff", borderRadius: 12, padding: 16, border: "1px solid #eaeaea" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
@@ -2696,6 +2779,59 @@ const ParkingPage = ({ data, t, refresh, user }) => {
           </div>
         </Modal>
       )}
+
+      {/* Spot detail — opened by clicking a stall in the lot diagram. Read-only view
+          plus the same actions the card offers, so the diagram is a full entry point
+          rather than a navigation aid. */}
+      {detailSpotId && (() => {
+        const spot = spots.find(s => s.id === detailSpotId);
+        if (!spot) return null;   // spot deleted while the modal was open
+        const occ = occBySpotId.get(spot.id);
+        const car = [spot.carYear, spot.carMake, spot.carModel].filter(Boolean).join(" ");
+        const prop = data.properties.find(p => p.id === spot.propertyId);
+        const close = () => setDetailSpotId(null);
+        return (
+          <Modal title={t.parkSpotDetailTitle(spot.label)} onClose={close}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+              <Badge status={occ ? "occupied" : "vacant"} t={t} />
+              <Badge status={spot.marketStatus} t={t} />
+            </div>
+
+            <DetailRow label={t.selectProperty} value={prop?.address || t.parkUnknownProperty} />
+            <DetailRow label={t.parkSpotType} value={spot.type} />
+            <DetailRow label={t.parkVehicle} value={car} />
+            <DetailRow label={t.parkMonthlyRate} value={spot.monthlyRate ? fmt(spot.monthlyRate) : ""} />
+
+            <div style={{ borderTop: "1px solid #eaeaea", marginTop: 14, paddingTop: 14 }}>
+              {occ ? (
+                <>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>
+                    {occ.kind === "tenant" ? t.parkExistingTenant : t.parkMarketRenter}
+                  </div>
+                  <DetailRow label={t.fullName} value={occ.name} />
+                  <DetailRow label={t.email} value={occ.person?.email} />
+                  <DetailRow label={t.phone} value={occ.person?.phone} />
+                  <DetailRow label={t.parkMonthlyRate} value={fmt(occ.lease.rate)} />
+                  <DetailRow label={t.startDate} value={fmtDate(occ.lease.startDate)} />
+                  <DetailRow label={t.endDate} value={occ.lease.endDate ? fmtDate(occ.lease.endDate) : t.parkOngoing} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+                    <Btn size="sm" variant="secondary" onClick={() => { close(); openEditSpot(spot); }}>{t.parkEditSpot}</Btn>
+                    <Btn size="sm" variant="secondary" onClick={() => { close(); endLeaseNow(occ.lease); }}>{t.parkEndLease}</Btn>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>{t.parkSpotVacantHint}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <Btn size="sm" variant="secondary" onClick={() => { close(); openEditSpot(spot); }}>{t.parkEditSpot}</Btn>
+                    <Btn size="sm" variant="secondary" onClick={() => { close(); openAddLease(spot); }}>{t.parkAddLease}</Btn>
+                  </div>
+                </>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 };
