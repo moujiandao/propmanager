@@ -19,6 +19,10 @@ import * as reminderOps from '@/lib/payment-reminders/core';
 import { createPropertyAdapter } from '@/lib/property/adapter';
 import { mapProperty } from '@/lib/property/mappers';
 import * as propertyOps from '@/lib/property/core';
+import { createParkingAdapter } from '@/lib/parking/adapter';
+import { mapParkingSpot, mapParkingRenter, mapParkingLease } from '@/lib/parking/mappers';
+import * as parkingOps from '@/lib/parking/core';
+import { activeLeaseForSpot } from '@/lib/parking/status';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -282,6 +286,26 @@ const T = {
     inProduction: "In Production", inProductionHint: "Tenants of this property will be hidden from the dashboard, Tenants, Payments, and To Do List pages.", propNotInProduction: "Not in Production",
     failedCreateLease: "Failed to create lease.", failedCreateTenant: "Failed to create tenant.",
     tenantNameMoveInRequired: "First name and move-in date are required.",
+    navParking: "Parking",
+    parkTitle: "Parking", parkSubtitle: (n) => `${n} parking spots`,
+    parkAddSpot: "Add Spot", parkAddSpotTitle: "Add Parking Spot",
+    parkSpotLabel: "Spot Label", parkMonthlyRate: "Monthly Rate ($)",
+    parkNoSpots: "No parking spots yet. Add the first one for a property.",
+    parkUnknownProperty: "Unknown property",
+    parkAddLease: "Add Lease", parkAddLeaseTitle: "Lease This Spot",
+    parkEndLease: "End Lease", parkSince: "since",
+    parkExistingTenant: "Existing Tenant", parkMarketRenter: "Market Renter",
+    parkOpenToMarket: "Open to Market", parkMarkTenantPriority: "Mark Tenant-Priority",
+    parkDeleteSpot: "Delete Spot", parkDeleteSpotTitle: "Delete Parking Spot",
+    parkDeleteSpotConfirm: (label) => `Delete spot "${label}"? This cannot be undone.`,
+    parkUnknownTenant: "Unknown tenant", parkUnknownRenter: "Unknown renter",
+    parkSpotFieldsRequired: "Property and spot label are required.",
+    parkLeaseFieldsRequired: "Rate and start date are required.",
+    parkSelectTenantRequired: "Select a tenant.",
+    parkRenterNameRequired: "Renter name is required.",
+    parkFailedCreateSpot: "Failed to create spot.", parkFailedDeleteSpot: "Failed to delete spot.",
+    parkFailedCreateLease: "Failed to create lease.",
+    st_tenant_priority: "Tenant Priority", st_open_market: "Open Market",
   },
   zh: {
     appName: "房产管理", landlord: "房东", tenant: "租客", signIn: "登录",
@@ -520,6 +544,26 @@ const T = {
     inProduction: "启用中", inProductionHint: "此房产的租客将不再显示在仪表盘、租客、付款和待办事项页面中。", propNotInProduction: "未启用",
     failedCreateLease: "创建租约失败。", failedCreateTenant: "创建租客失败。",
     tenantNameMoveInRequired: "请填写名字和入住日期。",
+    navParking: "停车位",
+    parkTitle: "停车位", parkSubtitle: (n) => `共 ${n} 个停车位`,
+    parkAddSpot: "添加车位", parkAddSpotTitle: "添加停车位",
+    parkSpotLabel: "车位编号", parkMonthlyRate: "月租金（$）",
+    parkNoSpots: "暂无停车位 — 请先为某个房产添加车位。",
+    parkUnknownProperty: "未知房产",
+    parkAddLease: "添加租约", parkAddLeaseTitle: "出租此车位",
+    parkEndLease: "结束租约", parkSince: "起租于",
+    parkExistingTenant: "现有租客", parkMarketRenter: "市场租客",
+    parkOpenToMarket: "开放给市场", parkMarkTenantPriority: "标记为租客优先",
+    parkDeleteSpot: "删除车位", parkDeleteSpotTitle: "删除停车位",
+    parkDeleteSpotConfirm: (label) => `删除车位 "${label}"？此操作无法撤销。`,
+    parkUnknownTenant: "未知租客", parkUnknownRenter: "未知租客",
+    parkSpotFieldsRequired: "房产和车位编号为必填项。",
+    parkLeaseFieldsRequired: "租金和起租日期为必填项。",
+    parkSelectTenantRequired: "请选择一位租客。",
+    parkRenterNameRequired: "租客姓名为必填项。",
+    parkFailedCreateSpot: "创建车位失败。", parkFailedDeleteSpot: "删除车位失败。",
+    parkFailedCreateLease: "创建租约失败。",
+    st_tenant_priority: "租客优先", st_open_market: "开放市场",
   }
 };
 
@@ -550,6 +594,7 @@ export const Icon = ({ name, size = 18 }) => {
     globe: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>,
     trash: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>,
     sparkles: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 14l.9 2.4L22.3 17l-2.4.9L19 20l-.9-2.4L15.7 17l2.4-.6z"/><path d="M5 17l.6 1.6L7.2 19l-1.6.6L5 21l-.6-1.4L2.8 19l1.6-.4z"/></svg>,
+    car: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 00-.84-.99L19 11l-2.7-3.6a1 1 0 00-.8-.4H5.24a2 2 0 00-1.8 1.1l-.8 1.63A6 6 0 002 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>,
   };
   return icons[name] || null;
 };
@@ -575,6 +620,8 @@ const statusColors = {
   closed:    { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
   occupied:  { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   vacant:    { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
+  tenant_priority: { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
+  open_market:     { bg: "#fef3c7", text: "#92400e", dot: "#f59e0b" },
 };
 
 export const Badge = ({ status, t }) => {
@@ -676,6 +723,7 @@ const Sidebar = ({ user, currentPage, onNavigate, onLogout, lang, setLang, t }) 
     { id: "maintenance", label: t.navTodo, icon: "wrench" },
   ];
   const landlordBottomNav = [
+    { id: "parking", label: t.navParking, icon: "car" },
     { id: "contracts", label: t.navLeases, icon: "file" },
     { id: "renewals", label: t.navRenewals, icon: "file" },
     { id: "email-automation", label: t.navEmailAutomation, icon: "mail" },
@@ -2351,6 +2399,231 @@ const ContractsPage = ({ data, t, refresh, user }) => {
   );
 };
 
+// ─── PARKING PAGE ─────────────────────────────────────────────────────────────
+const EMPTY_SPOT_FORM = { propertyId: "", label: "", monthlyRate: "" };
+const EMPTY_LEASE_FORM = { renterType: "tenant", tenantId: "", renterName: "", renterEmail: "", renterPhone: "", rate: "", startDate: "", endDate: "" };
+
+const ParkingPage = ({ data, t, refresh, user }) => {
+  const mx = useParkingMutations();
+  const todayStr = () => new Date().toISOString().split("T")[0];
+
+  const [showSpotModal, setShowSpotModal] = useState(false);
+  const [spotForm, setSpotForm] = useState(EMPTY_SPOT_FORM);
+  const setSF = (k, v) => setSpotForm(f => ({ ...f, [k]: v }));
+  const [spotError, setSpotError] = useState(null);
+  const [savingSpot, setSavingSpot] = useState(false);
+
+  const [leaseSpot, setLeaseSpot] = useState(null);
+  const [leaseForm, setLeaseForm] = useState(EMPTY_LEASE_FORM);
+  const setLF = (k, v) => setLeaseForm(f => ({ ...f, [k]: v }));
+  const [leaseError, setLeaseError] = useState(null);
+  const [savingLease, setSavingLease] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const openAddSpot = () => { setSpotForm(EMPTY_SPOT_FORM); setSpotError(null); setShowSpotModal(true); };
+
+  const saveSpot = async () => {
+    if (!spotForm.propertyId || !spotForm.label.trim()) { setSpotError(t.parkSpotFieldsRequired); return; }
+    setSavingSpot(true);
+    setSpotError(null);
+    try {
+      await mx.createSpot({ landlordId: user.id, propertyId: spotForm.propertyId, label: spotForm.label.trim(), monthlyRate: spotForm.monthlyRate });
+      await refresh();
+      setShowSpotModal(false);
+    } catch (e) {
+      setSpotError(e.message || t.parkFailedCreateSpot);
+    }
+    setSavingSpot(false);
+  };
+
+  const toggleMarketStatus = async (spot) => {
+    await mx.setMarketStatus(spot.id, spot.marketStatus === "open_market" ? "tenant_priority" : "open_market");
+    await refresh();
+  };
+
+  const confirmDeleteSpot = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await mx.deleteSpot(deleteTarget.id);
+      await refresh();
+      setDeleteTarget(null);
+    } catch (e) {
+      setDeleteError(e.message || t.parkFailedDeleteSpot);
+    }
+    setDeleting(false);
+  };
+
+  const openAddLease = (spot) => {
+    setLeaseSpot(spot);
+    setLeaseForm({ ...EMPTY_LEASE_FORM, rate: spot.monthlyRate ? String(spot.monthlyRate) : "", startDate: todayStr() });
+    setLeaseError(null);
+  };
+
+  const saveLease = async () => {
+    if (!leaseForm.rate || !leaseForm.startDate) { setLeaseError(t.parkLeaseFieldsRequired); return; }
+    if (leaseForm.renterType === "tenant" && !leaseForm.tenantId) { setLeaseError(t.parkSelectTenantRequired); return; }
+    if (leaseForm.renterType === "market" && !leaseForm.renterName.trim()) { setLeaseError(t.parkRenterNameRequired); return; }
+    setSavingLease(true);
+    setLeaseError(null);
+    try {
+      await mx.createLease({
+        landlordId: user.id,
+        parkingSpotId: leaseSpot.id,
+        rate: leaseForm.rate,
+        startDate: leaseForm.startDate,
+        endDate: leaseForm.endDate || null,
+        tenantId: leaseForm.renterType === "tenant" ? leaseForm.tenantId : undefined,
+        renter: leaseForm.renterType === "market"
+          ? { name: leaseForm.renterName.trim(), email: leaseForm.renterEmail.trim(), phone: leaseForm.renterPhone.trim() }
+          : undefined,
+      });
+      await refresh();
+      setLeaseSpot(null);
+    } catch (e) {
+      setLeaseError(e.message || t.parkFailedCreateLease);
+    }
+    setSavingLease(false);
+  };
+
+  const endLeaseNow = async (lease) => {
+    await mx.endLease(lease.id, todayStr());
+    await refresh();
+  };
+
+  const spots = data.parkingSpots || [];
+  const leases = data.parkingLeases || [];
+  const renters = data.parkingRenters || [];
+
+  const occupantFor = (spot) => {
+    const lease = activeLeaseForSpot(leases.filter(l => l.parkingSpotId === spot.id));
+    if (!lease) return null;
+    if (lease.tenantId) {
+      const ten = data.tenants.find(x => x.id === lease.tenantId);
+      return { lease, name: ten ? tenantFullName(ten) : t.parkUnknownTenant };
+    }
+    const renter = renters.find(r => r.id === lease.renterId);
+    return { lease, name: renter ? renter.name : t.parkUnknownRenter };
+  };
+
+  const byProperty = new Map();
+  for (const s of spots) {
+    if (!byProperty.has(s.propertyId)) byProperty.set(s.propertyId, []);
+    byProperty.get(s.propertyId).push(s);
+  }
+
+  return (
+    <div>
+      <PageHeader title={t.parkTitle} subtitle={t.parkSubtitle(spots.length)} action={<Btn icon="plus" onClick={openAddSpot}>{t.parkAddSpot}</Btn>} />
+
+      {spots.length === 0 ? (
+        <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 15, padding: "60px 0" }}>{t.parkNoSpots}</div>
+      ) : (
+        [...byProperty.entries()].map(([propertyId, propSpots]) => {
+          const prop = data.properties.find(p => p.id === propertyId);
+          return (
+            <div key={propertyId} style={{ marginBottom: 28 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>
+                {prop?.address || t.parkUnknownProperty}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+                {[...propSpots].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })).map(spot => {
+                  const occ = occupantFor(spot);
+                  return (
+                    <div key={spot.id} style={{ background: "#fff", borderRadius: 12, padding: 16, border: "1px solid #eaeaea" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: "#111111" }}>{spot.label}</div>
+                          <div style={{ fontSize: 13, color: "#9ca3af" }}>{spot.monthlyRate ? `${fmt(spot.monthlyRate)}/mo` : "—"}</div>
+                        </div>
+                        {!occ && (
+                          <button onClick={() => setDeleteTarget(spot)} style={dangerIconBtnStyle} title={t.parkDeleteSpot}>
+                            <Icon name="trash" size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                        <Badge status={occ ? "occupied" : "vacant"} t={t} />
+                        <Badge status={spot.marketStatus} t={t} />
+                      </div>
+                      {occ ? (
+                        <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 10 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#111111" }}>{occ.name}</div>
+                          <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
+                            {fmt(occ.lease.rate)}/mo &middot; {t.parkSince} {fmtDate(occ.lease.startDate)}
+                          </div>
+                          <Btn size="sm" variant="secondary" onClick={() => endLeaseNow(occ.lease)}>{t.parkEndLease}</Btn>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <Btn size="sm" variant="secondary" onClick={() => openAddLease(spot)}>{t.parkAddLease}</Btn>
+                          <Btn size="sm" variant="ghost" onClick={() => toggleMarketStatus(spot)}>
+                            {spot.marketStatus === "open_market" ? t.parkMarkTenantPriority : t.parkOpenToMarket}
+                          </Btn>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {showSpotModal && (
+        <Modal title={t.parkAddSpotTitle} onClose={() => setShowSpotModal(false)}>
+          <Sel label={t.selectProperty} value={spotForm.propertyId} onChange={v => setSF("propertyId", v)}
+            options={[{ value: "", label: t.selectProperty }, ...data.properties.map(p => ({ value: p.id, label: p.address }))]} />
+          <Inp label={t.parkSpotLabel} value={spotForm.label} onChange={v => setSF("label", v)} placeholder="A12" />
+          <Inp label={t.parkMonthlyRate} value={spotForm.monthlyRate} onChange={v => setSF("monthlyRate", v)} type="number" placeholder="0" />
+          {spotError && <p style={{ color: "#ef4444", fontSize: 13 }}>{spotError}</p>}
+          <Btn onClick={saveSpot} disabled={savingSpot}>{savingSpot ? t.creating : t.parkAddSpot}</Btn>
+        </Modal>
+      )}
+
+      {leaseSpot && (
+        <Modal title={t.parkAddLeaseTitle} onClose={() => setLeaseSpot(null)}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <Btn size="sm" variant={leaseForm.renterType === "tenant" ? "primary" : "secondary"} onClick={() => setLF("renterType", "tenant")}>{t.parkExistingTenant}</Btn>
+            <Btn size="sm" variant={leaseForm.renterType === "market" ? "primary" : "secondary"} onClick={() => setLF("renterType", "market")}>{t.parkMarketRenter}</Btn>
+          </div>
+          {leaseForm.renterType === "tenant" ? (
+            <Sel label={t.selectTenant} value={leaseForm.tenantId} onChange={v => setLF("tenantId", v)}
+              options={[{ value: "", label: t.selectTenant }, ...data.tenants.map(ten => ({ value: ten.id, label: tenantFullName(ten) }))]} />
+          ) : (
+            <>
+              <Inp label={t.fullName} value={leaseForm.renterName} onChange={v => setLF("renterName", v)} />
+              <Inp label={t.email} value={leaseForm.renterEmail} onChange={v => setLF("renterEmail", v)} />
+              <Inp label={t.phone} value={leaseForm.renterPhone} onChange={v => setLF("renterPhone", v)} />
+            </>
+          )}
+          <Inp label={t.parkMonthlyRate} value={leaseForm.rate} onChange={v => setLF("rate", v)} type="number" placeholder="0" />
+          <Inp label={t.startDate} value={leaseForm.startDate} onChange={v => setLF("startDate", v)} type="date" />
+          <Inp label={t.endDate} value={leaseForm.endDate} onChange={v => setLF("endDate", v)} type="date" />
+          {leaseError && <p style={{ color: "#ef4444", fontSize: 13 }}>{leaseError}</p>}
+          <Btn onClick={saveLease} disabled={savingLease}>{savingLease ? t.creating : t.parkAddLease}</Btn>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <Modal title={t.parkDeleteSpotTitle} onClose={() => setDeleteTarget(null)}>
+          <p style={{ fontSize: 14, color: "#374151" }}>{t.parkDeleteSpotConfirm(deleteTarget.label)}</p>
+          {deleteError && <p style={{ color: "#ef4444", fontSize: 13 }}>{deleteError}</p>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn variant="secondary" onClick={() => setDeleteTarget(null)}>{t.cancel}</Btn>
+            <Btn onClick={confirmDeleteSpot} disabled={deleting}>{deleting ? t.deleting : t.parkDeleteSpot}</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
 // ─── PAYMENTS PAGE ────────────────────────────────────────────────────────────
 const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
   // 3-month window: previous, current, next month
@@ -2799,6 +3072,20 @@ function usePropertyMutations() {
     create: (fields) => propertyOps.createProperty(adapter, fields),
     remove: (id) => propertyOps.deleteProperty(adapter, id),
     setDriveLink: (id, link) => propertyOps.setDriveLink(adapter, id, link),
+  };
+}
+
+// Parking writes behind the lib/parking seam (spot CRUD, lease create/end).
+// Call sites refresh() after, same shape as usePropertyMutations() — no
+// optimistic state coupling here.
+function useParkingMutations() {
+  const adapter = createParkingAdapter(supabase);
+  return {
+    createSpot: (fields) => parkingOps.createSpot(adapter, fields),
+    setMarketStatus: (id, marketStatus) => parkingOps.setMarketStatus(adapter, id, marketStatus),
+    deleteSpot: (id) => parkingOps.deleteSpot(adapter, id),
+    createLease: (fields) => parkingOps.createLease(adapter, fields),
+    endLease: (id, endDate) => parkingOps.endLease(adapter, id, endDate),
   };
 }
 
@@ -4073,7 +4360,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [], maintenanceComments: [], emailTemplates: [], emailAutomations: [], emailMessages: [], leaseRenewals: [], contractTenants: [] });
+  const [data, setData] = useState({ properties: [], tenants: [], contracts: [], payments: [], maintenance: [], emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [], maintenanceTypes: [], maintenanceAttachments: [], maintenanceComments: [], emailTemplates: [], emailAutomations: [], emailMessages: [], leaseRenewals: [], contractTenants: [], parkingSpots: [], parkingRenters: [], parkingLeases: [] });
   const [loadingData, setLoadingData] = useState(false);
   const [lang, setLang] = useState("zh");
   const [langReady, setLangReady] = useState(false);
@@ -4154,7 +4441,7 @@ export default function App() {
     setLoadingData(true);
     try {
       if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes, maintCommRes, emailTplRes, emailAutoRes, emailMsgRes, renewalRes] = await Promise.all([
+        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, llRes, maintTypesRes, maintAttRes, maintCommRes, emailTplRes, emailAutoRes, emailMsgRes, renewalRes, parkSpotRes, parkRenterRes, parkLeaseRes] = await Promise.all([
           supabase.from("properties").select("*").order("created_at", { ascending: true }),
           supabase.from("tenant_profiles").select("*"),
           supabase.from("contracts").select("*, contract_tenants(tenant_id)"),
@@ -4171,6 +4458,9 @@ export default function App() {
           supabase.from("email_automations").select("*").order("created_at", { ascending: true }),
           supabase.from("email_messages").select("*").neq("status", "draft").order("created_at", { ascending: false }).limit(300),
           supabase.from("lease_renewals").select("*").order("created_at", { ascending: false }),
+          supabase.from("parking_spots").select("*").order("label", { ascending: true }),
+          supabase.from("parking_renters").select("*"),
+          supabase.from("parking_leases").select("*").order("start_date", { ascending: false }),
         ]);
         const today = new Date().toISOString().split("T")[0];
         const units = (unitRes.data || []).map(mapUnit).map(unit => {
@@ -4238,6 +4528,9 @@ export default function App() {
           emailMessages:          (emailMsgRes.data  || []).map(mapEmailMessage),
           leaseRenewals:          (renewalRes.data   || []).map(mapLeaseRenewal),
           contractTenants,
+          parkingSpots:           (parkSpotRes.data   || []).map(mapParkingSpot),
+          parkingRenters:         (parkRenterRes.data || []).map(mapParkingRenter),
+          parkingLeases:          (parkLeaseRes.data  || []).map(mapParkingLease),
         });
       } else {
         // Tenant: fetch own profile + related data
@@ -4266,6 +4559,9 @@ export default function App() {
           units:         [],
           documents:     [],
           maintenanceComments: (maintCommRes.data || []).map(mapMaintenanceComment),
+          parkingSpots:   [],
+          parkingRenters: [],
+          parkingLeases:  [],
         });
       }
     } catch (err) {
@@ -4302,6 +4598,7 @@ export default function App() {
         case "properties":       return <PropertiesPage {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} />;
         case "tenants":          return <TenantsPage {...props} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
         case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={fetchAllData} user={user} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
+        case "parking":          return <ParkingPage {...props} />;
         case "contracts":        return <ContractsPage {...props} />;
         case "payments":         return <PaymentsPage data={data} t={t} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
         case "maintenance":      return <MaintenancePage {...props} />;
