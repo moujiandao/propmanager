@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-07-27]
+
+### Added
+- `parking_spots.type` (`scripts/add-parking-spot-type.sql`) — which part of the lot a spot sits in and how it's oriented. Chosen from a fixed picklist: `right side (diagonal)`, `back side (straight)`, `left side (straight)`. The vocabulary lives in `SPOT_TYPES` in `lib/parking/status.js` and is shared by the UI dropdown and the core's write validation, so the two can't drift — same pattern as `lib/maintenance/status.js`. Enforced in JS rather than as a DB `CHECK`: adding a fourth layout stays a one-line change instead of a migration, and `createSpot`/`updateSpot` reject an off-list value for *every* caller (seed scripts and future API routes included), not just the dropdown.
+- `parking_spots.car_make` / `car_model` / `car_year` (`scripts/add-parking-spot-car.sql`) — the vehicle parked in a spot, shown on the card as e.g. `2019 Honda Civic`. `car_year` is a `SMALLINT`; a non-numeric entry becomes null rather than letting `NaN` reach the database. **Deliberate tradeoff:** these live on the spot, not the lease, so the vehicle is attached to the concrete rather than the occupant — when a lease ends the previous renter's car stays listed until someone clears it, and there's no history of which vehicle occupied a spot when. Chosen for simplicity (one place to look, one modal to edit) over the lease-scoped alternative.
+- Parking spot **editing** (`property-management-app.jsx`), which the page previously had no path for — label, type, rate, and vehicle were fixed at creation, so a typo meant deleting and recreating the spot, and only while it was unleased. One modal serves both add and edit, keyed on an `editingSpot` state. New `updateSpot` op in `lib/parking/core.js` + `iconBtn` (neutral sibling of `dangerIconBtnStyle`).
+- `scripts/seed-ridge-rd-parking.mjs` — creates the 14 Ridge Rd spots with their types. Resolves the property by address rather than a hardcoded UUID, and is idempotent (reads existing labels first, inserts only what's missing, reports rather than overwrites a type mismatch).
+
+### Changed
+- `updateSpot` deliberately does **not** accept a property: moving a spot between properties would strand its lease history against a lot it no longer belongs to, and could collide with the unique `(property_id, label)` constraint on arrival. The edit modal renders property read-only, and a test asserts a `property_id` passed in is ignored. Editing stays available on leased spots (renaming doesn't invalidate a lease); deleting remains gated on the spot being free.
+
 ## [2026-07-26]
 
 ### Added
