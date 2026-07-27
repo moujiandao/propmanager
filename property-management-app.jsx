@@ -290,6 +290,8 @@ const T = {
     parkTitle: "Parking", parkSubtitle: (n) => `${n} parking spots`,
     parkAddSpot: "Add Spot", parkAddSpotTitle: "Add Parking Spot",
     parkSpotLabel: "Spot Label", parkMonthlyRate: "Monthly Rate ($)",
+    parkSpotType: "Type (optional)", parkSpotTypePlaceholder: "e.g. right side (diagonal)",
+    parkEditSpot: "Edit Spot", parkEditSpotTitle: "Edit Parking Spot", parkFailedUpdateSpot: "Failed to update spot.",
     parkNoSpots: "No parking spots yet. Add the first one for a property.",
     parkUnknownProperty: "Unknown property",
     parkAddLease: "Add Lease", parkAddLeaseTitle: "Lease This Spot",
@@ -548,6 +550,8 @@ const T = {
     parkTitle: "停车位", parkSubtitle: (n) => `共 ${n} 个停车位`,
     parkAddSpot: "添加车位", parkAddSpotTitle: "添加停车位",
     parkSpotLabel: "车位编号", parkMonthlyRate: "月租金（$）",
+    parkSpotType: "类型（可选）", parkSpotTypePlaceholder: "例如：右侧（斜位）",
+    parkEditSpot: "编辑车位", parkEditSpotTitle: "编辑停车位", parkFailedUpdateSpot: "更新车位失败。",
     parkNoSpots: "暂无停车位 — 请先为某个房产添加车位。",
     parkUnknownProperty: "未知房产",
     parkAddLease: "添加租约", parkAddLeaseTitle: "出租此车位",
@@ -2400,7 +2404,7 @@ const ContractsPage = ({ data, t, refresh, user }) => {
 };
 
 // ─── PARKING PAGE ─────────────────────────────────────────────────────────────
-const EMPTY_SPOT_FORM = { propertyId: "", label: "", monthlyRate: "" };
+const EMPTY_SPOT_FORM = { propertyId: "", label: "", type: "", monthlyRate: "" };
 const EMPTY_LEASE_FORM = { renterType: "tenant", tenantId: "", renterName: "", renterEmail: "", renterPhone: "", rate: "", startDate: "", endDate: "" };
 
 const ParkingPage = ({ data, t, refresh, user }) => {
@@ -2408,6 +2412,9 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   const todayStr = () => new Date().toISOString().split("T")[0];
 
   const [showSpotModal, setShowSpotModal] = useState(false);
+  // null = the modal is in "add" mode; a spot = "edit" mode. One modal serves both
+  // so the form markup isn't duplicated.
+  const [editingSpot, setEditingSpot] = useState(null);
   const [spotForm, setSpotForm] = useState(EMPTY_SPOT_FORM);
   const setSF = (k, v) => setSpotForm(f => ({ ...f, [k]: v }));
   const [spotError, setSpotError] = useState(null);
@@ -2423,18 +2430,44 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   const [deleteError, setDeleteError] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const openAddSpot = () => { setSpotForm(EMPTY_SPOT_FORM); setSpotError(null); setShowSpotModal(true); };
+  const openAddSpot = () => {
+    setEditingSpot(null);
+    setSpotForm(EMPTY_SPOT_FORM);
+    setSpotError(null);
+    setShowSpotModal(true);
+  };
+
+  const openEditSpot = (spot) => {
+    setEditingSpot(spot);
+    setSpotForm({
+      propertyId: spot.propertyId,
+      label: spot.label,
+      type: spot.type || "",
+      monthlyRate: spot.monthlyRate == null ? "" : String(spot.monthlyRate),
+    });
+    setSpotError(null);
+    setShowSpotModal(true);
+  };
 
   const saveSpot = async () => {
-    if (!spotForm.propertyId || !spotForm.label.trim()) { setSpotError(t.parkSpotFieldsRequired); return; }
+    // Property is only required when adding — on edit it's fixed and not shown.
+    if ((!editingSpot && !spotForm.propertyId) || !spotForm.label.trim()) {
+      setSpotError(t.parkSpotFieldsRequired);
+      return;
+    }
     setSavingSpot(true);
     setSpotError(null);
     try {
-      await mx.createSpot({ landlordId: user.id, propertyId: spotForm.propertyId, label: spotForm.label.trim(), monthlyRate: spotForm.monthlyRate });
+      if (editingSpot) {
+        await mx.updateSpot(editingSpot.id, { label: spotForm.label, type: spotForm.type, monthlyRate: spotForm.monthlyRate });
+      } else {
+        await mx.createSpot({ landlordId: user.id, propertyId: spotForm.propertyId, label: spotForm.label.trim(), type: spotForm.type, monthlyRate: spotForm.monthlyRate });
+      }
       await refresh();
       setShowSpotModal(false);
+      setEditingSpot(null);
     } catch (e) {
-      setSpotError(e.message || t.parkFailedCreateSpot);
+      setSpotError(e.message || (editingSpot ? t.parkFailedUpdateSpot : t.parkFailedCreateSpot));
     }
     setSavingSpot(false);
   };
@@ -2538,13 +2571,22 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                         <div>
                           <div style={{ fontSize: 15, fontWeight: 700, color: "#111111" }}>{spot.label}</div>
+                          {spot.type && <div style={{ fontSize: 12, color: "#6b7280" }}>{spot.type}</div>}
                           <div style={{ fontSize: 13, color: "#9ca3af" }}>{spot.monthlyRate ? `${fmt(spot.monthlyRate)}/mo` : "—"}</div>
                         </div>
-                        {!occ && (
-                          <button onClick={() => setDeleteTarget(spot)} style={dangerIconBtnStyle} title={t.parkDeleteSpot}>
-                            <Icon name="trash" size={13} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          {/* Editing stays available while leased — renaming a spot or
+                              fixing its type doesn't invalidate an active lease. Deleting
+                              does, so that stays gated on the spot being free. */}
+                          <button onClick={() => openEditSpot(spot)} style={iconBtn} title={t.parkEditSpot}>
+                            <Icon name="edit" size={13} />
                           </button>
-                        )}
+                          {!occ && (
+                            <button onClick={() => setDeleteTarget(spot)} style={dangerIconBtnStyle} title={t.parkDeleteSpot}>
+                              <Icon name="trash" size={13} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
                         <Badge status={occ ? "occupied" : "vacant"} t={t} />
@@ -2576,13 +2618,26 @@ const ParkingPage = ({ data, t, refresh, user }) => {
       )}
 
       {showSpotModal && (
-        <Modal title={t.parkAddSpotTitle} onClose={() => setShowSpotModal(false)}>
-          <Sel label={t.selectProperty} value={spotForm.propertyId} onChange={v => setSF("propertyId", v)}
-            options={[{ value: "", label: t.selectProperty }, ...data.properties.map(p => ({ value: p.id, label: p.address }))]} />
+        <Modal title={editingSpot ? t.parkEditSpotTitle : t.parkAddSpotTitle} onClose={() => { setShowSpotModal(false); setEditingSpot(null); }}>
+          {editingSpot ? (
+            // Property is fixed once a spot exists: moving it would strand lease
+            // history against a lot the spot no longer belongs to, and could collide
+            // with the unique (property_id, label) constraint on arrival.
+            <Inp label={t.selectProperty} value={data.properties.find(p => p.id === editingSpot.propertyId)?.address || t.parkUnknownProperty} readOnly />
+          ) : (
+            <Sel label={t.selectProperty} value={spotForm.propertyId} onChange={v => setSF("propertyId", v)}
+              options={[{ value: "", label: t.selectProperty }, ...data.properties.map(p => ({ value: p.id, label: p.address }))]} />
+          )}
           <Inp label={t.parkSpotLabel} value={spotForm.label} onChange={v => setSF("label", v)} placeholder="A12" />
+          <Inp label={t.parkSpotType} value={spotForm.type} onChange={v => setSF("type", v)} placeholder={t.parkSpotTypePlaceholder} />
           <Inp label={t.parkMonthlyRate} value={spotForm.monthlyRate} onChange={v => setSF("monthlyRate", v)} type="number" placeholder="0" />
           {spotError && <p style={{ color: "#ef4444", fontSize: 13 }}>{spotError}</p>}
-          <Btn onClick={saveSpot} disabled={savingSpot}>{savingSpot ? t.creating : t.parkAddSpot}</Btn>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => { setShowSpotModal(false); setEditingSpot(null); }}>{t.cancel}</Btn>
+            <Btn onClick={saveSpot} disabled={savingSpot}>
+              {savingSpot ? t.saving : editingSpot ? t.saveChanges : t.parkAddSpot}
+            </Btn>
+          </div>
         </Modal>
       )}
 
@@ -3082,6 +3137,7 @@ function useParkingMutations() {
   const adapter = createParkingAdapter(supabase);
   return {
     createSpot: (fields) => parkingOps.createSpot(adapter, fields),
+    updateSpot: (id, fields) => parkingOps.updateSpot(adapter, id, fields),
     setMarketStatus: (id, marketStatus) => parkingOps.setMarketStatus(adapter, id, marketStatus),
     deleteSpot: (id) => parkingOps.deleteSpot(adapter, id),
     createLease: (fields) => parkingOps.createLease(adapter, fields),
@@ -3242,6 +3298,8 @@ const commentSendStyle = (disabled) => ({ padding: "8px 16px", borderRadius: 8, 
 
 // Outlined red icon-button for row-level delete actions. Call sites override fontSize.
 const dangerIconBtnStyle = { background: "#fff", border: "1px solid #fca5a5", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", fontFamily: "inherit" };
+// Neutral sibling of the above, for non-destructive row-level actions (edit).
+const iconBtn = { background: "#fff", border: "1px solid #eaeaea", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontWeight: 600, color: "#6b7280", display: "flex", alignItems: "center", fontFamily: "inherit" };
 
 // ─── TO DO LIST (kanban) ────────────────────────────────────────────────────
 // Board over the existing maintenance_requests. Stored status values are unchanged
