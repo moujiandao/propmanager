@@ -22,7 +22,7 @@ import * as propertyOps from '@/lib/property/core';
 import { createParkingAdapter } from '@/lib/parking/adapter';
 import { mapParkingSpot, mapParkingRenter, mapParkingLease } from '@/lib/parking/mappers';
 import * as parkingOps from '@/lib/parking/core';
-import { activeLeaseForSpot } from '@/lib/parking/status';
+import { activeLeaseForSpot, SPOT_TYPES } from '@/lib/parking/status';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -290,7 +290,8 @@ const T = {
     parkTitle: "Parking", parkSubtitle: (n) => `${n} parking spots`,
     parkAddSpot: "Add Spot", parkAddSpotTitle: "Add Parking Spot",
     parkSpotLabel: "Spot Label", parkMonthlyRate: "Monthly Rate ($)",
-    parkSpotType: "Type (optional)", parkSpotTypePlaceholder: "e.g. right side (diagonal)",
+    parkSpotType: "Type (optional)", parkSpotTypeNone: "— None —",
+    parkVehicle: "Vehicle", parkCarMake: "Car Make", parkCarModel: "Car Model", parkCarYear: "Car Year",
     parkEditSpot: "Edit Spot", parkEditSpotTitle: "Edit Parking Spot", parkFailedUpdateSpot: "Failed to update spot.",
     parkNoSpots: "No parking spots yet. Add the first one for a property.",
     parkUnknownProperty: "Unknown property",
@@ -550,7 +551,8 @@ const T = {
     parkTitle: "停车位", parkSubtitle: (n) => `共 ${n} 个停车位`,
     parkAddSpot: "添加车位", parkAddSpotTitle: "添加停车位",
     parkSpotLabel: "车位编号", parkMonthlyRate: "月租金（$）",
-    parkSpotType: "类型（可选）", parkSpotTypePlaceholder: "例如：右侧（斜位）",
+    parkSpotType: "类型（可选）", parkSpotTypeNone: "— 无 —",
+    parkVehicle: "车辆", parkCarMake: "汽车品牌", parkCarModel: "汽车型号", parkCarYear: "汽车年份",
     parkEditSpot: "编辑车位", parkEditSpotTitle: "编辑停车位", parkFailedUpdateSpot: "更新车位失败。",
     parkNoSpots: "暂无停车位 — 请先为某个房产添加车位。",
     parkUnknownProperty: "未知房产",
@@ -2404,7 +2406,7 @@ const ContractsPage = ({ data, t, refresh, user }) => {
 };
 
 // ─── PARKING PAGE ─────────────────────────────────────────────────────────────
-const EMPTY_SPOT_FORM = { propertyId: "", label: "", type: "", monthlyRate: "" };
+const EMPTY_SPOT_FORM = { propertyId: "", label: "", type: "", monthlyRate: "", carMake: "", carModel: "", carYear: "" };
 const EMPTY_LEASE_FORM = { renterType: "tenant", tenantId: "", renterName: "", renterEmail: "", renterPhone: "", rate: "", startDate: "", endDate: "" };
 
 const ParkingPage = ({ data, t, refresh, user }) => {
@@ -2444,6 +2446,9 @@ const ParkingPage = ({ data, t, refresh, user }) => {
       label: spot.label,
       type: spot.type || "",
       monthlyRate: spot.monthlyRate == null ? "" : String(spot.monthlyRate),
+      carMake: spot.carMake || "",
+      carModel: spot.carModel || "",
+      carYear: spot.carYear == null ? "" : String(spot.carYear),
     });
     setSpotError(null);
     setShowSpotModal(true);
@@ -2458,10 +2463,11 @@ const ParkingPage = ({ data, t, refresh, user }) => {
     setSavingSpot(true);
     setSpotError(null);
     try {
+      const car = { carMake: spotForm.carMake, carModel: spotForm.carModel, carYear: spotForm.carYear };
       if (editingSpot) {
-        await mx.updateSpot(editingSpot.id, { label: spotForm.label, type: spotForm.type, monthlyRate: spotForm.monthlyRate });
+        await mx.updateSpot(editingSpot.id, { label: spotForm.label, type: spotForm.type, monthlyRate: spotForm.monthlyRate, ...car });
       } else {
-        await mx.createSpot({ landlordId: user.id, propertyId: spotForm.propertyId, label: spotForm.label.trim(), type: spotForm.type, monthlyRate: spotForm.monthlyRate });
+        await mx.createSpot({ landlordId: user.id, propertyId: spotForm.propertyId, label: spotForm.label.trim(), type: spotForm.type, monthlyRate: spotForm.monthlyRate, ...car });
       }
       await refresh();
       setShowSpotModal(false);
@@ -2572,6 +2578,12 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                         <div>
                           <div style={{ fontSize: 15, fontWeight: 700, color: "#111111" }}>{spot.label}</div>
                           {spot.type && <div style={{ fontSize: 12, color: "#6b7280" }}>{spot.type}</div>}
+                          {(() => {
+                            // "2019 Honda Civic" from whichever parts are filled in;
+                            // nothing renders if none are.
+                            const car = [spot.carYear, spot.carMake, spot.carModel].filter(Boolean).join(" ");
+                            return car ? <div style={{ fontSize: 12, color: "#111111", fontWeight: 600 }}>{car}</div> : null;
+                          })()}
                           <div style={{ fontSize: 13, color: "#9ca3af" }}>{spot.monthlyRate ? `${fmt(spot.monthlyRate)}/mo` : "—"}</div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -2629,8 +2641,17 @@ const ParkingPage = ({ data, t, refresh, user }) => {
               options={[{ value: "", label: t.selectProperty }, ...data.properties.map(p => ({ value: p.id, label: p.address }))]} />
           )}
           <Inp label={t.parkSpotLabel} value={spotForm.label} onChange={v => setSF("label", v)} placeholder="A12" />
-          <Inp label={t.parkSpotType} value={spotForm.type} onChange={v => setSF("type", v)} placeholder={t.parkSpotTypePlaceholder} />
+          <Sel label={t.parkSpotType} value={spotForm.type} onChange={v => setSF("type", v)}
+            options={[{ value: "", label: t.parkSpotTypeNone }, ...SPOT_TYPES.map(x => ({ value: x, label: x }))]} />
           <Inp label={t.parkMonthlyRate} value={spotForm.monthlyRate} onChange={v => setSF("monthlyRate", v)} type="number" placeholder="0" />
+          <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 14, marginTop: 2 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>{t.parkVehicle}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Inp label={t.parkCarMake} value={spotForm.carMake} onChange={v => setSF("carMake", v)} placeholder="Honda" />
+              <Inp label={t.parkCarModel} value={spotForm.carModel} onChange={v => setSF("carModel", v)} placeholder="Civic" />
+            </div>
+            <Inp label={t.parkCarYear} value={spotForm.carYear} onChange={v => setSF("carYear", v)} type="number" placeholder="2019" />
+          </div>
           {spotError && <p style={{ color: "#ef4444", fontSize: 13 }}>{spotError}</p>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => { setShowSpotModal(false); setEditingSpot(null); }}>{t.cancel}</Btn>
