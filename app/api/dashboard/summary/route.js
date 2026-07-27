@@ -181,11 +181,20 @@ export async function POST(request) {
     }
     const scopedUnits = unitsRes.data || []
 
+    // Properties flagged NOT in production drop out of this briefing, same as the
+    // dashboard/Tenants/Payments/To Do List pages. Property count itself is unaffected —
+    // only tenant- and maintenance-derived facts are scoped down.
+    const excludedPropertyIds = new Set((propsRes.data || []).filter(p => p.in_production === false).map(p => p.id))
+    const visibleTenants = (tenantsRes.data || []).filter(t => !t.property_id || !excludedPropertyIds.has(t.property_id))
+    const visibleTenantIds = new Set(visibleTenants.map(t => t.id))
+    const visiblePayments = (paymentsRes.data || []).filter(p => !p.tenant_id || visibleTenantIds.has(p.tenant_id))
+    const visibleMaintenance = (maintRes.data || []).filter(m => !m.property_id || !excludedPropertyIds.has(m.property_id))
+
     const facts = buildFacts({
-      tenants: tenantsRes.data || [],
+      tenants: visibleTenants,
       contracts: contractsRes.data || [],
-      payments: paymentsRes.data || [],
-      maintenance: maintRes.data || [],
+      payments: visiblePayments,
+      maintenance: visibleMaintenance,
       properties: propsRes.data || [],
       units: scopedUnits,
       now: new Date(),

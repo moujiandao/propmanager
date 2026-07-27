@@ -279,6 +279,7 @@ const T = {
     docView: "View", docNoDocuments: "No documents attached", docDriveLinkPlaceholder: "Paste Google Drive share URL",
     docAttach: "Attach", docRemove: "Remove",
     editProperty: "Edit Property", driveFolderUrl: "Google Drive Folder URL",
+    inProduction: "In Production", inProductionHint: "Tenants of this property will be hidden from the dashboard, Tenants, Payments, and To Do List pages.", propNotInProduction: "Not in Production",
     failedCreateLease: "Failed to create lease.", failedCreateTenant: "Failed to create tenant.",
     tenantNameMoveInRequired: "First name and move-in date are required.",
   },
@@ -516,6 +517,7 @@ const T = {
     docView: "查看", docNoDocuments: "暂无附件", docDriveLinkPlaceholder: "粘贴 Google Drive 分享链接",
     docAttach: "附加", docRemove: "删除",
     editProperty: "编辑房产", driveFolderUrl: "Google Drive 文件夹链接",
+    inProduction: "启用中", inProductionHint: "此房产的租客将不再显示在仪表盘、租客、付款和待办事项页面中。", propNotInProduction: "未启用",
     failedCreateLease: "创建租约失败。", failedCreateTenant: "创建租客失败。",
     tenantNameMoveInRequired: "请填写名字和入住日期。",
   }
@@ -783,6 +785,14 @@ export const PropertyFilterBar = ({ chips, hidden, setHidden, t }) => {
   );
 };
 
+// Property ids flagged NOT in production (`properties.inProduction === false`, see
+// lib/property/mappers.js). A tenant or maintenance request tied to one of these ids
+// is excluded from the dashboard, Tenants, Payments, and To Do List pages — the flag
+// retires a property from active tracking without deleting its history. A tenant with
+// no assigned property is unaffected, since the flag is per-property, not per-tenant.
+const nonProductionPropertyIds = (properties) =>
+  new Set((properties || []).filter(p => p.inProduction === false).map(p => p.id));
+
 const StatCard = ({ label, value, sub, icon, color = "#111111" }) => (
   <div style={{ background: "#fff", borderRadius: 14, padding: "20px 22px", border: "1px solid #f5f5f5", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
@@ -798,7 +808,30 @@ const StatCard = ({ label, value, sub, icon, color = "#111111" }) => (
 
 // ─── LANDLORD DASHBOARD ───────────────────────────────────────────────────────
 const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelectedPropertyId, setSelectedTenantId }) => {
-  const { properties, tenants, payments, maintenance, contracts, units = [] } = data;
+  const { properties, tenants: allTenants, payments: allPayments, maintenance: allMaintenance, contracts, units: allUnits = [] } = data;
+  // Everything below reads `tenants`/`payments`/`maintenance`/`units` (not the `all*`
+  // names), so scoping down here — instead of hunting every call site in this
+  // ~250-line component — makes every dashboard calculation agree by construction.
+  // `properties` itself is NOT filtered: the flag hides a property's tenants, not the
+  // property listing (that stays on the Properties page, where the flag is toggled).
+  const excludedPropertyIds = useMemo(() => nonProductionPropertyIds(properties), [properties]);
+  const tenants = useMemo(
+    () => allTenants.filter(x => !x.propertyId || !excludedPropertyIds.has(x.propertyId)),
+    [allTenants, excludedPropertyIds]
+  );
+  const visibleTenantIds = useMemo(() => new Set(tenants.map(x => x.id)), [tenants]);
+  const payments = useMemo(
+    () => allPayments.filter(x => !x.tenantId || visibleTenantIds.has(x.tenantId)),
+    [allPayments, visibleTenantIds]
+  );
+  const maintenance = useMemo(
+    () => allMaintenance.filter(x => !x.propertyId || !excludedPropertyIds.has(x.propertyId)),
+    [allMaintenance, excludedPropertyIds]
+  );
+  const units = useMemo(
+    () => allUnits.filter(x => !excludedPropertyIds.has(x.propertyId)),
+    [allUnits, excludedPropertyIds]
+  );
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
@@ -1273,7 +1306,7 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
 const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId }) => {
   const propertyMx = usePropertyMutations();
   const [show, setShow] = useState(false);
-  const [form, setForm] = useState({ address: "", city: "", state: "CA", zip: "", units: "1", type: "Single Family", status: "vacant" });
+  const [form, setForm] = useState({ address: "", city: "", state: "CA", zip: "", units: "1", type: "Single Family", status: "vacant", inProduction: true });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -1313,7 +1346,7 @@ const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId
     try {
       await propertyMx.create({
         landlordId: user.id, address: form.address, city: form.city, state: form.state, zip: form.zip,
-        units: form.units, type: form.type, status: form.status,
+        units: form.units, type: form.type, status: form.status, inProduction: form.inProduction,
       });
     } catch { return; }
     await refresh(); setShow(false);
@@ -1321,7 +1354,7 @@ const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId
   const openEdit = (p, e) => {
     e.stopPropagation();
     setEditing(p);
-    setEditForm({ address: p.address, city: p.city, state: p.state, zip: p.zip, units: String(p.units || ""), type: p.type || "Single Family", status: p.status || "vacant", driveLink: p.driveLink || "" });
+    setEditForm({ address: p.address, city: p.city, state: p.state, zip: p.zip, units: String(p.units || ""), type: p.type || "Single Family", status: p.status || "vacant", driveLink: p.driveLink || "", inProduction: p.inProduction !== false });
   };
   const saveEdit = async () => {
     setEditError(null);
@@ -1332,7 +1365,7 @@ const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId
         propertyId: editing.id,
         address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip,
         units: editForm.units, type: editForm.type, status: editForm.status,
-        driveLink: editForm.driveLink || "",
+        driveLink: editForm.driveLink || "", inProduction: editForm.inProduction,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -1381,7 +1414,12 @@ const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId
               </div>
               <div style={{ padding: 22 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111111", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{p.address}</h3>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111111", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>{p.address}</h3>
+                    {p.inProduction === false && (
+                      <span style={{ display: "inline-block", marginTop: 5, fontSize: 11, fontWeight: 700, color: "#991b1b", background: "#fee2e2", padding: "2px 8px", borderRadius: 6, letterSpacing: ".3px" }}>{t.propNotInProduction}</span>
+                    )}
+                  </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button onClick={e => openEdit(p, e)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#9ca3af", borderRadius: 6, display: "flex", alignItems: "center" }}
                       onMouseEnter={e => e.currentTarget.style.color = "#111111"} onMouseLeave={e => e.currentTarget.style.color = "#9ca3af"}>
@@ -1416,6 +1454,13 @@ const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId
             <Inp label={t.units} value={form.units} onChange={v => setF("units",v)} type="number" />
             <Sel label={t.status} value={form.status} onChange={v => setF("status",v)} options={[{value:"vacant",label:t.st_vacant},{value:"occupied",label:t.st_occupied}]} />
           </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              <input type="checkbox" checked={form.inProduction} onChange={e => setF("inProduction", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+              {t.inProduction}
+            </label>
+            {!form.inProduction && <p style={{ margin: "5px 0 0", fontSize: 11, color: "#9ca3af", lineHeight: 1.4 }}>{t.inProductionHint}</p>}
+          </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
             <Btn variant="secondary" onClick={() => setShow(false)}>{t.cancel}</Btn>
             <Btn onClick={add}>{t.addProperty}</Btn>
@@ -1435,6 +1480,13 @@ const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId
             <Sel label={t.status} value={editForm.status} onChange={v => setEF("status",v)} options={[{value:"vacant",label:t.st_vacant},{value:"occupied",label:t.st_occupied}]} />
           </div>
           <Inp label={t.driveFolderUrl} value={editForm.driveLink} onChange={v => setEF("driveLink",v)} placeholder="https://drive.google.com/drive/folders/..." />
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              <input type="checkbox" checked={editForm.inProduction} onChange={e => setEF("inProduction", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+              {t.inProduction}
+            </label>
+            {!editForm.inProduction && <p style={{ margin: "5px 0 0", fontSize: 11, color: "#9ca3af", lineHeight: 1.4 }}>{t.inProductionHint}</p>}
+          </div>
           {editError && <div style={{ fontSize: 13, color: "#ef4444", marginTop: 4 }}>{editError}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
             <Btn variant="secondary" onClick={() => { setEditing(null); setEditError(null); }}>{t.cancel}</Btn>
@@ -1582,16 +1634,23 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     if (statusReady) localStorage.setItem("propmanager_tenant_status_filter", statusFilter);
   }, [statusFilter, statusReady]);
 
+  // Tenants of a property flagged "not in production" never reach the page, independent
+  // of the show/hide chip state above — that state is a per-session display preference,
+  // this is a data-level exclusion. Properties with no visible tenants left are also
+  // dropped from the chip list itself, since toggling an always-empty chip is dead UI.
+  const excludedPropertyIds = nonProductionPropertyIds(data.properties);
+  const inProductionTenants = data.tenants.filter(ten => !ten.propertyId || !excludedPropertyIds.has(ten.propertyId));
+
   const propKey = (ten) => ten.propertyId || "__none__";
   const isVisible = (ten) => !hiddenProps.has(propKey(ten));
   const filterChips = [
-    ...data.properties.map(p => ({ id: p.id, label: p.address })),
-    ...(data.tenants.some(ten => !ten.propertyId) ? [{ id: "__none__", label: t.tenNoProperty }] : []),
+    ...data.properties.filter(p => !excludedPropertyIds.has(p.id)).map(p => ({ id: p.id, label: p.address })),
+    ...(inProductionTenants.some(ten => !ten.propertyId) ? [{ id: "__none__", label: t.tenNoProperty }] : []),
   ];
 
-  const currentTenants = data.tenants.filter(t => t.status?.toLowerCase() === "current tenant" && isVisible(t));
-  const futureTenants  = data.tenants.filter(t => t.status?.toLowerCase() === "future tenant" && isVisible(t));
-  const pastTenants    = data.tenants.filter(t => t.status?.toLowerCase() === "previous tenant" && isVisible(t));
+  const currentTenants = inProductionTenants.filter(ten => ten.status?.toLowerCase() === "current tenant" && isVisible(ten));
+  const futureTenants  = inProductionTenants.filter(ten => ten.status?.toLowerCase() === "future tenant" && isVisible(ten));
+  const pastTenants    = inProductionTenants.filter(ten => ten.status?.toLowerCase() === "previous tenant" && isVisible(ten));
 
   // Tenants shown depend on the persisted status filter; past view has no "future" secondary group
   const primaryTenants   = statusFilter === "past" ? pastTenants : currentTenants;
@@ -2354,18 +2413,27 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
     } catch { /* ignore quota / private-mode failures */ }
   }, [hiddenProps]);
 
+  // Tenants of a property flagged "not in production" are excluded regardless of the
+  // show/hide chip state (a per-session display preference; this is a data-level
+  // exclusion), and such properties are dropped from the chip list itself.
+  const excludedPropertyIds = nonProductionPropertyIds(data.properties);
+
   const filterChips = [
-    ...data.properties.map(p => ({ id: p.id, label: p.address })),
+    ...data.properties.filter(p => !excludedPropertyIds.has(p.id)).map(p => ({ id: p.id, label: p.address })),
     ...(data.tenants.some(ten => ten.status === "current tenant" && !ten.propertyId)
       ? [{ id: "__none__", label: t.tenNoProperty }] : []),
   ];
 
-  // Group tenants by unit
-  const grouped = useMemo(() => {
+  // Group tenants by unit. Plain const, not useMemo — the React Compiler memoizes
+  // consts automatically; a manual useMemo here trips "memoization could not be
+  // preserved" once its body closes over excludedPropertyIds (see CLAUDE.md).
+  const grouped = (() => {
     const unitMap = {};
     const noUnit = [];
     const visible = data.tenants.filter(ten =>
-      ten.status === "current tenant" && !hiddenProps.has(ten.propertyId || "__none__"));
+      ten.status === "current tenant"
+      && (!ten.propertyId || !excludedPropertyIds.has(ten.propertyId))
+      && !hiddenProps.has(ten.propertyId || "__none__"));
     for (const tenant of visible) {
       if (tenant.unitId) {
         if (!unitMap[tenant.unitId]) {
@@ -2381,9 +2449,9 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
     );
     if (noUnit.length > 0) groups.push({ unit: null, tenants: noUnit });
     return groups;
-  }, [data.tenants, data.units, hiddenProps]);
+  })();
 
-  const allTenants = useMemo(() => grouped.flatMap(g => g.tenants), [grouped]);
+  const allTenants = grouped.flatMap(g => g.tenants);
 
   const getContract = (tenant) => data.contracts.find(c => c.tenantIds.includes(tenant.id));
 
@@ -2967,17 +3035,24 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const fileInputRef = useRef(null);
   const mx = useMaintenanceMutations(setData);
 
+  // Requests/tenants tied to a property flagged "not in production" don't reach this
+  // board — retiring a property hides its To Do List entries the same as it hides the
+  // property's tenants on the dashboard, Tenants, and Payments pages.
+  const excludedPropertyIds = nonProductionPropertyIds(data.properties);
+  const visibleMaintenance = data.maintenance.filter(m => !m.propertyId || !excludedPropertyIds.has(m.propertyId));
+  const visibleTenants = data.tenants.filter(ten => !ten.propertyId || !excludedPropertyIds.has(ten.propertyId));
+
   // A few px of movement before a drag begins, so a click opens the card detail
   // and only an actual drag moves it between columns.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const onDragEnd = ({ active, over }) => {
     if (!over) return;
-    const m = data.maintenance.find(x => x.id === active.id);
+    const m = visibleMaintenance.find(x => x.id === active.id);
     if (!m || todoColumnOf(m.status) === over.id) return;
     updateStatus(active.id, over.id);
   };
 
-  const selectedTenant = data.tenants.find(ten => ten.id === form.tenantId);
+  const selectedTenant = visibleTenants.find(ten => ten.id === form.tenantId);
   const selectedUnit = selectedTenant
     ? (data.units.find(u => u.id === selectedTenant.unitId)?.unitNumber || selectedTenant.unit || "—")
     : "—";
@@ -3077,13 +3152,13 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
 
   return (
     <div>
-      <PageHeader title={t.maintTitle} subtitle={t.maintSubtitle(data.maintenance.filter(m => maintStatus.isOpen(m.status)).length)} action={<Btn icon="plus" onClick={() => { resetModal(); setShowModal(true); }}>{t.maintNewRequest}</Btn>} />
+      <PageHeader title={t.maintTitle} subtitle={t.maintSubtitle(visibleMaintenance.filter(m => maintStatus.isOpen(m.status)).length)} action={<Btn icon="plus" onClick={() => { resetModal(); setShowModal(true); }}>{t.maintNewRequest}</Btn>} />
 
       {/* Kanban board */}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div style={{ display: "flex", gap: 16, alignItems: "flex-start", overflowX: "auto", paddingBottom: 8 }}>
           {TODO_COLUMNS.map(col => {
-            const cards = data.maintenance.filter(m => todoColumnOf(m.status) === col.key);
+            const cards = visibleMaintenance.filter(m => todoColumnOf(m.status) === col.key);
             return (
               <TodoColumn key={col.key} id={col.key} title={t[col.tKey]} count={cards.length} emptyText={t.todoEmptyColumn}>
                 {cards.map(m => {
@@ -3106,7 +3181,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
 
       {/* Card detail modal */}
       {detailId && (() => {
-        const m = data.maintenance.find(x => x.id === detailId);
+        const m = visibleMaintenance.find(x => x.id === detailId);
         if (!m) return null;
         const ten = data.tenants.find(ten => ten.id === m.tenantId);
         const prop = data.properties.find(p => p.id === m.propertyId);
@@ -3171,7 +3246,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
               <select value={form.tenantId} onChange={e => setF("tenantId", e.target.value)}
                 style={{ width: "100%", padding: "10px 14px", border: "1px solid #eaeaea", borderRadius: 9, fontSize: 14, color: "#111111", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}>
                 <option value="">{t.maintSelectTenant}</option>
-                {data.tenants.filter(ten => ten.status === "current tenant" || ten.status === "future tenant").map(ten => (
+                {visibleTenants.filter(ten => ten.status === "current tenant" || ten.status === "future tenant").map(ten => (
                   <option key={ten.id} value={ten.id}>{tenantFullName(ten)}</option>
                 ))}
               </select>
