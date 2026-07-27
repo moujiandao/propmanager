@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request) {
-  const { propertyId, address, city, state, zip, units, type, status, driveLink } = await request.json()
+  const { propertyId, address, city, state, zip, units, type, status, driveLink, inProduction } = await request.json()
 
   if (!propertyId) {
     return Response.json({ error: 'propertyId is required.' }, { status: 400 })
@@ -24,6 +24,9 @@ export async function POST(request) {
       type,
       status,
       drive_link: driveLink?.trim() || null,
+      // Matches the `units` pattern above: undefined is dropped by JSON.stringify, so a
+      // caller that omits inProduction leaves the column untouched rather than resetting it.
+      in_production: typeof inProduction === 'boolean' ? inProduction : undefined,
     })
     .eq('id', propertyId)
 
