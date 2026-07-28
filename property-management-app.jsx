@@ -299,8 +299,8 @@ const T = {
     parkUnplaced: (labels) => `Not shown above (no type set): ${labels}`,
     parkNoSpots: "No parking spots yet. Add the first one for a property.",
     parkUnknownProperty: "Unknown property",
-    parkAddLease: "Add Lease", parkAddLeaseTitle: "Lease This Spot",
-    parkEndLease: "End Lease", parkSince: "since",
+    parkAddLease: "Add Parking Lease", parkAddLeaseTitle: "New Parking Lease",
+    parkEndLease: "End Parking Lease", parkSince: "since", parkLeaseHeading: "Parking Lease",
     parkExistingTenant: "Existing Tenant", parkMarketRenter: "Market Renter",
     parkOpenToMarket: "Open to Market", parkMarkTenantPriority: "Mark Tenant-Priority",
     parkDeleteSpot: "Delete Spot", parkDeleteSpotTitle: "Delete Parking Spot",
@@ -311,7 +311,7 @@ const T = {
     parkSelectTenantRequired: "Select a tenant.",
     parkRenterNameRequired: "Renter name is required.",
     parkFailedCreateSpot: "Failed to create spot.", parkFailedDeleteSpot: "Failed to delete spot.",
-    parkFailedCreateLease: "Failed to create lease.",
+    parkFailedCreateLease: "Failed to create parking lease.",
     st_tenant_priority: "Tenant Priority", st_open_market: "Open Market",
   },
   zh: {
@@ -563,8 +563,8 @@ const T = {
     parkUnplaced: (labels) => `未显示在上图中（未设置类型）：${labels}`,
     parkNoSpots: "暂无停车位 — 请先为某个房产添加车位。",
     parkUnknownProperty: "未知房产",
-    parkAddLease: "添加租约", parkAddLeaseTitle: "出租此车位",
-    parkEndLease: "结束租约", parkSince: "起租于",
+    parkAddLease: "添加车位租约", parkAddLeaseTitle: "新建车位租约",
+    parkEndLease: "结束车位租约", parkSince: "起租于", parkLeaseHeading: "车位租约",
     parkExistingTenant: "现有租客", parkMarketRenter: "市场租客",
     parkOpenToMarket: "开放给市场", parkMarkTenantPriority: "标记为租客优先",
     parkDeleteSpot: "删除车位", parkDeleteSpotTitle: "删除停车位",
@@ -575,7 +575,7 @@ const T = {
     parkSelectTenantRequired: "请选择一位租客。",
     parkRenterNameRequired: "租客姓名为必填项。",
     parkFailedCreateSpot: "创建车位失败。", parkFailedDeleteSpot: "删除车位失败。",
-    parkFailedCreateLease: "创建租约失败。",
+    parkFailedCreateLease: "创建车位租约失败。",
     st_tenant_priority: "租客优先", st_open_market: "开放市场",
   }
 };
@@ -2419,6 +2419,7 @@ const EMPTY_LEASE_FORM = { renterType: "tenant", tenantId: "", renterName: "", r
 // Label/value row for the spot detail modal. Renders an em-dash for anything empty so
 // the rows stay aligned instead of collapsing when a field is unset.
 const detailRowStyle = { display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", fontSize: 13 };
+const detailSectionHeading = { fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 };
 const DetailRow = ({ label, value }) => (
   <div style={detailRowStyle}>
     <span style={{ color: "#9ca3af" }}>{label}</span>
@@ -2805,12 +2806,16 @@ const ParkingPage = ({ data, t, refresh, user }) => {
             <div style={{ borderTop: "1px solid #eaeaea", marginTop: 14, paddingTop: 14 }}>
               {occ ? (
                 <>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>
+                  <div style={detailSectionHeading}>
                     {occ.kind === "tenant" ? t.parkExistingTenant : t.parkMarketRenter}
                   </div>
                   <DetailRow label={t.fullName} value={occ.name} />
                   <DetailRow label={t.email} value={occ.person?.email} />
                   <DetailRow label={t.phone} value={occ.person?.phone} />
+                  {/* The rate and dates belong to the parking lease, not the person — and
+                      a parking lease is a separate agreement from the tenant's residential
+                      lease (see CONTEXT.md), so the heading names it explicitly. */}
+                  <div style={{ ...detailSectionHeading, marginTop: 14 }}>{t.parkLeaseHeading}</div>
                   <DetailRow label={t.parkMonthlyRate} value={fmt(occ.lease.rate)} />
                   <DetailRow label={t.startDate} value={fmtDate(occ.lease.startDate)} />
                   <DetailRow label={t.endDate} value={occ.lease.endDate ? fmtDate(occ.lease.endDate) : t.parkOngoing} />

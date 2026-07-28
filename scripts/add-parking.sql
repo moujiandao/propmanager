@@ -10,9 +10,13 @@
 --                       has no link to auth.users: nothing in the write
 --                       path ever creates a login for one of these rows,
 --                       so a market renter can never get portal access.
---   parking_leases   - the "contract" for a spot. Exactly one of
---                       tenant_id / renter_id is set (CHECK), so a lease
---                       can never be ambiguous about who it's for.
+--   parking_leases   - the PARKING LEASE: the agreement for one spot.
+--                       A separate record from `contracts` (the residential
+--                       lease), with no link between them -- a spot can be
+--                       rented by a non-tenant, and parking terms run
+--                       independently of the residential term. Exactly one
+--                       of tenant_id / renter_id is set (CHECK), so a
+--                       parking lease is never ambiguous about who it's for.
 --
 -- Occupancy is DERIVED from a lease's start/end dates (see
 -- lib/parking/status.js), not stored as a column, mirroring the tenant
