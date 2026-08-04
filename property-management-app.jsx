@@ -10,7 +10,7 @@ import * as maint from '@/lib/maintenance/core';
 import * as maintStatus from '@/lib/maintenance/status';
 import { createTenantAdapter } from '@/lib/tenant/adapter';
 import { mapTenant } from '@/lib/tenant/mappers';
-import { statusFor, isCurrentRow } from '@/lib/tenant/status';
+import { statusFor, isCurrentRow, awaitingMoveInAck, awaitingMoveOutAck } from '@/lib/tenant/status';
 import * as tenantOps from '@/lib/tenant/core';
 import { createPaymentReminderAdapter } from '@/lib/payment-reminders/adapter';
 import { mapEmailSettings } from '@/lib/payment-reminders/mappers';
@@ -19,6 +19,9 @@ import * as reminderOps from '@/lib/payment-reminders/core';
 import { createPropertyAdapter } from '@/lib/property/adapter';
 import { mapProperty } from '@/lib/property/mappers';
 import * as propertyOps from '@/lib/property/core';
+import { createUnitAdapter } from '@/lib/units/adapter';
+import { mapUnit } from '@/lib/units/mappers';
+import * as unitOps from '@/lib/units/core';
 import { createParkingAdapter } from '@/lib/parking/adapter';
 import { mapParkingSpot, mapParkingRenter, mapParkingLease } from '@/lib/parking/mappers';
 import * as parkingOps from '@/lib/parking/core';
@@ -272,6 +275,29 @@ const T = {
     emailLoginNote: "This email is the tenant's login. Changing it will update the address used for login and notifications.",
     deleteTenant: "Delete Tenant", deleteWarning: "This will permanently remove their account and all associated data. This cannot be undone.",
     deleting: "Deleting…", langLabel: "Language", navDocuments: "Documents", navAdminUsers: "Admin Users",
+    // Units (property detail page — lib/units seam)
+    unitAdd: "Add Unit", unitEditTitle: (n) => `Edit Unit ${n}`, unitLabel: (n) => `Unit ${n}`,
+    unitEditAction: "Edit unit", unitDeleteAction: "Delete unit",
+    unitsEmpty: "No units yet. Add the first unit for this property.",
+    unitsOccupiedCount: (occ, total) => `${occ}/${total} occupied`,
+    unitNumberLabel: "Unit Number", unitNumberPlaceholder: "e.g. 101, A, 2B",
+    unitBedrooms: "Bedrooms", unitBathrooms: "Bathrooms",
+    unitRentLabel: "Monthly Rent ($)", unitRentPlaceholder: "e.g. 1500", unitRentPerMonth: (v) => `${v}/mo`,
+    unitBedBath: (b, ba) => `${b} bed / ${ba} bath`,
+    unitTenantHeading: "Tenant", unitTenantsHeading: (n) => `Tenants (${n})`,
+    unitOccupiedUnlinked: "Occupied — tenant unlinked", unitVacant: "Vacant",
+    unitNumberRequired: "Unit number is required.",
+    unitDeleteTitle: (n) => `Delete Unit ${n}?`,
+    unitDeleteWarning: "This permanently removes the unit. This cannot be undone.",
+    unitDeleteBlocked: (n) => `${n} tenant${n === 1 ? " is" : "s are"} still assigned to this unit. Reassign ${n === 1 ? "them" : "them"} to another unit before deleting it.`,
+    unitDeleteConfirm: "Delete Unit",
+    unitPropertyNotFound: "Property not found.", unitBack: "Back",
+    maintClosedOn: (date) => `Closed ${date}`, maintClosedDate: "Closed",
+    // Dashboard move-in / move-out acknowledgment
+    dashAckMovedIn: (n) => n === 1 ? "Tenant has moved in" : "Tenants have moved in",
+    dashAckMovedOut: (n) => n === 1 ? "Tenant has moved out" : "Tenants have moved out",
+    dashAckPendingMoveIn: "Awaiting confirmation", dashAckPendingMoveOut: "Awaiting confirmation",
+    dashAckSaving: "Confirming…",
     adminUsersTitle: "Admin Users", adminUsersSubtitle: "Create additional landlord accounts",
     adminName: "Name", adminEmail: "Email", adminPassword: "Password",
     adminCreateBtn: "Create Admin Account", adminCreating: "Creating…",
@@ -536,6 +562,29 @@ const T = {
     emailLoginNote: "此邮箱为租客登录账号，修改后将同步更新登录及通知所用的邮箱。",
     deleteTenant: "删除租客", deleteWarning: "这将永久删除其账号及所有相关数据，此操作无法撤销。",
     deleting: "删除中…", langLabel: "语言", navDocuments: "文件", navAdminUsers: "管理员用户",
+    // 单元（房产详情页 — lib/units seam）
+    unitAdd: "添加单元", unitEditTitle: (n) => `编辑单元 ${n}`, unitLabel: (n) => `单元 ${n}`,
+    unitEditAction: "编辑单元", unitDeleteAction: "删除单元",
+    unitsEmpty: "暂无单元。为此房产添加第一个单元。",
+    unitsOccupiedCount: (occ, total) => `${total} 个单元中 ${occ} 个已入住`,
+    unitNumberLabel: "单元号", unitNumberPlaceholder: "例如 101、A、2B",
+    unitBedrooms: "卧室数", unitBathrooms: "卫生间数",
+    unitRentLabel: "月租金（$）", unitRentPlaceholder: "例如 1500", unitRentPerMonth: (v) => `${v}/月`,
+    unitBedBath: (b, ba) => `${b} 卧 / ${ba} 卫`,
+    unitTenantHeading: "租户", unitTenantsHeading: (n) => `租户（${n}）`,
+    unitOccupiedUnlinked: "已入住 — 未关联租户", unitVacant: "空置",
+    unitNumberRequired: "请填写单元号。",
+    unitDeleteTitle: (n) => `删除单元 ${n}？`,
+    unitDeleteWarning: "此操作将永久删除该单元，且无法撤销。",
+    unitDeleteBlocked: (n) => `仍有 ${n} 位租户分配在此单元。请先将其转移到其他单元，然后再删除。`,
+    unitDeleteConfirm: "删除单元",
+    unitPropertyNotFound: "未找到房产。", unitBack: "返回",
+    maintClosedOn: (date) => `已关闭 ${date}`, maintClosedDate: "关闭日期",
+    // 仪表板入住 / 退租确认
+    dashAckMovedIn: () => "租户已入住",
+    dashAckMovedOut: () => "租户已退租",
+    dashAckPendingMoveIn: "待确认", dashAckPendingMoveOut: "待确认",
+    dashAckSaving: "确认中…",
     adminUsersTitle: "管理员用户", adminUsersSubtitle: "创建额外的房东账号",
     adminName: "姓名", adminEmail: "电子邮件", adminPassword: "密码",
     adminCreateBtn: "创建管理员账号", adminCreating: "创建中…",
@@ -867,14 +916,46 @@ const StatCard = ({ label, value, sub, icon, color = "#111111" }) => (
   </div>
 );
 
+// Shared by both dashboard transition-acknowledgment buttons ("…have moved in" /
+// "…have moved out"); only cursor + opacity differ while a confirm is in flight.
+const ackBtnStyle = { alignSelf: "flex-start", marginTop: 4, background: "#111111", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, fontFamily: "inherit" };
+
 // ─── LANDLORD DASHBOARD ───────────────────────────────────────────────────────
-const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelectedPropertyId, setSelectedTenantId }) => {
+const LandlordDashboard = ({ data, setData, t, lang, langReady, user, setPage, setSelectedPropertyId, setSelectedTenantId }) => {
   const { properties, tenants: allTenants, payments: allPayments, maintenance: allMaintenance, contracts, units: allUnits = [] } = data;
   // Everything below reads `tenants`/`payments`/`maintenance`/`units` (not the `all*`
   // names), so scoping down here — instead of hunting every call site in this
   // ~250-line component — makes every dashboard calculation agree by construction.
   // `properties` itself is NOT filtered: the flag hides a property's tenants, not the
   // property listing (that stays on the Properties page, where the flag is toggled).
+  const tenantMx = useTenantMutations();
+  const [ackingRow, setAckingRow] = useState(null);   // row key currently being confirmed
+
+  // Confirm every pending move-in (or move-out) on one unit row at once, which
+  // is what the landlord means by "the tenants have moved in". Optimistic: the
+  // row disappears immediately, and on failure the acked fields are restored so
+  // it comes back rather than silently staying gone.
+  const acknowledgeTransition = async (rowKey, tenantsToAck, direction) => {
+    if (!tenantsToAck.length) return;
+    const field = direction === "in" ? "moveInAckedAt" : "moveOutAckedAt";
+    const now = new Date().toISOString();
+    const ids = new Set(tenantsToAck.map(x => x.id));
+    setAckingRow(rowKey);
+    let prevTenants;
+    setData(d => {
+      prevTenants = d.tenants;
+      return { ...d, tenants: d.tenants.map(x => ids.has(x.id) ? { ...x, [field]: x[field] || now } : x) };
+    });
+    try {
+      const op = direction === "in" ? tenantMx.acknowledgeMoveIn : tenantMx.acknowledgeMoveOut;
+      await Promise.all(tenantsToAck.map(x => op(x.id, x[field])));
+    } catch (e) {
+      console.error("[dashboard] acknowledge transition", e);
+      setData(d => ({ ...d, tenants: prevTenants }));
+    }
+    setAckingRow(null);
+  };
+
   const excludedPropertyIds = useMemo(() => nonProductionPropertyIds(properties), [properties]);
   const tenants = useMemo(
     () => allTenants.filter(x => !x.propertyId || !excludedPropertyIds.has(x.propertyId)),
@@ -1042,9 +1123,14 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
       return map.get(k);
     };
 
+    // Upcoming move-outs in the window, PLUS move-outs whose date has passed
+    // that nobody has confirmed. Without the second clause the row dismisses
+    // itself the day after the move-out (the tenant derives to "previous"), so
+    // a move-out that never actually happened silently disappears.
     tenants
-      .filter(ten => ten.status === "current tenant" && ten.moveOutDate
-                     && ten.moveOutDate >= todayStr && ten.moveOutDate <= sixMoStr)
+      .filter(ten => (ten.status === "current tenant" && ten.moveOutDate
+                      && ten.moveOutDate >= todayStr && ten.moveOutDate <= sixMoStr)
+                     || awaitingMoveOutAck(ten))
       .forEach(ten => {
         const unit = units.find(u => u.id === ten.unitId);
         const prop = properties.find(p => p.id === ten.propertyId);
@@ -1052,8 +1138,10 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
         ensureRow(k, ten.propertyId, prop?.address || "", ten.unitId, unit?.unitNumber || ten.unit || "—").outgoing.push(ten);
       });
 
+    // Same on the way in: a future tenant flips to "current" on their move-in
+    // day and would vanish from this list, so keep them until confirmed.
     tenants
-      .filter(ten => ten.status === "future tenant")
+      .filter(ten => ten.status === "future tenant" || awaitingMoveInAck(ten))
       .forEach(ten => {
         const unit = units.find(u => u.id === ten.unitId);
         const prop = properties.find(p => p.id === ten.propertyId);
@@ -1098,7 +1186,11 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
         return String(t.unit || "").trim() === String(row.unitLabel || "").trim();
       });
       const allCurrentMovingOut = row.outgoing.length > 0 && currentOnUnit.length === row.outgoing.length;
-      return { ...row, gapMonths, gapDays, allCurrentMovingOut, earliestIncomingDate: earliestIn };
+      // The transitions whose date has arrived but that nobody has confirmed —
+      // these are what the "have moved in / out" buttons act on.
+      const pendingMoveIns = row.incoming.filter(x => awaitingMoveInAck(x));
+      const pendingMoveOuts = row.outgoing.filter(x => awaitingMoveOutAck(x));
+      return { ...row, gapMonths, gapDays, allCurrentMovingOut, earliestIncomingDate: earliestIn, pendingMoveIns, pendingMoveOuts };
     }).sort((a, b) => {
       if (a.propertyAddress !== b.propertyAddress)
         return a.propertyAddress.localeCompare(b.propertyAddress);
@@ -1244,9 +1336,21 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                             >{tenantFullName(ten)}</div>
                             <div style={{ fontSize: 13, color: "#9ca3af" }}>{fmtDate(ten.moveOutDate)}</div>
+                            {awaitingMoveOutAck(ten) && (
+                              <div style={{ fontSize: 12, color: "#b45309", fontWeight: 600, marginTop: 2 }}>{t.dashAckPendingMoveOut}</div>
+                            )}
                           </div>
                         </div>
                       ))}
+                      {row.pendingMoveOuts.length > 0 && (
+                        <button
+                          onClick={() => acknowledgeTransition(row.key, row.pendingMoveOuts, "out")}
+                          disabled={ackingRow === row.key}
+                          style={{ ...ackBtnStyle, cursor: ackingRow === row.key ? "wait" : "pointer", opacity: ackingRow === row.key ? 0.7 : 1 }}
+                        >
+                          {ackingRow === row.key ? t.dashAckSaving : t.dashAckMovedOut(row.pendingMoveOuts.length)}
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div style={{ fontSize: 14, color: "#9ca3af", fontStyle: "italic" }}>
@@ -1274,9 +1378,21 @@ const LandlordDashboard = ({ data, t, lang, langReady, user, setPage, setSelecte
                             ) : (
                               <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 2 }}>{t.securityDepositReceived}</div>
                             )}
+                            {awaitingMoveInAck(ten) && (
+                              <div style={{ fontSize: 12, color: "#b45309", fontWeight: 600, marginTop: 2 }}>{t.dashAckPendingMoveIn}</div>
+                            )}
                           </div>
                         </div>
                       ))}
+                      {row.pendingMoveIns.length > 0 && (
+                        <button
+                          onClick={() => acknowledgeTransition(row.key, row.pendingMoveIns, "in")}
+                          disabled={ackingRow === row.key}
+                          style={{ ...ackBtnStyle, cursor: ackingRow === row.key ? "wait" : "pointer", opacity: ackingRow === row.key ? 0.7 : 1 }}
+                        >
+                          {ackingRow === row.key ? t.dashAckSaving : t.dashAckMovedIn(row.pendingMoveIns.length)}
+                        </button>
+                      )}
                     </div>
                   ) : (() => {
                     const latestOut = row.outgoing.length ? row.outgoing[row.outgoing.length - 1].moveOutDate : null;
@@ -3215,10 +3331,20 @@ function useMaintenanceMutations(setData, { onError } = {}) {
 
   return {
     // Optimistic (instant board move / thread change), with rollback.
-    setStatus: (id, status) => optimistic("maintenance",
-      d => ({ ...d, maintenance: d.maintenance.map(m => m.id === id ? { ...m, status } : m) }),
-      () => maint.setStatus(adapter, id, status),
-    ),
+    // `existingClosedAt` comes from the row the caller already has, so re-closing
+    // an already-closed ticket keeps its original close date. The optimistic
+    // patch runs the same rule as the core so the card doesn't flash a stale
+    // date before the refetch.
+    setStatus: (id, status, existingClosedAt = null) => {
+      const now = new Date().toISOString();
+      const closedAt = maintStatus.nextClosedAt(status, existingClosedAt, now);
+      return optimistic("maintenance",
+        d => ({ ...d, maintenance: d.maintenance.map(m => m.id === id
+          ? { ...m, status, closedAt, closedDate: closedAt ? closedAt.split("T")[0] : null }
+          : m) }),
+        () => maint.setStatus(adapter, id, status, { existingClosedAt, now }),
+      );
+    },
     deleteComment: (comment, hasReplies) => {
       const now = new Date().toISOString();
       return optimistic("maintenanceComments",
@@ -3292,6 +3418,19 @@ function usePropertyMutations() {
   };
 }
 
+// Unit writes behind the lib/units seam (create / edit / guarded delete).
+// Call sites refresh() after, same shape as usePropertyMutations(). Exported
+// because PropertyDetailPage (phase2-components) is the only caller — the hook
+// stays the single write path for units even though the UI lives next door.
+export function useUnitMutations() {
+  const adapter = createUnitAdapter(supabase);
+  return {
+    create: (fields) => unitOps.createUnit(adapter, fields),
+    update: (id, fields) => unitOps.updateUnit(adapter, id, fields),
+    remove: (id) => unitOps.deleteUnit(adapter, id),
+  };
+}
+
 // Parking writes behind the lib/parking seam (spot CRUD, lease create/end).
 // Call sites refresh() after, same shape as usePropertyMutations() — no
 // optimistic state coupling here.
@@ -3316,6 +3455,8 @@ function useTenantMutations() {
     setRecurringPayment: (id, value) => tenantOps.setRecurringPayment(adapter, id, value),
     setBankConnected: (id) => tenantOps.setBankConnected(adapter, id),
     updateDisplayName: (id, name) => tenantOps.updateDisplayName(adapter, id, name),
+    acknowledgeMoveIn: (id, alreadyAckedAt) => tenantOps.acknowledgeMoveIn(adapter, id, { alreadyAckedAt }),
+    acknowledgeMoveOut: (id, alreadyAckedAt) => tenantOps.acknowledgeMoveOut(adapter, id, { alreadyAckedAt }),
   };
 }
 
@@ -3480,7 +3621,10 @@ const todoColumnOf = maintStatus.columnOf;
 // Priority → accent color, shared by the landlord board and the tenant request list.
 const PRIORITY_COLORS = { high: "#ef4444", medium: "#f59e0b", low: "#3b82f6" };
 
-const TodoCard = ({ request, tenantName, sub, typeText, priorityColor, commentCount, attachmentCount, onOpen }) => {
+// `closedText` is pre-formatted by the caller (the card stays locale-agnostic,
+// same as `sub`/`typeText`). Empty for open tickets and for ones closed before
+// closed_at existed.
+const TodoCard = ({ request, tenantName, sub, closedText, typeText, priorityColor, commentCount, attachmentCount, onOpen }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: request.id });
   return (
     <div
@@ -3498,9 +3642,17 @@ const TodoCard = ({ request, tenantName, sub, typeText, priorityColor, commentCo
       <div style={{ width: 3, borderRadius: 3, background: priorityColor || "#eaeaea", flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: "0 0 6px", fontSize: 14, color: "#111111", fontWeight: 500, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{request.description}</p>
+        {/* Shown whenever a translation exists, regardless of the UI language:
+            the point is that a bilingual landlord can read the card without
+            opening it. Clamped to 2 lines like the original so a long request
+            can't make one card tower over the rest of the column. */}
+        {request.descriptionZh && (
+          <p style={{ margin: "0 0 6px", fontSize: 13, color: "#4b5563", lineHeight: 1.4, background: "#f7f7f8", borderRadius: 6, padding: "5px 8px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{request.descriptionZh}</p>
+        )}
         <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{tenantName}</div>
-        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: typeText || commentCount || attachmentCount ? 8 : 0 }}>{sub}</div>
+        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: closedText || typeText || commentCount || attachmentCount ? 8 : 0 }}>{sub}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {closedText && <span style={{ background: "#ecfdf5", color: "#047857", padding: "1px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>{closedText}</span>}
           {typeText && <span style={{ background: "#f3f4f6", color: "#111111", padding: "1px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>{typeText}</span>}
           {commentCount > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, color: "#9ca3af" }}><Icon name="mail" size={12} />{commentCount}</span>}
           {attachmentCount > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, color: "#9ca3af" }}><Icon name="file" size={12} />{attachmentCount}</span>}
@@ -3556,7 +3708,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
     if (!over) return;
     const m = visibleMaintenance.find(x => x.id === active.id);
     if (!m || todoColumnOf(m.status) === over.id) return;
-    updateStatus(active.id, over.id);
+    updateStatus(active.id, over.id, m.closedAt);
   };
 
   const selectedTenant = visibleTenants.find(ten => ten.id === form.tenantId);
@@ -3564,7 +3716,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
     ? (data.units.find(u => u.id === selectedTenant.unitId)?.unitNumber || selectedTenant.unit || "—")
     : "—";
 
-  const updateStatus = (id, status) => mx.setStatus(id, status).catch(() => {});
+  const updateStatus = (id, status, existingClosedAt) => mx.setStatus(id, status, existingClosedAt).catch(() => {});
 
   const addType = async () => {
     if (!newTypeName.trim() || !user?.id) return;
@@ -3676,6 +3828,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
                   const sub = `${prop?.address || "—"}${m.unit ? ` · ${m.unit}` : ""} · ${fmtDate(m.date)}`;
                   return (
                     <TodoCard key={m.id} request={m} tenantName={ten ? tenantFullName(ten) : "—"} sub={sub}
+                      closedText={m.closedDate ? t.maintClosedOn(fmtDate(m.closedDate)) : ""}
                       typeText={m.type} priorityColor={pColors[m.priority]} commentCount={commentCount}
                       attachmentCount={attachmentCount} onOpen={setDetailId} />
                   );
@@ -3718,12 +3871,14 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
               <span>{ten ? tenantFullName(ten) : "—"}</span>
               <span>{prop?.address}{m.unit ? ` · ${m.unit}` : ""}</span>
               <span>{fmtDate(m.date)}</span>
+              {/* Null on open tickets and on ones closed before closed_at existed. */}
+              {m.closedDate && <span style={{ fontWeight: 600 }}>{t.maintClosedOn(fmtDate(m.closedDate))}</span>}
               {m.priority && <span style={{ color: pColors[m.priority], fontWeight: 600 }}>{pLabels[m.priority]}</span>}
               {m.type && <span style={{ background: "#f3f4f6", color: "#111111", padding: "1px 8px", borderRadius: 99, fontSize: 12, fontWeight: 600 }}>{m.type}</span>}
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: attachments.length ? 14 : 4 }}>
               <Badge status={m.status} t={t} />
-              <select value={m.status} onChange={e => updateStatus(m.id, e.target.value)}
+              <select value={m.status} onChange={e => updateStatus(m.id, e.target.value, m.closedAt)}
                 style={{ padding: "6px 10px", border: "1px solid #eaeaea", borderRadius: 8, fontSize: 12, color: "#374151", cursor: "pointer", fontFamily: "inherit", outline: "none" }}>
                 <option value="new">{t.statusNew}</option>
                 <option value="in-progress">{t.statusInProgress}</option>
@@ -4647,7 +4802,8 @@ export default function App() {
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
   const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
   // mapMaintenance / -Type / -Attachment / -Comment now live in lib/maintenance/mappers (imported at top) — one home for the aggregate's shape.
-  const mapUnit = (u) => ({ id: u.id, propertyId: u.property_id, unitNumber: u.unit_number, bedrooms: u.bedrooms, bathrooms: u.bathrooms, monthlyRent: u.monthly_rent, status: u.status });
+  // mapUnit now lives in lib/units/mappers (imported at top). The `status` it
+  // returns is overwritten below with occupancy derived from the unit's tenants.
   const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, contractId: d.contract_id || null, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at, driveLink: d.drive_link || null })
   // mapEmailSettings now lives in lib/payment-reminders/mappers (imported at top).
   const mapEmailTemplate = (e) => ({ id: e.id, name: e.name, subject: e.subject || "", bodyHtml: e.body_html || "", bodyText: e.body_text || "", updatedAt: e.updated_at, createdAt: e.created_at });
@@ -4826,7 +4982,7 @@ export default function App() {
         case "email-automation": return <EmailAutomationPage {...props} />;
         case "renewals":         return <RenewalsPage {...props} />;
         case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={fetchAllData} user={user} />;
-        case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
+        case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} t={t} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
         case "admin-users":      return <AdminUsersPage t={t} data={data} user={user} refresh={fetchAllData} />;
         default:                 return <LandlordDashboard {...props} />;
       }

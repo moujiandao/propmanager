@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
-import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader } from './property-management-app'
+import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader, useUnitMutations } from './property-management-app'
+import { UnitHasTenantsError } from '@/lib/units/core'
 import { fmt } from '@/lib/format'
 
 const PdfViewer = dynamic(() => import('./components/pdf-viewer'), {
@@ -74,15 +75,25 @@ export const DocViewer = ({ doc, onClose }) => {
   )
 }
 
-const EMPTY_UNIT_FORM = { unitNumber: "", bedrooms: "1", bathrooms: "1", monthlyRent: "", status: "vacant" }
+// No `status` field: unit occupancy is DERIVED from the unit's tenants in
+// fetchAllData, so a status picked here would be silently overwritten on the
+// next load. See the note on createUnit in lib/units/core.js.
+const EMPTY_UNIT_FORM = { unitNumber: "", bedrooms: "1", bathrooms: "1", monthlyRent: "" }
 
-export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, onBack, onNavigateToTenant }) => {
+const unitIconBtn = { background: "#fafafa", border: "1px solid #eaeaea", borderRadius: 6, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#9ca3af" }
+const unitDangerIconBtn = { ...unitIconBtn, border: "1px solid #fca5a5", color: "#ef4444" }
+
+export const PropertyDetailPage = ({ data, setData, refresh, user, t, propertyId, onBack, onNavigateToTenant }) => {
   const [showModal, setShowModal] = useState(false)
   const [editUnit, setEditUnit] = useState(null) // null = adding new, object = editing
   const [form, setForm] = useState(EMPTY_UNIT_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
 
+  const unitMx = useUnitMutations()
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const property = data.properties.find(p => p.id === propertyId)
@@ -102,42 +113,56 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
       bedrooms: String(unit.bedrooms ?? 1),
       bathrooms: String(unit.bathrooms ?? 1),
       monthlyRent: String(unit.monthlyRent || ""),
-      status: unit.status || "vacant",
     })
     setError("")
     setShowModal(true)
   }
 
   const save = async () => {
-    if (!form.unitNumber.trim()) { setError("Unit number is required."); return; }
+    if (!form.unitNumber.trim()) { setError(t.unitNumberRequired); return; }
     setSaving(true)
     setError("")
-    const payload = {
-      property_id: propertyId,
-      unit_number: form.unitNumber.trim(),
-      bedrooms: parseInt(form.bedrooms) || 1,
-      bathrooms: parseInt(form.bathrooms) || 1,
-      monthly_rent: parseFloat(form.monthlyRent) || null,
-      status: form.status,
+    try {
+      if (editUnit) await unitMx.update(editUnit.id, form)
+      else await unitMx.create({ propertyId, ...form })
+    } catch (e) {
+      setError(e.message)
+      setSaving(false)
+      return
     }
-    let err
-    if (editUnit) {
-      const res = await supabase.from("units").update(payload).eq("id", editUnit.id)
-      err = res.error
-    } else {
-      const res = await supabase.from("units").insert(payload)
-      err = res.error
-    }
-    if (err) { setError(err.message); setSaving(false); return; }
     await refresh()
     setShowModal(false)
     setSaving(false)
   }
 
+  // The count shown in the dialog comes from already-loaded client state, so
+  // it's advisory only — lib/units/core re-reads it before deleting anything.
+  const linkedTenantCount = (unit) => (data.tenants || []).filter(x => x.unitId === unit.id).length
+
+  const openDelete = (unit) => {
+    setDeleteTarget(unit)
+    setDeleteError("")
+  }
+
+  const confirmDelete = async () => {
+    setDeleting(true)
+    setDeleteError("")
+    try {
+      await unitMx.remove(deleteTarget.id)
+    } catch (e) {
+      setDeleteError(e instanceof UnitHasTenantsError ? t.unitDeleteBlocked(e.count) : e.message)
+      setDeleting(false)
+      return
+    }
+    await refresh()
+    setDeleteTarget(null)
+    setDeleting(false)
+  }
+
   if (!property) {
     return (
       <div style={{ color: "#9ca3af", fontSize: 15, padding: 40 }}>
-        Property not found.
+        {t.unitPropertyNotFound}
       </div>
     )
   }
@@ -157,14 +182,14 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
-          Back
+          {t.unitBack}
         </button>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#111111", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", letterSpacing: "-0.5px" }}>
             {property.address}
           </h1>
           <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
-            {property.city}, {property.state} {property.zip} &middot; {property.type} &middot; {occupiedCount}/{units.length} occupied
+            {property.city}, {property.state} {property.zip} &middot; {property.type} &middot; {t.unitsOccupiedCount(occupiedCount, units.length)}
           </p>
         </div>
         <div style={{ marginLeft: "auto" }}>
@@ -175,7 +200,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
             onMouseLeave={e => e.currentTarget.style.opacity = "1"}
           >
             <Icon name="plus" size={15} />
-            Add Unit
+            {t.unitAdd}
           </button>
         </div>
       </div>
@@ -183,71 +208,75 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
       {/* Units grid */}
       {units.length === 0 ? (
         <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 15, padding: "60px 0" }}>
-          No units yet. Add the first unit for this property.
+          {t.unitsEmpty}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
           {[...units].sort((a, b) => Number(a.unitNumber) - Number(b.unitNumber)).map(unit => {
-            const tenants = (data.tenants || []).filter(t => t.unitId === unit.id && t.status === "current tenant")
+            // `ten`, not `t` — `t` is the translation bag in this scope now.
+            const tenants = (data.tenants || []).filter(ten => ten.unitId === unit.id && ten.status === "current tenant")
             const isOccupied = unit.status === 'occupied'
             return (
               <div key={unit.id} style={{ background: "#fff", borderRadius: 12, padding: 16, border: "1px solid #eaeaea", position: "relative" }}>
-                <button
-                  onClick={() => openEdit(unit)}
-                  style={{ position: "absolute", top: 10, right: 10, background: "#fafafa", border: "1px solid #eaeaea", borderRadius: 6, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#9ca3af" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
-                  onMouseLeave={e => e.currentTarget.style.background = "#fafafa"}
-                >
-                  <Icon name="edit" size={11} />
-                </button>
+                {/* Edit stays available on an occupied unit — renaming or fixing a
+                    bed count doesn't invalidate anyone's tenancy. Delete is guarded
+                    in lib/units/core, which blocks while any tenant is assigned. */}
+                <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 4 }}>
+                  <button onClick={() => openEdit(unit)} style={unitIconBtn} title={t.unitEditAction}>
+                    <Icon name="edit" size={11} />
+                  </button>
+                  <button onClick={() => openDelete(unit)} style={unitDangerIconBtn} title={t.unitDeleteAction}>
+                    <Icon name="trash" size={11} />
+                  </button>
+                </div>
 
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ width: 32, height: 32, background: isOccupied ? "rgba(17,17,17,.15)" : "rgba(148,163,184,.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
                     <Icon name="home" size={14} />
                   </div>
                   <h3 style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 700, color: "#111111", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
-                    Unit {unit.unitNumber}
+                    {t.unitLabel(unit.unitNumber)}
                   </h3>
                   <p style={{ margin: 0, fontSize: 11, color: "#6b7280" }}>
-                    {unit.bedrooms} bed / {unit.bathrooms} bath
+                    {t.unitBedBath(unit.bedrooms, unit.bathrooms)}
                   </p>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#9ca3af" }}>
-                    {unit.monthlyRent ? fmt(unit.monthlyRent) + "/mo" : "—"}
+                    {unit.monthlyRent ? t.unitRentPerMonth(fmt(unit.monthlyRent)) : "—"}
                   </span>
-                  <Badge status={unit.status || "vacant"} />
+                  <Badge status={unit.status || "vacant"} t={t} />
                 </div>
 
                 {isOccupied && tenants.length > 0 ? (
                   <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 10 }}>
                     <div style={{ color: "#6b7280", marginBottom: 5, textTransform: "uppercase", fontSize: 10, letterSpacing: ".5px", fontWeight: 600 }}>
-                      {tenants.length === 1 ? "Tenant" : `Tenants (${tenants.length})`}
+                      {tenants.length === 1 ? t.unitTenantHeading : t.unitTenantsHeading(tenants.length)}
                     </div>
-                    {tenants.map(t => (
-                      <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
+                    {tenants.map(ten => (
+                      <div key={ten.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
                         <button
-                          onClick={() => onNavigateToTenant && onNavigateToTenant(t.id)}
+                          onClick={() => onNavigateToTenant && onNavigateToTenant(ten.id)}
                           style={{ background: "none", border: "none", color: "#9ca3af", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 12, fontFamily: "inherit", textAlign: "left" }}
                           onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
                           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                         >
-                          {t.lastName ? `${t.name} ${t.lastName}` : t.name}
+                          {ten.lastName ? `${ten.name} ${ten.lastName}` : ten.name}
                         </button>
-                        <span style={{ fontSize: 12, color: t.monthlyRent ? "#111111" : "#9ca3af", fontWeight: 600 }}>
-                          {t.monthlyRent ? fmt(t.monthlyRent) : "—"}
+                        <span style={{ fontSize: 12, color: ten.monthlyRent ? "#111111" : "#9ca3af", fontWeight: 600 }}>
+                          {ten.monthlyRent ? fmt(ten.monthlyRent) : "—"}
                         </span>
                       </div>
                     ))}
                   </div>
                 ) : isOccupied ? (
                   <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 10, fontSize: 12, color: "#9ca3af" }}>
-                    Occupied — tenant unlinked
+                    {t.unitOccupiedUnlinked}
                   </div>
                 ) : (
                   <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 10, fontSize: 12, color: "#9ca3af" }}>
-                    Vacant
+                    {t.unitVacant}
                   </div>
                 )}
               </div>
@@ -259,51 +288,77 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, propertyId, o
       {/* Add / Edit modal */}
       {showModal && (
         <Modal
-          title={editUnit ? `Edit Unit ${editUnit.unitNumber}` : "Add Unit"}
+          title={editUnit ? t.unitEditTitle(editUnit.unitNumber) : t.unitAdd}
           onClose={() => setShowModal(false)}
         >
           <Inp
-            label="Unit Number"
+            label={t.unitNumberLabel}
             value={form.unitNumber}
             onChange={v => setF("unitNumber", v)}
-            placeholder="e.g. 101, A, 2B"
+            placeholder={t.unitNumberPlaceholder}
           />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Inp
-              label="Bedrooms"
+              label={t.unitBedrooms}
               value={form.bedrooms}
               onChange={v => setF("bedrooms", v)}
               type="number"
             />
             <Inp
-              label="Bathrooms"
+              label={t.unitBathrooms}
               value={form.bathrooms}
               onChange={v => setF("bathrooms", v)}
               type="number"
             />
           </div>
           <Inp
-            label="Monthly Rent ($)"
+            label={t.unitRentLabel}
             value={form.monthlyRent}
             onChange={v => setF("monthlyRent", v)}
             type="number"
-            placeholder="e.g. 1500"
+            placeholder={t.unitRentPlaceholder}
           />
-          <Sel
-            label="Status"
-            value={form.status}
-            onChange={v => setF("status", v)}
-            options={[
-              { value: "vacant", label: "Vacant" },
-              { value: "occupied", label: "Occupied" },
-            ]}
-          />
+          {/* No Status field: occupancy is derived from the unit's tenants on
+              every load, so anything chosen here would be overwritten. */}
           {error && (
             <p style={{ color: "#ef4444", fontSize: 13, margin: "0 0 12px" }}>{error}</p>
           )}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-            <Btn variant="secondary" onClick={() => setShowModal(false)}>Cancel</Btn>
-            <Btn onClick={save}>{saving ? "Saving…" : editUnit ? "Save Changes" : "Add Unit"}</Btn>
+            <Btn variant="secondary" onClick={() => setShowModal(false)}>{t.cancel}</Btn>
+            <Btn onClick={save}>{saving ? t.saving : editUnit ? t.saveChanges : t.unitAdd}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete confirm */}
+      {deleteTarget && (
+        <Modal
+          title={t.unitDeleteTitle(deleteTarget.unitNumber)}
+          onClose={() => { if (!deleting) { setDeleteTarget(null); setDeleteError("") } }}
+        >
+          {linkedTenantCount(deleteTarget) > 0 ? (
+            <p style={{ margin: "0 0 20px", fontSize: 14, color: "#111111" }}>
+              {t.unitDeleteBlocked(linkedTenantCount(deleteTarget))}
+            </p>
+          ) : (
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>
+              {t.unitDeleteWarning}
+            </p>
+          )}
+          {deleteError && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#ef4444" }}>{deleteError}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => { setDeleteTarget(null); setDeleteError("") }} disabled={deleting}>{t.cancel}</Btn>
+            {/* Hidden, not just disabled, when tenants are assigned — the message
+                above already says what to do, and core would reject it anyway. */}
+            {linkedTenantCount(deleteTarget) === 0 && (
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1, fontFamily: "inherit" }}
+              >
+                {deleting ? t.deleting : t.unitDeleteConfirm}
+              </button>
+            )}
           </div>
         </Modal>
       )}
