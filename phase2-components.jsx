@@ -135,9 +135,12 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, t, propertyId
     setSaving(false)
   }
 
-  // The count shown in the dialog comes from already-loaded client state, so
-  // it's advisory only — lib/units/core re-reads it before deleting anything.
-  const linkedTenantCount = (unit) => (data.tenants || []).filter(x => x.unitId === unit.id).length
+  // Every tenant linked to the unit, not just the current ones — that's what
+  // lib/units/core blocks on. Deliberately wider than what the unit card shows
+  // (which lists current tenants only), so a *previous* tenant can block a
+  // delete on a card that reads "Vacant". Naming them here is what stops that
+  // from being a dead end. Advisory: the core re-reads the count before deleting.
+  const blockingTenants = (unit) => (data.tenants || []).filter(x => x.unitId === unit.id)
 
   const openDelete = (unit) => {
     setDeleteTarget(unit)
@@ -336,10 +339,32 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, t, propertyId
           title={t.unitDeleteTitle(deleteTarget.unitNumber)}
           onClose={() => { if (!deleting) { setDeleteTarget(null); setDeleteError("") } }}
         >
-          {linkedTenantCount(deleteTarget) > 0 ? (
-            <p style={{ margin: "0 0 20px", fontSize: 14, color: "#111111" }}>
-              {t.unitDeleteBlocked(linkedTenantCount(deleteTarget))}
-            </p>
+          {blockingTenants(deleteTarget).length > 0 ? (
+            <>
+              <p style={{ margin: "0 0 12px", fontSize: 14, color: "#111111" }}>
+                {t.unitDeleteBlocked(blockingTenants(deleteTarget).length)}
+              </p>
+              {/* Naming them is the point: a previous tenant can block a delete
+                  on a unit the card shows as vacant, and without this the
+                  landlord has no way to find out who. */}
+              <div style={{ margin: "0 0 20px", border: "1px solid #eaeaea", borderRadius: 8, overflow: "hidden" }}>
+                {blockingTenants(deleteTarget).map((ten, i) => (
+                  <button
+                    key={ten.id}
+                    onClick={() => onNavigateToTenant && onNavigateToTenant(ten.id)}
+                    style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", background: "#fff", border: "none", borderTop: i === 0 ? "none" : "1px solid #f5f5f5", cursor: onNavigateToTenant ? "pointer" : "default", fontFamily: "inherit", textAlign: "left" }}
+                    onMouseEnter={e => { if (onNavigateToTenant) e.currentTarget.style.background = "#fafafa" }}
+                    onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+                  >
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#111111" }}>
+                      {ten.lastName ? `${ten.name} ${ten.lastName}` : ten.name}
+                    </span>
+                    <Badge status={ten.status} t={t} />
+                  </button>
+                ))}
+              </div>
+              <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>{t.unitDeleteReassignHint}</p>
+            </>
           ) : (
             <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>
               {t.unitDeleteWarning}
@@ -350,7 +375,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, t, propertyId
             <Btn variant="secondary" onClick={() => { setDeleteTarget(null); setDeleteError("") }} disabled={deleting}>{t.cancel}</Btn>
             {/* Hidden, not just disabled, when tenants are assigned — the message
                 above already says what to do, and core would reject it anyway. */}
-            {linkedTenantCount(deleteTarget) === 0 && (
+            {blockingTenants(deleteTarget).length === 0 && (
               <button
                 onClick={confirmDelete}
                 disabled={deleting}
