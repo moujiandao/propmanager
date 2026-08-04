@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-08-03]
+
+### Added
+- `lib/units/` (`core.js` + `adapter.js` + `fake.js` + `mappers.js` + `core.test.mjs`) — the sixth per-entity data-access seam, covering unit create/edit/delete. `PropertyDetailPage` previously wrote `supabase.from("units")` inline, the pattern the seam replaced everywhere else. Called through a `useUnitMutations()` hook exported from `property-management-app.jsx` (exported, unusually, because the only caller lives in `phase2-components.jsx` — the hook stays the single write path even though the UI is next door). `mapUnit` moved out of `fetchAllData` into `lib/units/mappers.js`.
+- **Unit deletion** (`phase2-components.jsx`) — the property detail page had no delete at all. Guarded: `deleteUnit` blocks while **any** tenant references the unit, current or previous, and reports the count. Blocking rather than nulling `unit_id` is deliberate — a previous tenant's `unit_id` is what the Unit Transitions dashboard and housemate detection read, so unlinking to allow a delete would lose history silently. The guard re-reads the tenant count through the adapter instead of trusting the caller's already-loaded `data.tenants`: that client state can be minutes stale, and a stale zero would delete a unit someone has since been moved into. The confirm dialog's count is advisory only.
+- `maintenance_requests.closed_at` (`scripts/add-maintenance-closed-at.sql`) — when a To Do List ticket was closed, shown as a chip on the kanban card and in the ticket detail modal. The rule lives in `nextClosedAt` in `lib/maintenance/status.js` (the Status vocabulary's home) so the board drag and the detail-modal dropdown can't disagree: stamp on the transition *into* closed, preserve an existing timestamp when an already-closed ticket is re-closed, clear on reopen. Status and `closed_at` are written in one update, so a request is never observed closed-without-a-date. **Not backfilled** — `updated_at` says when a row last changed, not when it was closed, and inventing a close date the landlord never recorded is worse than showing nothing; pre-existing closed tickets render without one until re-closed.
+- `tenant_profiles.move_in_acked_at` / `move_out_acked_at` (`scripts/add-tenant-transition-ack.sql`) — landlord confirmation that a move actually happened, with "Tenant(s) have moved in / out" buttons on each dashboard Unit Transitions row. Because status is derived from dates, a transition used to dismiss itself: an incoming tenant vanished the moment their move-in date arrived, whether or not they showed up. `awaitingMoveInAck` / `awaitingMoveOutAck` in `lib/tenant/status.js` keep it listed until confirmed; `acknowledgeMoveIn` / `acknowledgeMoveOut` in `lib/tenant/core.js` are the writes (idempotent — a second click keeps the first timestamp). One-way by design: if a move-in didn't happen the fix is to change the date, which is the single source of truth every other status rule already reads.
+
+### Changed
+- The To Do List kanban card now shows the Chinese translation under the description when one has been generated, clamped to two lines like the original so a long request can't tower over its column. Shown regardless of UI language — the point is that a bilingual landlord can read the card without opening it.
+- `PropertyDetailPage`'s units section is now bilingual (`t.unit*` keys in both `T.en` and `T.zh`), where the whole of `phase2-components.jsx` had been hardcoded English. Scoped to the units UI; the file's document and tenant-contact sections are still untranslated. Note the `t` map variable inside the unit card was renamed to `ten` — it shadowed the new translation prop.
+
+### Removed
+- The **Status** dropdown from the add/edit unit modal. It was dead: `fetchAllData` recomputes every unit's `status` from tenant occupancy on load, so a status chosen here was silently overwritten. `createUnit`/`updateUnit` never write the column; the DB default keeps it non-null for external SQL.
+
+### Migrations to run
+`scripts/add-maintenance-closed-at.sql` and `scripts/add-tenant-transition-ack.sql` — neither has been applied. The second **must** be run with its backfill: "unacknowledged" is the null default, so without it every tenant who ever moved in becomes an unacknowledged move-in and the dashboard fills with years of history.
+
 ## [2026-07-27]
 
 ### Added
