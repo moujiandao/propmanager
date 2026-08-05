@@ -274,6 +274,15 @@ const T = {
     emailReadOnly: "Email address cannot be changed here. To update a tenant's email, do so from Supabase Auth.",
     emailLoginNote: "This email is the tenant's login. Changing it will update the address used for login and notifications.",
     deleteTenant: "Delete Tenant", deleteWarning: "This will permanently remove their account and all associated data. This cannot be undone.",
+    deleteTenantConfirmBefore: "Are you sure you want to delete ", deleteTenantConfirmAfter: "?",
+    deleteTenantBlockedBefore: "", deleteTenantBlockedAfter: " still has linked records and can't be deleted:",
+    deleteTenantBlockedHint: "Deleting would take these with them, so it's blocked. Remove or reassign them first — or leave the tenant in place, since a move-out date already files them as a previous tenant.",
+    deleteTenantFailed: "Could not delete this tenant. Please try again.",
+    blocker_payments: (n) => `${n} payment${n === 1 ? "" : "s"}`,
+    blocker_contracts: (n) => `${n} lease${n === 1 ? "" : "s"}`,
+    blocker_maintenance: (n) => `${n} maintenance request${n === 1 ? "" : "s"}`,
+    blocker_documents: (n) => `${n} document${n === 1 ? "" : "s"}`,
+    blocker_parkingLeases: (n) => `${n} parking lease${n === 1 ? "" : "s"}`,
     deleting: "Deleting…", langLabel: "Language", navDocuments: "Documents", navAdminUsers: "Admin Users",
     // Units (property detail page — lib/units seam)
     unitAdd: "Add Unit", unitEditTitle: (n) => `Edit Unit ${n}`, unitLabel: (n) => `Unit ${n}`,
@@ -562,6 +571,15 @@ const T = {
     emailReadOnly: "此处无法修改电子邮件。如需更新租客邮箱，请在Supabase Auth中操作。",
     emailLoginNote: "此邮箱为租客登录账号，修改后将同步更新登录及通知所用的邮箱。",
     deleteTenant: "删除租客", deleteWarning: "这将永久删除其账号及所有相关数据，此操作无法撤销。",
+    deleteTenantConfirmBefore: "确定要删除 ", deleteTenantConfirmAfter: " 吗？",
+    deleteTenantBlockedBefore: "", deleteTenantBlockedAfter: " 仍有关联记录，无法删除：",
+    deleteTenantBlockedHint: "删除会一并移除这些记录，因此已被阻止。请先移除或转移这些记录；也可以保留该租客 — 填写退租日期后，系统已将其归类为前租客。",
+    deleteTenantFailed: "删除该租客失败，请重试。",
+    blocker_payments: (n) => `${n} 条付款记录`,
+    blocker_contracts: (n) => `${n} 份租约`,
+    blocker_maintenance: (n) => `${n} 条维修请求`,
+    blocker_documents: (n) => `${n} 份文件`,
+    blocker_parkingLeases: (n) => `${n} 份停车租约`,
     deleting: "删除中…", langLabel: "语言", navDocuments: "文件", navAdminUsers: "管理员用户",
     // 单元（房产详情页 — lib/units seam）
     unitAdd: "添加单元", unitEditTitle: (n) => `编辑单元 ${n}`, unitLabel: (n) => `单元 ${n}`,
@@ -1705,9 +1723,30 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const [groupBy, setGroupBy] = useState("unit");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteBlockers, setDeleteBlockers] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  // The response used to be discarded, so a refused delete looked exactly like a
+  // successful one: the modal closed and the tenant reappeared on the next
+  // refresh with nothing said. Now a 409 lists what's still linked and the modal
+  // stays open holding that explanation.
   const confirmDelete = async () => {
     setDeleting(true);
-    await fetch("/api/auth/delete-tenant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenantId: deleteTarget.id }) });
+    setDeleteBlockers(null);
+    setDeleteError("");
+    try {
+      const res = await fetch("/api/auth/delete-tenant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenantId: deleteTarget.id }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (json.blockers?.length) setDeleteBlockers(json.blockers);
+        else setDeleteError(json.error || t.deleteTenantFailed);
+        setDeleting(false);
+        return;
+      }
+    } catch {
+      setDeleteError(t.deleteTenantFailed);
+      setDeleting(false);
+      return;
+    }
     await refresh();
     setDeleteTarget(null);
     setDeleting(false);
@@ -2148,18 +2187,41 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <Modal title={t.deleteTenant} onClose={() => setDeleteTarget(null)}>
-          <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
-            Are you sure you want to delete <strong>{tenantFullName(deleteTarget)}</strong>?
-          </p>
-          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
-            {t.deleteWarning}
-          </p>
+        <Modal title={t.deleteTenant} onClose={() => { if (!deleting) { setDeleteTarget(null); setDeleteBlockers(null); setDeleteError(""); } }}>
+          {deleteBlockers ? (
+            <>
+              <p style={{ margin: "0 0 12px", fontSize: 14, color: "#111111" }}>
+                {t.deleteTenantBlockedBefore}<strong>{tenantFullName(deleteTarget)}</strong>{t.deleteTenantBlockedAfter}
+              </p>
+              <div style={{ margin: "0 0 16px", border: "1px solid #eaeaea", borderRadius: 8, overflow: "hidden" }}>
+                {deleteBlockers.map((b, i) => (
+                  <div key={b.key} style={{ padding: "10px 12px", fontSize: 14, color: "#374151", borderTop: i === 0 ? "none" : "1px solid #f5f5f5" }}>
+                    {t[`blocker_${b.key}`] ? t[`blocker_${b.key}`](b.count) : `${b.count} × ${b.key}`}
+                  </div>
+                ))}
+              </div>
+              <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>{t.deleteTenantBlockedHint}</p>
+            </>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
+                {t.deleteTenantConfirmBefore}<strong>{tenantFullName(deleteTarget)}</strong>{t.deleteTenantConfirmAfter}
+              </p>
+              <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
+                {t.deleteWarning}
+              </p>
+            </>
+          )}
+          {deleteError && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#ef4444" }}>{deleteError}</p>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn variant="secondary" onClick={() => setDeleteTarget(null)}>{t.cancel}</Btn>
-            <button onClick={confirmDelete} disabled={deleting} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1, fontFamily: "inherit" }}>
-              {deleting ? t.deleting : t.deleteTenant}
-            </button>
+            <Btn variant="secondary" onClick={() => { setDeleteTarget(null); setDeleteBlockers(null); setDeleteError(""); }} disabled={deleting}>{t.cancel}</Btn>
+            {/* Hidden once we know what's blocking — the list already says why,
+                and the server would refuse again. */}
+            {!deleteBlockers && (
+              <button onClick={confirmDelete} disabled={deleting} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1, fontFamily: "inherit" }}>
+                {deleting ? t.deleting : t.deleteTenant}
+              </button>
+            )}
           </div>
         </Modal>
       )}

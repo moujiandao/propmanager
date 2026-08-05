@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { isCurrentRow } from '@/lib/tenant/status'
+import { TENANT_DELETE_BLOCKERS, summarizeBlockers } from '@/lib/tenant/deletion'
 
 export async function POST(request) {
   const { tenantId } = await request.json()
@@ -18,6 +19,25 @@ export async function POST(request) {
     .eq('id', tenantId)
     .single()
 
+  // Refuse while anything still points at this tenant, and say what. Several of
+  // these FKs would reject the delete anyway, but as an opaque Postgres
+  // constraint error; the rest (contract_tenants, parking_leases) cascade and
+  // would disappear silently. Counting first turns both into one clear answer.
+  const counts = {}
+  for (const b of TENANT_DELETE_BLOCKERS) {
+    const { count, error } = await supabase
+      .from(b.table)
+      .select('*', { count: 'exact', head: true })
+      .eq(b.column, tenantId)
+    // A relation we can't count is left out rather than guessed at — a phantom
+    // blocker would make a deletable tenant permanently undeletable.
+    if (!error) counts[b.key] = count || 0
+  }
+  const blockers = summarizeBlockers(counts)
+  if (blockers.length > 0) {
+    return Response.json({ error: 'Tenant still has linked records.', blockers }, { status: 409 })
+  }
+
   // Delete profile first (FK references auth.users)
   const { error: profileError } = await supabase
     .from('tenant_profiles')
@@ -26,9 +46,13 @@ export async function POST(request) {
 
   if (profileError) return Response.json({ error: profileError.message }, { status: 400 })
 
-  // Delete auth user
+  // Delete the auth user, if there is one. Tenants created without a portal
+  // login have no auth.users row, so this errors for them — and the profile is
+  // already gone by now, making the delete a success from every caller's point
+  // of view. Reporting a failure here would be a lie that also hides the real
+  // outcome, so it's logged and swallowed.
   const { error: authError } = await supabase.auth.admin.deleteUser(tenantId)
-  if (authError) return Response.json({ error: authError.message }, { status: 400 })
+  if (authError) console.warn('[delete-tenant] auth user not removed:', authError.message)
 
   // Recompute occupancy for the affected property
   if (tenant?.property_id) {
