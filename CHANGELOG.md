@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-08-05]
+
+### Fixed
+- **Tenant delete reported nothing when it refused.** The feature already existed end to end (Tenants page → Actions → trash icon), but `confirmDelete` discarded the response, so a refused delete was indistinguishable from a successful one — modal closed, refresh ran, tenant reappeared unexplained. New `lib/tenant/deletion.js` (+ tests) holds `TENANT_DELETE_BLOCKERS`, the one list of relations that stand in the way; `app/api/auth/delete-tenant` counts them before touching anything and returns 409 with the counts, and the modal renders them. Three of the five FKs (`documents`, `payments`, `maintenance_requests`) would have rejected the delete anyway but as an opaque constraint error; the other two (`contract_tenants`, `parking_leases`) cascade and would have vanished silently — counting first turns both into one answer. Blocking rather than cascading is deliberate: a tenant's payment history is the books, and "previous tenant" already serves as the archive, so hard delete is for test rows and mistakes.
+- Deleting a tenant created **without a portal login** returned 400 after the profile row was already deleted — `supabase.auth.admin.deleteUser` errors when there's no `auth.users` row, so the route reported failure for a delete that had in fact happened. Now logged and swallowed.
+- The tenant confirm modal's "Are you sure you want to delete X?" was hardcoded English; translated along with the new strings.
+
 ## [2026-08-03]
 
 ### Added
