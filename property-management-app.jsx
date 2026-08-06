@@ -11,6 +11,7 @@ import * as maintStatus from '@/lib/maintenance/status';
 import { createTenantAdapter } from '@/lib/tenant/adapter';
 import { mapTenant } from '@/lib/tenant/mappers';
 import { statusFor, isCurrentRow, awaitingMoveInAck, awaitingMoveOutAck } from '@/lib/tenant/status';
+import { blockersFromData } from '@/lib/tenant/deletion';
 import * as tenantOps from '@/lib/tenant/core';
 import { createPaymentReminderAdapter } from '@/lib/payment-reminders/adapter';
 import { mapEmailSettings } from '@/lib/payment-reminders/mappers';
@@ -1704,6 +1705,89 @@ const PropertiesPage = ({ data, t, refresh, user, setPage, setSelectedPropertyId
   );
 };
 
+// ─── TENANT DELETE MODAL ──────────────────────────────────────────────────────
+// One modal for both places a tenant can be deleted from (the tenants table and
+// the tenant detail page), exported for the latter — same reason
+// `useUnitMutations` is exported: the second caller lives in
+// phase2-components.jsx. Duplicating it there would mean two copies of the
+// blocker rendering, and the refusal wording is the whole point of this screen.
+//
+// `onDeleted` runs only after the server confirms the delete; the caller decides
+// what "gone" means for its surface (close the modal vs. navigate back).
+export const TenantDeleteModal = ({ tenant, data, t, onClose, onDeleted }) => {
+  const [deleting, setDeleting] = useState(false);
+  const [serverBlockers, setServerBlockers] = useState(null);
+  const [error, setError] = useState("");
+
+  // Counted from loaded data so the refusal appears *before* the red button
+  // rather than after pressing it. The server's answer wins once we have one:
+  // this snapshot can be stale or RLS-narrowed, so it can undercount, and an
+  // empty list here is "nothing known to block", not permission.
+  const blockers = serverBlockers ?? blockersFromData(data, tenant.id);
+
+  const confirmDelete = async () => {
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/delete-tenant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenantId: tenant.id }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // A 409 here means the pre-flight missed something — show what the
+        // server found instead of the stale local list.
+        if (json.blockers?.length) setServerBlockers(json.blockers);
+        else setError(json.error || t.deleteTenantFailed);
+        setDeleting(false);
+        return;
+      }
+    } catch {
+      setError(t.deleteTenantFailed);
+      setDeleting(false);
+      return;
+    }
+    await onDeleted();
+  };
+
+  return (
+    <Modal title={t.deleteTenant} onClose={() => { if (!deleting) onClose(); }}>
+      {blockers.length > 0 ? (
+        <>
+          <p style={{ margin: "0 0 12px", fontSize: 14, color: "#111111" }}>
+            {t.deleteTenantBlockedBefore}<strong>{tenantFullName(tenant)}</strong>{t.deleteTenantBlockedAfter}
+          </p>
+          <div style={{ margin: "0 0 16px", border: "1px solid #eaeaea", borderRadius: 8, overflow: "hidden" }}>
+            {blockers.map((b, i) => (
+              <div key={b.key} style={{ padding: "10px 12px", fontSize: 14, color: "#374151", borderTop: i === 0 ? "none" : "1px solid #f5f5f5" }}>
+                {t[`blocker_${b.key}`] ? t[`blocker_${b.key}`](b.count) : `${b.count} × ${b.key}`}
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>{t.deleteTenantBlockedHint}</p>
+        </>
+      ) : (
+        <>
+          <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
+            {t.deleteTenantConfirmBefore}<strong>{tenantFullName(tenant)}</strong>{t.deleteTenantConfirmAfter}
+          </p>
+          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
+            {t.deleteWarning}
+          </p>
+        </>
+      )}
+      {error && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#ef4444" }}>{error}</p>}
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <Btn variant="secondary" onClick={onClose} disabled={deleting}>{t.cancel}</Btn>
+        {/* Hidden, not disabled, while something is in the way — the list above
+            already says why, and the server would refuse anyway. */}
+        {blockers.length === 0 && (
+          <button onClick={confirmDelete} disabled={deleting} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1, fontFamily: "inherit" }}>
+            {deleting ? t.deleting : t.deleteTenant}
+          </button>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
 // ─── TENANTS PAGE ─────────────────────────────────────────────────────────────
 const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTenantId }) => {
   const [show, setShow] = useState(false);
@@ -1722,35 +1806,6 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
   const [groupBy, setGroupBy] = useState("unit");
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteBlockers, setDeleteBlockers] = useState(null);
-  const [deleteError, setDeleteError] = useState("");
-  // The response used to be discarded, so a refused delete looked exactly like a
-  // successful one: the modal closed and the tenant reappeared on the next
-  // refresh with nothing said. Now a 409 lists what's still linked and the modal
-  // stays open holding that explanation.
-  const confirmDelete = async () => {
-    setDeleting(true);
-    setDeleteBlockers(null);
-    setDeleteError("");
-    try {
-      const res = await fetch("/api/auth/delete-tenant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenantId: deleteTarget.id }) });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        if (json.blockers?.length) setDeleteBlockers(json.blockers);
-        else setDeleteError(json.error || t.deleteTenantFailed);
-        setDeleting(false);
-        return;
-      }
-    } catch {
-      setDeleteError(t.deleteTenantFailed);
-      setDeleting(false);
-      return;
-    }
-    await refresh();
-    setDeleteTarget(null);
-    setDeleting(false);
-  };
 
   const openEdit = (ten) => {
     setEditTenant(ten);
@@ -2187,43 +2242,13 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <Modal title={t.deleteTenant} onClose={() => { if (!deleting) { setDeleteTarget(null); setDeleteBlockers(null); setDeleteError(""); } }}>
-          {deleteBlockers ? (
-            <>
-              <p style={{ margin: "0 0 12px", fontSize: 14, color: "#111111" }}>
-                {t.deleteTenantBlockedBefore}<strong>{tenantFullName(deleteTarget)}</strong>{t.deleteTenantBlockedAfter}
-              </p>
-              <div style={{ margin: "0 0 16px", border: "1px solid #eaeaea", borderRadius: 8, overflow: "hidden" }}>
-                {deleteBlockers.map((b, i) => (
-                  <div key={b.key} style={{ padding: "10px 12px", fontSize: 14, color: "#374151", borderTop: i === 0 ? "none" : "1px solid #f5f5f5" }}>
-                    {t[`blocker_${b.key}`] ? t[`blocker_${b.key}`](b.count) : `${b.count} × ${b.key}`}
-                  </div>
-                ))}
-              </div>
-              <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>{t.deleteTenantBlockedHint}</p>
-            </>
-          ) : (
-            <>
-              <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
-                {t.deleteTenantConfirmBefore}<strong>{tenantFullName(deleteTarget)}</strong>{t.deleteTenantConfirmAfter}
-              </p>
-              <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
-                {t.deleteWarning}
-              </p>
-            </>
-          )}
-          {deleteError && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#ef4444" }}>{deleteError}</p>}
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn variant="secondary" onClick={() => { setDeleteTarget(null); setDeleteBlockers(null); setDeleteError(""); }} disabled={deleting}>{t.cancel}</Btn>
-            {/* Hidden once we know what's blocking — the list already says why,
-                and the server would refuse again. */}
-            {!deleteBlockers && (
-              <button onClick={confirmDelete} disabled={deleting} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1, fontFamily: "inherit" }}>
-                {deleting ? t.deleting : t.deleteTenant}
-              </button>
-            )}
-          </div>
-        </Modal>
+        <TenantDeleteModal
+          tenant={deleteTarget}
+          data={data}
+          t={t}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={async () => { await refresh(); setDeleteTarget(null); }}
+        />
       )}
     </div>
   );
@@ -5037,7 +5062,7 @@ export default function App() {
         case "dashboard":        return <LandlordDashboard {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} setSelectedTenantId={setSelectedTenantId} />;
         case "properties":       return <PropertiesPage {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} />;
         case "tenants":          return <TenantsPage {...props} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
-        case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={fetchAllData} user={user} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
+        case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={fetchAllData} user={user} t={t} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
         case "parking":          return <ParkingPage {...props} />;
         case "contracts":        return <ContractsPage {...props} />;
         case "payments":         return <PaymentsPage data={data} t={t} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;

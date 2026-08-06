@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
-import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader, useUnitMutations } from './property-management-app'
+import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader, useUnitMutations, TenantDeleteModal } from './property-management-app'
 import { UnitHasTenantsError } from '@/lib/units/core'
 import { fmt } from '@/lib/format'
 
@@ -793,8 +793,9 @@ const EMPTY_TENANT_FORM = {
   zelleName: "", homeAddress: "", age: "", unitId: "", notes: "", securityDeposit: "", securityDepositRefunded: false,
 }
 
-export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBack, onNavigateToProperty }) => {
+export const TenantContactPage = ({ data, setData, refresh, user, t, tenantId, onBack, onNavigateToProperty }) => {
   const [editing, setEditing] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_TENANT_FORM)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState("")
@@ -931,6 +932,17 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
   return (
     <div style={{ background: "#fafafa", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
       {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
+      {/* Leaves before refreshing: this page renders off the tenant that just
+          stopped existing, and `onBack` unmounts it. */}
+      {deleteOpen && (
+        <TenantDeleteModal
+          tenant={tenant}
+          data={data}
+          t={t}
+          onClose={() => setDeleteOpen(false)}
+          onDeleted={() => { onBack(); refresh(); }}
+        />
+      )}
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
         <button
@@ -969,13 +981,24 @@ export const TenantContactPage = ({ data, setData, refresh, user, tenantId, onBa
               </button>
             </>
           ) : (
-            <button onClick={() => setEditing(true)}
-              style={{ background: "#ffffff", border: "1px solid #eaeaea", borderRadius: 9, padding: "9px 18px", color: "#9ca3af", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
-              onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
-              onMouseLeave={e => e.currentTarget.style.background = "#ffffff"}
-            >
-              <Icon name="edit" size={13} /> Edit Profile
-            </button>
+            <>
+              <button onClick={() => setEditing(true)}
+                style={{ background: "#ffffff", border: "1px solid #eaeaea", borderRadius: 9, padding: "9px 18px", color: "#9ca3af", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+                onMouseLeave={e => e.currentTarget.style.background = "#ffffff"}
+              >
+                <Icon name="edit" size={13} /> Edit Profile
+              </button>
+              {/* Same delete as the tenants table, reachable from the page the
+                  landlord is already on when they decide a record is junk. */}
+              <button onClick={() => setDeleteOpen(true)}
+                style={{ background: "#ffffff", border: "1px solid #fecaca", borderRadius: 9, padding: "9px 18px", color: "#dc2626", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
+                onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
+                onMouseLeave={e => e.currentTarget.style.background = "#ffffff"}
+              >
+                <Icon name="trash" size={13} /> {t.deleteTenant}
+              </button>
+            </>
           )}
         </div>
       </div>
