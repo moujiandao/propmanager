@@ -373,7 +373,6 @@ const T = {
     parkDeleteLeaseConfirm: (who) => `Delete the parking lease for ${who}? This erases the record and its vehicle entirely. To close out a lease that simply ended, use End Parking Lease instead.`,
     parkFailedDeleteLease: "Failed to delete lease.",
     parkExistingTenant: "Existing Tenant", parkMarketRenter: "Market Renter",
-    parkOpenToMarket: "Open to Market", parkMarkTenantPriority: "Mark Tenant-Priority",
     parkDeleteSpot: "Delete Spot", parkDeleteSpotTitle: "Delete Parking Spot",
     parkDeleteSpotConfirm: (label) => `Delete spot "${label}"? This cannot be undone.`,
     parkUnknownTenant: "Unknown tenant", parkUnknownRenter: "Unknown renter",
@@ -383,7 +382,7 @@ const T = {
     parkRenterNameRequired: "Renter name is required.",
     parkFailedCreateSpot: "Failed to create spot.", parkFailedDeleteSpot: "Failed to delete spot.",
     parkFailedCreateLease: "Failed to create parking lease.",
-    st_tenant_priority: "Tenant Priority", st_open_market: "Open Market",
+    st_leased_tenant: "Tenant", st_leased_renter: "Market Renter",
   },
   zh: {
     appName: "房产管理", landlord: "房东", tenant: "租客", signIn: "登录",
@@ -699,7 +698,6 @@ const T = {
     parkDeleteLeaseConfirm: (who) => `确定删除 ${who} 的车位租约吗？这将彻底删除该记录及其车辆信息。如果只是租约到期，请使用"结束车位租约"。`,
     parkFailedDeleteLease: "删除租约失败。",
     parkExistingTenant: "现有租客", parkMarketRenter: "市场租客",
-    parkOpenToMarket: "开放给市场", parkMarkTenantPriority: "标记为租客优先",
     parkDeleteSpot: "删除车位", parkDeleteSpotTitle: "删除停车位",
     parkDeleteSpotConfirm: (label) => `删除车位 "${label}"？此操作无法撤销。`,
     parkUnknownTenant: "未知租客", parkUnknownRenter: "未知租客",
@@ -709,7 +707,7 @@ const T = {
     parkRenterNameRequired: "租客姓名为必填项。",
     parkFailedCreateSpot: "创建车位失败。", parkFailedDeleteSpot: "删除车位失败。",
     parkFailedCreateLease: "创建车位租约失败。",
-    st_tenant_priority: "租客优先", st_open_market: "开放市场",
+    st_leased_tenant: "租客", st_leased_renter: "市场租客",
   }
 };
 
@@ -795,8 +793,8 @@ const statusColors = {
   closed:    { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
   occupied:  { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
   vacant:    { bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
-  tenant_priority: { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
-  open_market:     { bg: "#fef3c7", text: "#92400e", dot: "#f59e0b" },
+  leased_tenant:   { bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
+  leased_renter:   { bg: "#fef3c7", text: "#92400e", dot: "#f59e0b" },
 };
 
 export const Badge = ({ status, t }) => {
@@ -2882,11 +2880,6 @@ const ParkingPage = ({ data, t, refresh, user }) => {
     setSavingSpot(false);
   };
 
-  const toggleMarketStatus = async (spot) => {
-    await mx.setMarketStatus(spot.id, spot.marketStatus === "open_market" ? "tenant_priority" : "open_market");
-    await refresh();
-  };
-
   const confirmDeleteSpot = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -3092,7 +3085,10 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                       </div>
                       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
                         <Badge status={occ ? "occupied" : "vacant"} t={t} />
-                        <Badge status={spot.marketStatus} t={t} />
+                        {/* Who the spot is let to, read off the live lease rather than
+                            a flag somebody had to remember to flip. Vacant spots get
+                            no second badge — there is no lease to describe. */}
+                        {occ && <Badge status={occ.kind === "tenant" ? "leased_tenant" : "leased_renter"} t={t} />}
                       </div>
                       {occ ? (
                         <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 10 }}>
@@ -3106,12 +3102,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <Btn size="sm" variant="secondary" onClick={() => openAddLease(spot)}>{t.parkAddLease}</Btn>
-                          <Btn size="sm" variant="ghost" onClick={() => toggleMarketStatus(spot)}>
-                            {spot.marketStatus === "open_market" ? t.parkMarkTenantPriority : t.parkOpenToMarket}
-                          </Btn>
-                        </div>
+                        <Btn size="sm" variant="secondary" onClick={() => openAddLease(spot)}>{t.parkAddLease}</Btn>
                       )}
                     </div>
                   );
@@ -3240,7 +3231,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
           <Modal title={t.parkSpotDetailTitle(spot.label)} onClose={close}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
               <Badge status={occ ? "occupied" : "vacant"} t={t} />
-              <Badge status={spot.marketStatus} t={t} />
+              {occ && <Badge status={occ.kind === "tenant" ? "leased_tenant" : "leased_renter"} t={t} />}
             </div>
 
             <DetailRow label={t.selectProperty} value={prop?.address || t.parkUnknownProperty} />
@@ -3954,7 +3945,6 @@ function useParkingMutations() {
   return {
     createSpot: (fields) => parkingOps.createSpot(adapter, fields),
     updateSpot: (id, fields) => parkingOps.updateSpot(adapter, id, fields),
-    setMarketStatus: (id, marketStatus) => parkingOps.setMarketStatus(adapter, id, marketStatus),
     updateLease: (id, fields) => parkingOps.updateLease(adapter, id, fields),
     deleteLease: (id) => parkingOps.deleteLease(adapter, id),
     deleteSpot: (id) => parkingOps.deleteSpot(adapter, id),
