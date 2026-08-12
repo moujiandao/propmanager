@@ -340,6 +340,8 @@ const T = {
     parkEndLease: "End Parking Lease", parkSince: "since", parkLeaseHeading: "Parking Lease",
     parkEditLease: "Edit Lease", parkEditLeaseTitle: "Edit Parking Lease",
     parkFailedUpdateLease: "Failed to update lease.",
+    parkRateRequired: "A rate above 0 is required.",
+    parkEndBeforeStart: (start) => `End date cannot be before the start date (${start}).`,
     parkExistingTenant: "Existing Tenant", parkMarketRenter: "Market Renter",
     parkOpenToMarket: "Open to Market", parkMarkTenantPriority: "Mark Tenant-Priority",
     parkDeleteSpot: "Delete Spot", parkDeleteSpotTitle: "Delete Parking Spot",
@@ -639,6 +641,8 @@ const T = {
     parkEndLease: "结束车位租约", parkSince: "起租于", parkLeaseHeading: "车位租约",
     parkEditLease: "编辑租约", parkEditLeaseTitle: "编辑车位租约",
     parkFailedUpdateLease: "更新租约失败。",
+    parkRateRequired: "租金必须大于 0。",
+    parkEndBeforeStart: (start) => `结束日期不能早于起租日期（${start}）。`,
     parkExistingTenant: "现有租客", parkMarketRenter: "市场租客",
     parkOpenToMarket: "开放给市场", parkMarkTenantPriority: "标记为租客优先",
     parkDeleteSpot: "删除车位", parkDeleteSpotTitle: "删除停车位",
@@ -2628,9 +2632,8 @@ const EMPTY_LEASE_FORM = { renterType: "tenant", tenantId: "", renterName: "", r
 // Label/value row for the spot detail modal. Renders an em-dash for anything empty so
 // the rows stay aligned instead of collapsing when a field is unset.
 const detailRowStyle = { display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", fontSize: 13 };
+// Also used above the VEHICLE block in both lease modals.
 const detailSectionHeading = { fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 };
-// Same treatment, used above the VEHICLE block in both lease modals.
-const vehicleSectionHeading = { fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 };
 const DetailRow = ({ label, value }) => (
   <div style={detailRowStyle}>
     <span style={{ color: "#9ca3af" }}>{label}</span>
@@ -2839,7 +2842,14 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   };
 
   const saveLeaseEdit = async () => {
-    if (!leaseEditForm.rate) { setLeaseEditError(t.parkLeaseFieldsRequired); return; }
+    // Guards match what would otherwise fail below with an untranslated message:
+    // core's updateLease rejects a non-positive rate, and the DB's
+    // (end_date >= start_date) CHECK rejects an end date before the start.
+    if (!(Number(leaseEditForm.rate) > 0)) { setLeaseEditError(t.parkRateRequired); return; }
+    if (leaseEditForm.endDate && leaseEditForm.endDate < editingLease.startDate) {
+      setLeaseEditError(t.parkEndBeforeStart(fmtDate(editingLease.startDate)));
+      return;
+    }
     setSavingLeaseEdit(true);
     setLeaseEditError(null);
     try {
@@ -3006,7 +3016,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
           <Inp label={t.startDate} value={leaseForm.startDate} onChange={v => setLF("startDate", v)} type="date" />
           <Inp label={t.endDate} value={leaseForm.endDate} onChange={v => setLF("endDate", v)} type="date" />
           <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 14, marginTop: 2 }}>
-            <div style={vehicleSectionHeading}>{t.parkVehicle}</div>
+            <div style={detailSectionHeading}>{t.parkVehicle}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <Inp label={t.parkCarMake} value={leaseForm.carMake} onChange={v => setLF("carMake", v)} placeholder="Honda" />
               <Inp label={t.parkCarModel} value={leaseForm.carModel} onChange={v => setLF("carModel", v)} placeholder="Civic" />
@@ -3023,7 +3033,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
           <Inp label={t.parkMonthlyRate} value={leaseEditForm.rate} onChange={v => setLEF("rate", v)} type="number" placeholder="0" />
           <Inp label={t.endDate} value={leaseEditForm.endDate} onChange={v => setLEF("endDate", v)} type="date" />
           <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 14, marginTop: 2 }}>
-            <div style={vehicleSectionHeading}>{t.parkVehicle}</div>
+            <div style={detailSectionHeading}>{t.parkVehicle}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <Inp label={t.parkCarMake} value={leaseEditForm.carMake} onChange={v => setLEF("carMake", v)} placeholder="Honda" />
               <Inp label={t.parkCarModel} value={leaseEditForm.carModel} onChange={v => setLEF("carModel", v)} placeholder="Civic" />
@@ -3582,7 +3592,7 @@ export function useUnitMutations() {
   };
 }
 
-// Parking writes behind the lib/parking seam (spot CRUD, lease create/end).
+// Parking writes behind the lib/parking seam (spot CRUD, lease create/edit/end).
 // Call sites refresh() after, same shape as usePropertyMutations() — no
 // optimistic state coupling here.
 function useParkingMutations() {

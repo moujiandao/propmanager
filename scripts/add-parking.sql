@@ -31,7 +31,21 @@
 -- Both landlord_id-scoped tables reuse the existing is_team_member()
 -- RLS helper from migrate-team-landlords.sql.
 --
--- Idempotent: safe to run more than once. Run in Supabase -> SQL Editor.
+-- FRESH DATABASE: this script alone is not the whole parking schema.
+-- Run these after it, in order:
+--   1. scripts/add-parking-spot-type.sql          (parking_spots.type)
+--   2. scripts/add-parking-lease-vehicle.sql      (no-op here: the car
+--                                                  columns are already in
+--                                                  the create below)
+--   3. scripts/drop-parking-spot-vehicle.sql      (no-op here: this script
+--                                                  never creates the old
+--                                                  spot vehicle/rate columns)
+-- Steps 2 and 3 matter only for a database created before 2026-08-11.
+--
+-- Idempotent: safe to run more than once. Note that `create table if not
+-- exists` will NOT add columns to a table that already exists -- on an
+-- existing database the numbered scripts above are what change its shape.
+-- Run in Supabase -> SQL Editor.
 -- =====================================================================
 
 begin;
@@ -57,7 +71,6 @@ create table if not exists public.parking_spots (
   landlord_id   uuid not null references public.landlord_profiles(id) on delete cascade,
   property_id   uuid not null references public.properties(id) on delete cascade,
   label         text not null,
-  monthly_rate  numeric,
   market_status text not null default 'tenant_priority'
                   check (market_status in ('tenant_priority', 'open_market')),
   created_at    timestamptz not null default now(),
@@ -110,6 +123,11 @@ create table if not exists public.parking_leases (
   rate            numeric not null,
   start_date      date not null,
   end_date        date,
+  -- The vehicle on this agreement. It arrives with the lease and leaves with
+  -- it; parking_spots carries no vehicle. See scripts/add-parking-lease-vehicle.sql.
+  car_make        text,
+  car_model       text,
+  car_year        smallint,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   check ((tenant_id is not null)::int + (renter_id is not null)::int = 1),

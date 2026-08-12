@@ -17,7 +17,10 @@
 -- compares numerically. All three are nullable: a lease can exist with
 -- no vehicle recorded.
 --
--- Idempotent: safe to run more than once. Run in Supabase -> SQL Editor.
+-- Idempotent: safe to re-run any number of times BEFORE the contract half.
+-- Afterwards the backfill references parking_spots.car_make, which no longer
+-- exists, and the whole script aborts inside its transaction -- harmless, but
+-- it will not succeed. Run in Supabase -> SQL Editor.
 -- =====================================================================
 
 begin;
