@@ -70,7 +70,7 @@ const T = {
     statOpenMaint: "Open Maintenance", statRequests: "requests",
     tenantPaymentStatus: "Tenant Payment Status", recentMaintenance: "Recent Maintenance", recentPayments: "Recent Payments",
     colTenant: "Tenant", colTenants: "Tenants", colAmount: "Amount", colDueDate: "Due Date", colPaidDate: "Paid Date",
-    colType: "Type", colAchStatus: "ACH Status", colStatus: "Status", colContact: "Contact",
+    colType: "Type", colAchStatus: "ACH Status", colStatus: "Status", colContact: "Contact", colPriority: "Priority",
     colProperty: "Property / Unit", colBank: "Bank", colRecurring: "Recurring",
     colTerm: "Term", colDaysRemaining: "Days Remaining",
     propTitle: "Properties", propSubtitle: (n) => `${n} properties in portfolio`,
@@ -97,6 +97,14 @@ const T = {
     maintTitle: "To Do List", maintSubtitle: (n) => `${n} open requests`,
     maintNewRequest: "New Request",
     todoDetailTitle: "Request Details", todoEmptyColumn: "Nothing here",
+    todoEditRequest: "Edit Request", todoEditTitle: "Edit Request",
+    todoDeleteRequest: "Delete Request", todoDeleteTitle: "Delete Request",
+    todoDeleteConfirm: (n) => n > 0
+      ? `Delete this request? Its ${n} attachment(s) and every comment on it go too. This cannot be undone — to close a request that is simply finished, set its status to Closed instead.`
+      : "Delete this request? Every comment on it goes too. This cannot be undone — to close a request that is simply finished, set its status to Closed instead.",
+    todoDescRequired: "A description is required.",
+    todoFailedUpdate: "Failed to update request.", todoFailedDelete: "Failed to delete request.",
+    todoFilesOrphaned: "The request was deleted, but its attachment files could not be removed from storage.",
     priorityHigh: "high priority", priorityMedium: "medium priority", priorityLow: "low priority",
     statusOpen: "Open", statusInProgress: "In Progress", statusResolved: "Resolved",
     statusNew: "New", statusClosed: "Closed",
@@ -377,7 +385,7 @@ const T = {
     statOpenMaint: "待处理维修", statRequests: "个请求",
     tenantPaymentStatus: "租客付款状态", recentMaintenance: "最近维修请求", recentPayments: "最近付款记录",
     colTenant: "租客", colTenants: "租客", colAmount: "金额", colDueDate: "到期日", colPaidDate: "付款日",
-    colType: "类型", colAchStatus: "ACH状态", colStatus: "状态", colContact: "联系方式",
+    colType: "类型", colAchStatus: "ACH状态", colStatus: "状态", colContact: "联系方式", colPriority: "优先级",
     colProperty: "房产 / 单元", colBank: "银行账户", colRecurring: "自动续费",
     colTerm: "合同期限", colDaysRemaining: "剩余天数",
     propTitle: "房产管理", propSubtitle: (n) => `共 ${n} 处房产`,
@@ -404,6 +412,14 @@ const T = {
     maintTitle: "待办事项", maintSubtitle: (n) => `${n} 个待处理请求`,
     maintNewRequest: "新建请求",
     todoDetailTitle: "请求详情", todoEmptyColumn: "暂无",
+    todoEditRequest: "编辑请求", todoEditTitle: "编辑请求",
+    todoDeleteRequest: "删除请求", todoDeleteTitle: "删除请求",
+    todoDeleteConfirm: (n) => n > 0
+      ? `确定删除此请求吗？其 ${n} 个附件和全部评论也会一并删除。此操作无法撤销 — 如果只是处理完毕，请将状态改为"已关闭"。`
+      : '确定删除此请求吗？其全部评论也会一并删除。此操作无法撤销 — 如果只是处理完毕，请将状态改为"已关闭"。',
+    todoDescRequired: "描述为必填项。",
+    todoFailedUpdate: "更新请求失败。", todoFailedDelete: "删除请求失败。",
+    todoFilesOrphaned: "请求已删除，但其附件文件未能从存储中移除。",
     priorityHigh: "高优先级", priorityMedium: "中优先级", priorityLow: "低优先级",
     statusOpen: "待处理", statusInProgress: "处理中", statusResolved: "已解决",
     statusNew: "新建", statusClosed: "已关闭",
@@ -3632,6 +3648,25 @@ function useMaintenanceMutations(setData, { onError } = {}) {
         () => maint.setStatus(adapter, id, status, { existingClosedAt, now }),
       );
     },
+    updateRequest: (id, fields) => optimistic("maintenance",
+      d => ({ ...d, maintenance: d.maintenance.map(m => m.id === id
+        // descriptionZh is cleared alongside, matching what the core writes —
+        // otherwise the card would keep showing Chinese for the old text until
+        // the next refetch.
+        ? { ...m, ...fields, description: (fields.description || "").trim(), descriptionZh: "" }
+        : m) }),
+      () => maint.updateRequest(adapter, id, fields),
+    ),
+    // Only the `maintenance` slice is touched, even though the database cascades
+    // comments and attachments too. `optimistic` snapshots exactly one slice, so
+    // clearing the others here would leave them deleted locally if the write
+    // failed and the rollback ran. Their rows are unreferenced the moment the
+    // request is gone — nothing renders a thread for a request that isn't there
+    // — and the caller's refresh clears them for real.
+    deleteRequest: (id, attachmentPaths = []) => optimistic("maintenance",
+      d => ({ ...d, maintenance: d.maintenance.filter(m => m.id !== id) }),
+      () => maint.deleteRequest(adapter, id, attachmentPaths),
+    ),
     deleteComment: (comment, hasReplies) => {
       const now = new Date().toISOString();
       return optimistic("maintenanceComments",
@@ -3979,6 +4014,16 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
   const [translateState, setTranslateState] = useState("idle");
   const [cardTranslating, setCardTranslating] = useState({});
   const [detailId, setDetailId] = useState(null);
+  // The request being edited / queued for deletion. Both hold the request row so
+  // the form seeds once and the confirm can count what goes with it.
+  const [editReq, setEditReq] = useState(null);
+  const [editReqForm, setEditReqForm] = useState({ description: "", type: "", priority: "", unit: "" });
+  const setERF = (k, v) => setEditReqForm(f => ({ ...f, [k]: v }));
+  const [editReqError, setEditReqError] = useState(null);
+  const [savingReq, setSavingReq] = useState(false);
+  const [deleteReq, setDeleteReq] = useState(null);
+  const [deleteReqError, setDeleteReqError] = useState(null);
+  const [deletingReq, setDeletingReq] = useState(false);
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const fileInputRef = useRef(null);
   const mx = useMaintenanceMutations(setData);
@@ -4085,6 +4130,46 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
     setSubmitting(false);
   };
 
+  // Attachment file paths for a request — the storage objects that do NOT
+  // cascade with the row, so deleteRequest has to be told about them.
+  const attachmentPathsFor = (id) =>
+    (data.maintenanceAttachments || []).filter(a => a.maintenanceRequestId === id).map(a => a.filePath);
+
+  const openEditReq = (m) => {
+    setEditReq(m);
+    setEditReqForm({ description: m.description || "", type: m.type || "", priority: m.priority || "", unit: m.unit || "" });
+    setEditReqError(null);
+  };
+
+  const saveReqEdit = async () => {
+    if (!editReqForm.description.trim()) { setEditReqError(t.todoDescRequired); return; }
+    setSavingReq(true);
+    setEditReqError(null);
+    try {
+      await mx.updateRequest(editReq.id, editReqForm);
+      setEditReq(null);
+    } catch (e) {
+      setEditReqError(e.message || t.todoFailedUpdate);
+    }
+    setSavingReq(false);
+  };
+
+  const confirmDeleteReq = async () => {
+    setDeletingReq(true);
+    setDeleteReqError(null);
+    try {
+      const res = await mx.deleteRequest(deleteReq.id, attachmentPathsFor(deleteReq.id));
+      setDeleteReq(null);
+      setDetailId(null);   // the detail modal is showing a request that no longer exists
+      // The request is gone either way; a storage failure is worth saying out
+      // loud rather than swallowing, but it is not a failed delete.
+      if (res && res.filesRemoved === false) alert(t.todoFilesOrphaned);
+    } catch (e) {
+      setDeleteReqError(e.message || t.todoFailedDelete);
+    }
+    setDeletingReq(false);
+  };
+
   const pColors = PRIORITY_COLORS;
   const pLabels = { high: t.priorityHigh, medium: t.priorityMedium, low: t.priorityLow };
 
@@ -4183,9 +4268,47 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
               </div>
             )}
             <CommentThread request={m} comments={data.maintenanceComments || []} viewer={commentViewer} setData={setData} L={commentLabels} />
+            {/* Editing and deleting sit below the thread: the modal is for reading
+                a request first, and acting on the record itself is the rarer move. */}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", borderTop: "1px solid #eaeaea", marginTop: 16, paddingTop: 14 }}>
+              <Btn size="sm" variant="secondary" onClick={() => openEditReq(m)}>{t.todoEditRequest}</Btn>
+              <Btn size="sm" variant="secondary" onClick={() => setDeleteReq(m)}>{t.todoDeleteRequest}</Btn>
+            </div>
           </Modal>
         );
       })()}
+
+      {editReq && (
+        <Modal title={t.todoEditTitle} onClose={() => setEditReq(null)}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{t.maintDescription}</label>
+          <textarea value={editReqForm.description} onChange={e => setERF("description", e.target.value)} rows={4}
+            placeholder={t.maintDescriptionPlaceholder}
+            style={{ width: "100%", padding: "10px 14px", border: "1px solid #eaeaea", borderRadius: 9, fontSize: 14, color: "#111111", boxSizing: "border-box", outline: "none", fontFamily: "inherit", resize: "vertical", marginBottom: 12 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Sel label={t.maintType} value={editReqForm.type} onChange={v => setERF("type", v)}
+              options={[{ value: "", label: t.maintTypeSelect }, ...(data.maintenanceTypes || []).map(mt => ({ value: mt.name, label: mt.name }))]} />
+            <Sel label={t.colPriority} value={editReqForm.priority} onChange={v => setERF("priority", v)}
+              options={[{ value: "", label: "—" }, { value: "high", label: t.priorityHigh }, { value: "medium", label: t.priorityMedium }, { value: "low", label: t.priorityLow }]} />
+          </div>
+          <Inp label={t.maintUnit} value={editReqForm.unit} onChange={v => setERF("unit", v)} />
+          {editReqError && <p style={{ color: "#ef4444", fontSize: 13 }}>{editReqError}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setEditReq(null)}>{t.cancel}</Btn>
+            <Btn onClick={saveReqEdit} disabled={savingReq}>{savingReq ? t.saving : t.saveChanges}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {deleteReq && (
+        <Modal title={t.todoDeleteTitle} onClose={() => setDeleteReq(null)}>
+          <p style={{ fontSize: 14, color: "#374151" }}>{t.todoDeleteConfirm(attachmentPathsFor(deleteReq.id).length)}</p>
+          {deleteReqError && <p style={{ color: "#ef4444", fontSize: 13 }}>{deleteReqError}</p>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setDeleteReq(null)}>{t.cancel}</Btn>
+            <Btn onClick={confirmDeleteReq} disabled={deletingReq}>{deletingReq ? t.deleting : t.todoDeleteRequest}</Btn>
+          </div>
+        </Modal>
+      )}
 
       {/* New Request Modal */}
       {showModal && (
