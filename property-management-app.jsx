@@ -341,7 +341,11 @@ const T = {
     parkEditLease: "Edit Lease", parkEditLeaseTitle: "Edit Parking Lease",
     parkFailedUpdateLease: "Failed to update lease.",
     parkRateRequired: "A rate above 0 is required.",
-    parkEndBeforeStart: (start) => `End date cannot be before the start date (${start}).`,
+    parkStartRequired: "A start date is required.",
+    parkEndBeforeStart: "End date cannot be before the start date.",
+    parkDeleteLease: "Delete Lease", parkDeleteLeaseTitle: "Delete Parking Lease",
+    parkDeleteLeaseConfirm: (who) => `Delete the parking lease for ${who}? This erases the record and its vehicle entirely. To close out a lease that simply ended, use End Parking Lease instead.`,
+    parkFailedDeleteLease: "Failed to delete lease.",
     parkExistingTenant: "Existing Tenant", parkMarketRenter: "Market Renter",
     parkOpenToMarket: "Open to Market", parkMarkTenantPriority: "Mark Tenant-Priority",
     parkDeleteSpot: "Delete Spot", parkDeleteSpotTitle: "Delete Parking Spot",
@@ -642,7 +646,11 @@ const T = {
     parkEditLease: "编辑租约", parkEditLeaseTitle: "编辑车位租约",
     parkFailedUpdateLease: "更新租约失败。",
     parkRateRequired: "租金必须大于 0。",
-    parkEndBeforeStart: (start) => `结束日期不能早于起租日期（${start}）。`,
+    parkStartRequired: "起租日期为必填项。",
+    parkEndBeforeStart: "结束日期不能早于起租日期。",
+    parkDeleteLease: "删除租约", parkDeleteLeaseTitle: "删除车位租约",
+    parkDeleteLeaseConfirm: (who) => `确定删除 ${who} 的车位租约吗？这将彻底删除该记录及其车辆信息。如果只是租约到期，请使用"结束车位租约"。`,
+    parkFailedDeleteLease: "删除租约失败。",
     parkExistingTenant: "现有租客", parkMarketRenter: "市场租客",
     parkOpenToMarket: "开放给市场", parkMarkTenantPriority: "标记为租客优先",
     parkDeleteSpot: "删除车位", parkDeleteSpotTitle: "删除停车位",
@@ -2732,10 +2740,16 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   // unlike the spot detail modal, this one is a form seeded once on open, so a
   // mid-edit refresh must not overwrite what the user is typing.
   const [editingLease, setEditingLease] = useState(null);
-  const [leaseEditForm, setLeaseEditForm] = useState({ rate: "", endDate: "", carMake: "", carModel: "", carYear: "" });
+  const [leaseEditForm, setLeaseEditForm] = useState({ rate: "", startDate: "", endDate: "", carMake: "", carModel: "", carYear: "" });
   const setLEF = (k, v) => setLeaseEditForm(f => ({ ...f, [k]: v }));
   const [leaseEditError, setLeaseEditError] = useState(null);
   const [savingLeaseEdit, setSavingLeaseEdit] = useState(false);
+
+  // The lease queued for deletion, with the occupant's name resolved at open
+  // time so the confirm can name who it belongs to.
+  const [deleteLeaseTarget, setDeleteLeaseTarget] = useState(null);
+  const [deleteLeaseError, setDeleteLeaseError] = useState(null);
+  const [deletingLease, setDeletingLease] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
@@ -2852,6 +2866,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
     setEditingLease(lease);
     setLeaseEditForm({
       rate: lease.rate == null ? "" : String(lease.rate),
+      startDate: lease.startDate || "",
       endDate: lease.endDate || "",
       carMake: lease.carMake || "",
       carModel: lease.carModel || "",
@@ -2861,12 +2876,15 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   };
 
   const saveLeaseEdit = async () => {
-    // Guards match what would otherwise fail below with an untranslated message:
-    // core's updateLease rejects a non-positive rate, and the DB's
-    // (end_date >= start_date) CHECK rejects an end date before the start.
+    // Guards match what core's updateLease enforces, which in turn matches the
+    // table's NOT NULLs and its (end_date >= start_date) CHECK. Catching them
+    // here is what puts a translated message on screen instead of a raw
+    // constraint string. Dates compare as YYYY-MM-DD strings, which sort
+    // correctly without parsing.
     if (!(Number(leaseEditForm.rate) > 0)) { setLeaseEditError(t.parkRateRequired); return; }
-    if (leaseEditForm.endDate && leaseEditForm.endDate < editingLease.startDate) {
-      setLeaseEditError(t.parkEndBeforeStart(fmtDate(editingLease.startDate)));
+    if (!leaseEditForm.startDate) { setLeaseEditError(t.parkStartRequired); return; }
+    if (leaseEditForm.endDate && leaseEditForm.endDate < leaseEditForm.startDate) {
+      setLeaseEditError(t.parkEndBeforeStart);
       return;
     }
     setSavingLeaseEdit(true);
@@ -2881,6 +2899,21 @@ const ParkingPage = ({ data, t, refresh, user }) => {
     setSavingLeaseEdit(false);
   };
 
+  const confirmDeleteLease = async () => {
+    if (!deleteLeaseTarget) return;
+    setDeletingLease(true);
+    setDeleteLeaseError(null);
+    try {
+      await mx.deleteLease(deleteLeaseTarget.lease.id);
+      await refresh();
+      setDeleteLeaseTarget(null);
+      setEditingLease(null);   // the edit modal may have opened this
+    } catch (e) {
+      setDeleteLeaseError(e.message || t.parkFailedDeleteLease);
+    }
+    setDeletingLease(false);
+  };
+
   const spots = data.parkingSpots || [];
   const leases = data.parkingLeases || [];
   const renters = data.parkingRenters || [];
@@ -2888,15 +2921,21 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   // Returns null when vacant, otherwise { lease, name, kind, person }. `person` is the
   // underlying tenant or renter row so the detail modal can show contact details —
   // the cards only ever needed `name`, but a diagram click should surface who to call.
-  const occupantFor = (spot) => {
-    const lease = activeLeaseForSpot(leases.filter(l => l.parkingSpotId === spot.id));
-    if (!lease) return null;
+  // Who a lease belongs to. Split out of occupantFor so the delete confirm can
+  // name the party on a lease it already holds, without routing back through
+  // the spot — and so the tenant/renter branch has one home.
+  const partyForLease = (lease) => {
     if (lease.tenantId) {
       const ten = data.tenants.find(x => x.id === lease.tenantId);
       return { lease, name: ten ? tenantFullName(ten) : t.parkUnknownTenant, kind: "tenant", person: ten || null };
     }
     const renter = renters.find(r => r.id === lease.renterId);
     return { lease, name: renter ? renter.name : t.parkUnknownRenter, kind: "renter", person: renter || null };
+  };
+
+  const occupantFor = (spot) => {
+    const lease = activeLeaseForSpot(leases.filter(l => l.parkingSpotId === spot.id));
+    return lease ? partyForLease(lease) : null;
   };
 
   // Resolved once per spot and shared by the diagram and the cards — occupantFor scans
@@ -3050,6 +3089,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
       {editingLease && (
         <Modal title={t.parkEditLeaseTitle} onClose={() => setEditingLease(null)}>
           <Inp label={t.parkMonthlyRate} value={leaseEditForm.rate} onChange={v => setLEF("rate", v)} type="number" placeholder="0" />
+          <Inp label={t.startDate} value={leaseEditForm.startDate} onChange={v => setLEF("startDate", v)} type="date" />
           <Inp label={t.endDate} value={leaseEditForm.endDate} onChange={v => setLEF("endDate", v)} type="date" />
           <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 14, marginTop: 2 }}>
             <div style={detailSectionHeading}>{t.parkVehicle}</div>
@@ -3060,9 +3100,26 @@ const ParkingPage = ({ data, t, refresh, user }) => {
             <Inp label={t.parkCarYear} value={leaseEditForm.carYear} onChange={v => setLEF("carYear", v)} type="number" placeholder="2019" />
           </div>
           {leaseEditError && <p style={{ color: "#ef4444", fontSize: 13 }}>{leaseEditError}</p>}
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn variant="secondary" onClick={() => setEditingLease(null)}>{t.cancel}</Btn>
-            <Btn onClick={saveLeaseEdit} disabled={savingLeaseEdit}>{savingLeaseEdit ? t.saving : t.saveChanges}</Btn>
+          {/* Delete sits apart from Save/Cancel: it destroys the record rather
+              than editing it, and End Parking Lease is the routine way to close
+              one out. */}
+          <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
+            <Btn size="sm" variant="secondary" onClick={() => setDeleteLeaseTarget(partyForLease(editingLease))}>{t.parkDeleteLease}</Btn>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn variant="secondary" onClick={() => setEditingLease(null)}>{t.cancel}</Btn>
+              <Btn onClick={saveLeaseEdit} disabled={savingLeaseEdit}>{savingLeaseEdit ? t.saving : t.saveChanges}</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {deleteLeaseTarget && (
+        <Modal title={t.parkDeleteLeaseTitle} onClose={() => setDeleteLeaseTarget(null)}>
+          <p style={{ fontSize: 14, color: "#374151" }}>{t.parkDeleteLeaseConfirm(deleteLeaseTarget.name)}</p>
+          {deleteLeaseError && <p style={{ color: "#ef4444", fontSize: 13 }}>{deleteLeaseError}</p>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setDeleteLeaseTarget(null)}>{t.cancel}</Btn>
+            <Btn onClick={confirmDeleteLease} disabled={deletingLease}>{deletingLease ? t.deleting : t.parkDeleteLease}</Btn>
           </div>
         </Modal>
       )}
@@ -3621,6 +3678,7 @@ function useParkingMutations() {
     updateSpot: (id, fields) => parkingOps.updateSpot(adapter, id, fields),
     setMarketStatus: (id, marketStatus) => parkingOps.setMarketStatus(adapter, id, marketStatus),
     updateLease: (id, fields) => parkingOps.updateLease(adapter, id, fields),
+    deleteLease: (id) => parkingOps.deleteLease(adapter, id),
     deleteSpot: (id) => parkingOps.deleteSpot(adapter, id),
     createLease: (fields) => parkingOps.createLease(adapter, fields),
     endLease: (id, endDate) => parkingOps.endLease(adapter, id, endDate),
