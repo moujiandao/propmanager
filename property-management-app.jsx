@@ -3157,15 +3157,19 @@ function useMaintenanceMutations(setData, { onError } = {}) {
 // Payment-reminder settings writes behind the lib/payment-reminders seam.
 // setReminder is optimistic (toggle flips instantly) with rollback on failure;
 // the field→column mapping lives in the core, not here.
-function useEmailSettingsMutations(setData) {
-  const adapter = createPaymentReminderAdapter(supabase);
+// landlordId is the TEAM id (user.id), never user.authId — see the note in
+// adapter.js on what happens when it is missing.
+function useEmailSettingsMutations(setData, landlordId) {
+  const adapter = createPaymentReminderAdapter(supabase, landlordId);
   return {
     setReminder: async (field, value) => {
-      let prevValue;
-      setData(d => { prevValue = d.emailSettings[field]; return { ...d, emailSettings: { ...d.emailSettings, [field]: value } }; });
-      try { await reminderOps.setReminderField(adapter, field, value); }
+      // Capture the whole settings object, not just the one field: the write
+      // sends every flag so the row never inherits a DB default (see core.js).
+      let prev;
+      setData(d => { prev = d.emailSettings; return { ...d, emailSettings: { ...d.emailSettings, [field]: value } }; });
+      try { await reminderOps.setReminderField(adapter, field, value, prev); }
       // Roll back only this field, so a concurrent toggle of another field isn't clobbered.
-      catch (e) { setData(d => ({ ...d, emailSettings: { ...d.emailSettings, [field]: prevValue } })); console.error("[payment-reminders]", e); }
+      catch (e) { setData(d => ({ ...d, emailSettings: { ...d.emailSettings, [field]: prev[field] } })); console.error("[payment-reminders]", e); }
     },
     saveTemplates: (templates) => reminderOps.saveTemplates(adapter, templates),
   };
@@ -3882,9 +3886,9 @@ export const MaintenancePage = ({ data, setData, t, refresh, user }) => {
 };
 
 // ─── EMAIL PAGE ───────────────────────────────────────────────────────────────
-export const EmailPage = ({ data, setData, t, refresh }) => {
+export const EmailPage = ({ data, setData, t, refresh, user }) => {
   const s = data.emailSettings;
-  const reminderMx = useEmailSettingsMutations(setData);
+  const reminderMx = useEmailSettingsMutations(setData, user.id);
   const updS = (k, v) => reminderMx.setReminder(k, v);
   const updT = (k, v) => setData(d => ({...d, emailSettings:{...d.emailSettings,templates:{...d.emailSettings.templates,[k]:v}}}));
   const saveTemplate = async () => {
