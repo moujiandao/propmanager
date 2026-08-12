@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request) {
-  const { landlordId, parkingSpotId, rate, startDate, endDate, tenantId, renterId, renter } = await request.json()
+  const { landlordId, parkingSpotId, rate, startDate, endDate, tenantId, renterId, renter, carMake, carModel, carYear } = await request.json()
 
   if (!landlordId) return Response.json({ error: 'landlordId is required.' }, { status: 400 })
   if (!parkingSpotId) return Response.json({ error: 'parkingSpotId is required.' }, { status: 400 })
@@ -14,6 +14,16 @@ export async function POST(request) {
   }
   if (renter && !renter.name?.trim()) {
     return Response.json({ error: 'Renter name is required.' }, { status: 400 })
+  }
+
+  // car_year is a smallint column. core.js already normalizes, but this route
+  // is reachable directly, so coerce here too rather than letting a string or
+  // NaN reach Postgres.
+  const parsedCarYear = Number(carYear)
+  const carColumns = {
+    car_make: carMake?.trim() || null,
+    car_model: carModel?.trim() || null,
+    car_year: Number.isFinite(parsedCarYear) && parsedCarYear > 0 ? parsedCarYear : null,
   }
 
   const supabase = createClient(
@@ -54,6 +64,7 @@ export async function POST(request) {
       rate: +rate,
       start_date: startDate,
       end_date: endDate || null,
+      ...carColumns,
     })
     .select()
     .single()
