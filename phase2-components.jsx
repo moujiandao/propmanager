@@ -838,9 +838,9 @@ export const TenantContactPage = ({ data, setData, refresh, user, t, tenantId, o
       <div style={{ background: "#fafafa", minHeight: "100vh", padding: "32px 40px", fontFamily: "'Inter',system-ui,-apple-system,sans-serif" }}>
         {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
         <button onClick={onBack} style={{ background: "#ffffff", border: "1px solid #eaeaea", borderRadius: 9, padding: "8px 14px", color: "#9ca3af", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 24 }}>
-          ← Back
+          ← {t.unitBack}
         </button>
-        <p style={{ color: "#9ca3af", fontSize: 15 }}>Tenant not found.</p>
+        <p style={{ color: "#9ca3af", fontSize: 15 }}>{t.tenantNotFound}</p>
       </div>
     )
   }
