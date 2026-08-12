@@ -1,13 +1,14 @@
+-- SUPERSEDED (2026-08-11) by scripts/add-parking-lease-vehicle.sql and
+-- scripts/drop-parking-spot-vehicle.sql, which move these three columns
+-- onto parking_leases. Kept as history: it records that attaching the
+-- vehicle to the spot was a deliberate choice before it was reversed.
+-- Do not run this on a fresh database -- run the two scripts above.
+--
+-- Original note follows.
+--
 -- Vehicle details for a parking spot: which car is parked there.
---
--- These live on parking_spots, NOT parking_leases. That is a deliberate choice
--- with a known tradeoff: the vehicle is attached to the spot rather than to the
--- occupant, so when a lease ends the previous renter's car stays listed until
--- someone clears it, and there is no history of which vehicle occupied a spot
--- when. Chosen for simplicity -- one place to look, one modal to edit.
---
--- car_year is a smallint rather than text so it sorts and compares numerically.
--- All three are nullable: a spot can exist with no car recorded.
+-- car_year is a smallint rather than text so it sorts and compares
+-- numerically. All three are nullable.
 
 ALTER TABLE parking_spots
   ADD COLUMN IF NOT EXISTS car_make  TEXT,
