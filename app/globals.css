@@ -46,8 +46,27 @@ html {
 
 /* Marketing header: collapse the secondary links on narrow screens so the nav
    never overflows; keep Log in + the primary CTA. */
+/* Hero mockup sidebar. `display` is owned here rather than inline so the media
+   query below can hide it — an inline display would outrank this rule. */
+.pm-mock-sidebar {
+  display: flex;
+}
+
 @media (max-width: 640px) {
   .pm-nav-secondary {
+    display: none;
+  }
+
+  /* The fake sidebar is a fixed 168px of chrome. On a phone that leaves too little
+     room for the panel it exists to frame, so drop it and give the transitions
+     list the full width. */
+  .pm-mock-sidebar {
+    display: none;
+  }
+
+  /* Logo mark only. Logo + wordmark + nav did not fit on one row at ~375px, which
+     pushed the CTA past the viewport and made the whole page scroll sideways. */
+  .pm-wordmark {
     display: none;
   }
 }

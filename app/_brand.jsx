@@ -23,8 +23,13 @@ export function Logo({ size = 30, withWordmark = true, color = palette.text }) {
           <path d="M10 21v-6h4v6" />
         </svg>
       </span>
+      {/* The wordmark drops out below 640px (.pm-wordmark in globals.css). The
+          header is logo + nav on one row, and at ~375px the wordmark's 130px was
+          enough to push the CTA off-screen and make the whole page scroll
+          sideways. Note `display` is left to the stylesheet, not set inline, or
+          the media query could not override it. */}
       {withWordmark && (
-        <span style={{ fontSize: size * 0.62, fontWeight: 800, letterSpacing: '-0.02em', color }}>
+        <span className="pm-wordmark" style={{ fontSize: size * 0.62, fontWeight: 800, letterSpacing: '-0.02em', color }}>
           PropManager
         </span>
       )}
