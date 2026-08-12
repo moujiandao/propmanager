@@ -2,7 +2,19 @@
 
 ## [2026-08-12]
 
+### Added
+- `lib/contracts/mappers.js`, `lib/documents/mappers.js`, `lib/email/mappers.js`, `lib/docuseal/mappers.js` — the last seven snake→camel mappers moved out of the `App()` component closure into the per-entity `lib/<entity>/mappers.js` convention the seamed entities already follow. Nothing outside `App()` could load the app's data while they were closures; this is the prerequisite for a data loader that lives outside the component. Pure move, no shape change.
+
+### Fixed
+- The landlord UI painted Chinese and then corrected itself on every load. The stored language was read in an effect, so the first render always used the `"zh"` default; it is now read in a lazy `useState` initializer. This also retires the `langReady` flag that existed only to stop the dashboard's AI summary being generated in the wrong language, and which was threaded through the props bag to do it.
+- The tenant branch of `fetchAllData` left eight `data` slices `undefined` rather than empty arrays, because `setData` replaces the object and that branch omitted them. Both branches now spread over a shared `EMPTY_DATA`. Invisible until now only because every read site is `|| []`-guarded.
+
+### Removed
+- The `landlord_profiles` query — one of the 19 parallel calls in `fetchAllData`, written to `data.landlords` and read nowhere.
+- `DocumentsPage` and its `toEmbedUrl` helper, superseded by `DocumentsPageV2` (which is what `renderPage` actually mounts, and which carries its own `toEmbedUrlDrive`).
+
 ### Changed
+- Corrected the React Compiler claim in `CLAUDE.md` and the two inline comments citing it. The "memoization could not be preserved" lint error is real and comes from `eslint-plugin-react-hooks` v7, but the compiler itself is **not** enabled — there is no `reactCompiler` flag in `next.config.mjs` and `babel-plugin-react-compiler` is not installed. The hook values are genuinely unmemoized, which matters when reasoning about re-render cost.
 - **A parking spot is no longer labelled "Tenant Priority" or "Open Market" — its second badge is derived from whoever holds the live lease.** The stored `market_status` column was toggled by hand and had drifted exactly the way stored status always does in this app: spots sat labelled "Open Market" while their active lease was to a tenant. `leaseParty(lease)` in `lib/parking/status.js` reads it off the lease instead, whose CHECK already guarantees exactly one of `tenant_id`/`renter_id`, so the label can only be wrong when the lease is wrong. Occupied spots now read Occupied + Tenant / Market Renter; vacant spots carry one badge and no toggle button. `setMarketStatus` and the toggle are gone. Column drop (run after deploy): `scripts/drop-parking-spot-market-status.sql`. **Deliberately given up:** a vacant spot has no lease, so there's no longer a way to record that one is *offered* to the market before somebody takes it — that wants its own `listed` field, not a status describing a letting that doesn't exist.
 
 ### Added

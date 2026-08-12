@@ -33,6 +33,10 @@ import { mapParkingSpot, mapParkingRenter, mapParkingLease } from '@/lib/parking
 import * as parkingOps from '@/lib/parking/core';
 import { activeLeaseForSpot, SPOT_TYPES } from '@/lib/parking/status';
 import { lotLayout } from '@/lib/parking/layout';
+import { mapContract, mapContractTenant } from '@/lib/contracts/mappers';
+import { mapDocument } from '@/lib/documents/mappers';
+import { mapEmailTemplate, mapEmailAutomation, mapEmailMessage } from '@/lib/email/mappers';
+import { mapLeaseRenewal } from '@/lib/docuseal/mappers';
 import { PropertyDetailPage, DocumentsPageV2, TenantContactPage, DocViewer } from './phase2-components';
 import { EmailAutomationPage } from './email-automation-components';
 import { RenewalsPage } from './renewal-components';
@@ -5324,23 +5328,10 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ─── MAPPERS (snake_case Supabase → camelCase UI) ──────────────────────────
-  // mapProperty now lives in lib/property/mappers (imported at top).
-  // mapTenant now lives in lib/tenant/mappers (imported at top) — the one home for the tenant read-shape.
-  const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
-  // mapPayment now lives in lib/payments/mappers (imported at top) — one home for the read shape.
-  // mapMaintenance / -Type / -Attachment / -Comment now live in lib/maintenance/mappers (imported at top) — one home for the aggregate's shape.
-  // mapUnit now lives in lib/units/mappers (imported at top). The `status` it
-  // returns is overwritten below with occupancy derived from the unit's tenants.
-  const mapDocument = (d) => ({ id: d.id, landlordId: d.landlord_id, tenantId: d.tenant_id, propertyId: d.property_id, unitId: d.unit_id, contractId: d.contract_id || null, fileName: d.file_name, filePath: d.file_path, fileType: d.file_type, documentType: d.document_type, aiExtracted: d.ai_extracted, uploadedAt: d.uploaded_at, driveLink: d.drive_link || null })
-  // mapEmailSettings now lives in lib/payment-reminders/mappers (imported at top).
-  const mapEmailTemplate = (e) => ({ id: e.id, name: e.name, subject: e.subject || "", bodyHtml: e.body_html || "", bodyText: e.body_text || "", updatedAt: e.updated_at, createdAt: e.created_at });
-  const mapEmailAutomation = (a) => ({ id: a.id, name: a.name, eventType: a.event_type, offsetDays: a.offset_days || [], templateId: a.template_id || null, scope: a.scope || null, enabled: a.enabled || false });
-  const mapEmailMessage = (m) => ({ id: m.id, direction: m.direction, automationId: m.automation_id || null, templateId: m.template_id || null, tenantId: m.tenant_id || null, eventType: m.event_type || null, eventDate: m.event_date || null, toEmail: m.to_email || "", subject: m.subject || "", bodyHtml: m.body_html || "", bodyText: m.body_text || "", status: m.status, deliveredAt: m.delivered_at || null, openedAt: m.opened_at || null, repliedAt: m.replied_at || null, replyToMessageId: m.reply_to_message_id || null, isTest: m.is_test || false, createdAt: m.created_at });
-  const mapLeaseRenewal = (r) => ({ id: r.id, landlordId: r.landlord_id || null, contractId: r.contract_id, propertyId: r.property_id || null, originalLeaseDate: r.original_lease_date || null, newTermStart: r.new_term_start || null, newTermEnd: r.new_term_end || null, rentAmount: r.rent_amount, status: r.status || "draft", docusealSubmissionId: r.docuseal_submission_id || null, signers: r.signers || [], appliedToContract: r.applied_to_contract || false, createdAt: r.created_at || null, updatedAt: r.updated_at || null });
-  const mapContractTenant = (ct) => ({ contractId: ct.contract_id, tenantId: ct.tenant_id });
-
   // ─── DATA FETCHING ─────────────────────────────────────────────────────────
+  // Every mapper now lives in lib/<entity>/mappers (imported at top). They used
+  // to be defined here, inside the component closure, which is why nothing
+  // outside App() could load this data.
   const fetchAllData = async () => {
     setLoadingData(true);
     try {
