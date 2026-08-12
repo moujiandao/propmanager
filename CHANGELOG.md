@@ -3,6 +3,10 @@
 ## [2026-08-12]
 
 ### Added
+- **The app's store moved out of the page component and into a layout.** `components/app-store.jsx` holds `data`/`user`/`lang` behind three separate contexts and is mounted by a new `app/(app)/layout.js`. Because Next does not re-render a shared parent layout when navigating between its children, the loaded portfolio will survive navigation once real routes exist — which is the whole point. The cold-store gate lives *inside* the provider, replacing `children`: wrapping the provider in a conditional would remount it on every flip and wipe the store along with every optimistic update. `App()` now owns only `page` and the two selected-record ids.
+- `lib/dashboard/load.js` — `fetchAllData`'s body, now React-free and taking its Supabase client injected (`loadAllData`, `EMPTY_DATA`). Carries the warning that it must be handed a session-carrying anon client: its queries are unfiltered `select("*")` scoped only by RLS, so the service-role client would return every team's rows.
+- `lib/auth/current-user.js` — `getCurrentUser()`, the landlord/tenant role probe, moved to the server and wrapped in React `cache()` so a parent layout and a nested role guard resolve it once per request. This removes two sequential round trips and a null-render gate from the cold path; a page load now issues one portfolio fetch instead of two.
+- `lib/supabase/server-anon.js` — server-side client using the **anon** key, so RLS applies to server-side reads. `lib/supabase/server.js` (service role) stays for admin API routes.
 - `lib/contracts/mappers.js`, `lib/documents/mappers.js`, `lib/email/mappers.js`, `lib/docuseal/mappers.js` — the last seven snake→camel mappers moved out of the `App()` component closure into the per-entity `lib/<entity>/mappers.js` convention the seamed entities already follow. Nothing outside `App()` could load the app's data while they were closures; this is the prerequisite for a data loader that lives outside the component. Pure move, no shape change.
 
 ### Fixed
@@ -10,6 +14,8 @@
 - The tenant branch of `fetchAllData` left eight `data` slices `undefined` rather than empty arrays, because `setData` replaces the object and that branch omitted them. Both branches now spread over a shared `EMPTY_DATA`. Invisible until now only because every read site is `|| []`-guarded.
 
 ### Removed
+- `app/(app)/dashboard/layout.js` — its session guard moved up to `app/(app)/layout.js`, which now also resolves the role.
+- The client-side auth-resolution effect and `fetchAllData` from `App()`, along with the `authLoading` / no-user / cold-store render gates. The server layout and the provider own all of it now.
 - The `landlord_profiles` query — one of the 19 parallel calls in `fetchAllData`, written to `data.landlords` and read nowhere.
 - `DocumentsPage` and its `toEmbedUrl` helper, superseded by `DocumentsPageV2` (which is what `renderPage` actually mounts, and which carries its own `toEmbedUrlDrive`).
 

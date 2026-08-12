@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, Fragment } from "react";
+import { useAppUser, useAppLang, useAppData } from '@/components/app-store';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { createClient } from '@/lib/supabase/client';
@@ -3397,9 +3398,10 @@ const PaymentsPage = ({ data, t, refresh, setPage, setSelectedTenantId }) => {
   // Persisted property filter — same pattern as the Tenants page: store HIDDEN ids so a newly
   // added property shows by default. Its own storage key, so narrowing the payment view doesn't
   // silently narrow the tenant roster as well.
-  // Read lazily rather than via an effect: the whole dashboard is gated behind authLoading, so
-  // this never runs during SSR or hydration. That also removes the "ready" flag the Tenants page
-  // needs to stop its write effect clobbering storage before the read lands.
+  // Read lazily rather than via an effect: this page only mounts behind the
+  // provider's cold-store gate, so it never runs during SSR or hydration. That also
+  // removes the "ready" flag the Tenants page needs to stop its write effect
+  // clobbering storage before the read lands.
   const [hiddenProps, setHiddenProps] = useState(() => {
     try {
       const raw = typeof window !== "undefined" && localStorage.getItem("propmanager_payment_hidden_props");
@@ -5247,43 +5249,23 @@ const TenantProfilePage = ({ user, setUser }) => {
 };
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-// EMPTY_EMAIL_SETTINGS now lives in lib/payment-reminders/constants (imported at top).
-
-// The full shape of `data`. Both fetch branches spread over this rather than
-// building a bare object: setData REPLACES, so a branch that omits a slice would
-// leave it `undefined` instead of the empty array every consumer expects. The
-// tenant branch omits eight of them, which is why this is a shared const and not
-// just the useState initializer.
-const EMPTY_DATA = {
-  properties: [], tenants: [], contracts: [], payments: [], maintenance: [],
-  emailSettings: EMPTY_EMAIL_SETTINGS, units: [], documents: [],
-  maintenanceTypes: [], maintenanceAttachments: [], maintenanceComments: [],
-  emailTemplates: [], emailAutomations: [], emailMessages: [], leaseRenewals: [],
-  contractTenants: [], parkingSpots: [], parkingRenters: [], parkingLeases: [],
-};
+// The store (data, user, lang) lives in components/app-store, mounted by
+// app/(app)/layout.js. EMPTY_DATA and the read path live in lib/dashboard/load.
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  // The store lives in app/(app)/layout.js so it survives navigation between
+  // routes. This component owns only what is still page-state: which view is
+  // showing, and which record that view is showing. Both go away in the routing
+  // phase, when the URL becomes the source of truth for exactly this.
+  const { user, setUser } = useAppUser();
+  const { lang, setLang } = useAppLang();
+  const { data, setData, refresh } = useAppData();
+
   const [page, setPage] = useState("dashboard");
-  const [data, setData] = useState(EMPTY_DATA);
-  const [loadingData, setLoadingData] = useState(false);
-  // Read the stored language during the first render, not in an effect. Reading it
-  // afterwards meant every load painted "zh" and then corrected itself, and forced a
-  // `langReady` flag through the props bag so the dashboard summary wouldn't be
-  // generated in the wrong language. The window guard is for the SSR pass; App
-  // renders null until auth resolves, so the server never commits a language.
-  const [lang, setLang] = useState(() =>
-    (typeof window !== "undefined" && localStorage.getItem("propmanager_lang")) || "zh"
-  );
-  useEffect(() => { localStorage.setItem("propmanager_lang", lang); }, [lang]);
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [selectedTenantId, setSelectedTenantId] = useState(null);
   const t = T[lang];
   const prevPageRef = useRef(null);
-
-  useEffect(() => { document.body.style.margin = "0"; document.body.style.background = "#fafafa"; }, []);
-  useEffect(() => { if (user) fetchAllData(); }, [user]);
 
   // Sync browser history with internal page state
   useEffect(() => {
@@ -5309,175 +5291,10 @@ export default function App() {
     return () => window.removeEventListener("popstate", handler);
   }, []);
 
-  // Restore session on page load and react to auth state changes
-  useEffect(() => {
-    const resolveUser = async (authUser) => {
-      if (!authUser) { setUser(null); setAuthLoading(false); return; }
-      const { data: membership } = await supabase.from("landlord_members").select("landlord_id").eq("auth_user_id", authUser.id).maybeSingle();
-      if (membership) {
-        const { data: landlord } = await supabase.from("landlord_profiles").select("*").eq("id", membership.landlord_id).single();
-        if (landlord) { setUser({ id: landlord.id, authId: authUser.id, role: "landlord", email: authUser.email, name: landlord.name || authUser.email?.split("@")[0] }); setAuthLoading(false); return; }
-      }
-      const { data: tenant } = await supabase.from("tenant_profiles").select("*").eq("id", authUser.id).single();
-      if (tenant) { setUser({ id: tenant.id, authId: authUser.id, role: "tenant", email: authUser.email, name: tenant.name || authUser.email?.split("@")[0] }); }
-      setAuthLoading(false);
-    };
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      resolveUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // ─── DATA FETCHING ─────────────────────────────────────────────────────────
-  // Every mapper now lives in lib/<entity>/mappers (imported at top). They used
-  // to be defined here, inside the component closure, which is why nothing
-  // outside App() could load this data.
-  const fetchAllData = async () => {
-    setLoadingData(true);
-    try {
-      if (user.role === "landlord") {
-        const [propRes, tenRes, conRes, payRes, maintRes, emailRes, unitRes, docRes, maintTypesRes, maintAttRes, maintCommRes, emailTplRes, emailAutoRes, emailMsgRes, renewalRes, parkSpotRes, parkRenterRes, parkLeaseRes] = await Promise.all([
-          supabase.from("properties").select("*").order("created_at", { ascending: true }),
-          supabase.from("tenant_profiles").select("*"),
-          supabase.from("contracts").select("*, contract_tenants(tenant_id)"),
-          supabase.from("payments").select("*").order("due_date", { ascending: false }),
-          supabase.from("maintenance_requests").select("*").order("created_at", { ascending: false }),
-          supabase.from("email_settings").select("*").single(),
-          supabase.from("units").select("*").order("unit_number", { ascending: true }),
-          supabase.from("documents").select("*").order("uploaded_at", { ascending: false }),
-          supabase.from("maintenance_types").select("*").order("name", { ascending: true }),
-          supabase.from("maintenance_attachments").select("*").order("created_at", { ascending: true }),
-          supabase.from("maintenance_comments").select("*").order("created_at", { ascending: true }),
-          supabase.from("email_templates").select("*").order("updated_at", { ascending: false }),
-          supabase.from("email_automations").select("*").order("created_at", { ascending: true }),
-          supabase.from("email_messages").select("*").neq("status", "draft").order("created_at", { ascending: false }).limit(300),
-          supabase.from("lease_renewals").select("*").order("created_at", { ascending: false }),
-          supabase.from("parking_spots").select("*").order("label", { ascending: true }),
-          supabase.from("parking_renters").select("*"),
-          supabase.from("parking_leases").select("*").order("start_date", { ascending: false }),
-        ]);
-        const today = new Date().toISOString().split("T")[0];
-        const units = (unitRes.data || []).map(mapUnit).map(unit => {
-          const tenantsInUnit = (tenRes.data || []).filter(t => t.unit_id === unit.id);
-          // Occupancy follows the DERIVED status, same rule the server routes apply.
-          const isOccupied = tenantsInUnit.some(t => isCurrentRow(t));
-          return { ...unit, status: isOccupied ? "occupied" : "vacant" };
-        });
-
-        // Fetch contract_tenants via service-role route — RLS blocks the
-        // client-side join so contract_tenants(tenant_id) comes back empty.
-        let linkMap = new Map();
-        const contractIds = (conRes.data || []).map(c => c.id);
-        if (contractIds.length > 0) {
-          try {
-            const linkRes = await fetch(`/api/contracts/tenant-links`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ contractIds }),
-            });
-            if (linkRes.ok) {
-              const { links } = await linkRes.json();
-              for (const l of links || []) {
-                if (!linkMap.has(l.contract_id)) linkMap.set(l.contract_id, []);
-                linkMap.get(l.contract_id).push(l.tenant_id);
-              }
-            }
-          } catch (_) { /* fall back to client-side join */ }
-        }
-
-        const mappedContracts = (conRes.data || []).map(mapContract).map(c => {
-          const fromApi = linkMap.get(c.id);
-          return fromApi && fromApi.length > 0 ? { ...c, tenantIds: fromApi } : c;
-        });
-
-        // Flatten the contract→tenant junction into a list the Renewals page
-        // consumes. Prefer the service-role linkMap (RLS-safe); fall back to
-        // the embedded client-side join when the API route is unavailable.
-        const contractTenants = [];
-        for (const c of (conRes.data || [])) {
-          const fromApi = linkMap.get(c.id);
-          const tenantIds = (fromApi && fromApi.length > 0)
-            ? fromApi
-            : (c.contract_tenants || []).map(ct => ct.tenant_id);
-          for (const tenantId of tenantIds) {
-            contractTenants.push(mapContractTenant({ contract_id: c.id, tenant_id: tenantId }));
-          }
-        }
-
-        setData({
-          ...EMPTY_DATA,
-          properties:    (propRes.data  || []).map(mapProperty),
-          tenants:       (tenRes.data   || []).map(mapTenant),
-          contracts:     mappedContracts,
-          payments:      (payRes.data   || []).map(mapPayment),
-          maintenance:            (maintRes.data     || []).map(mapMaintenance),
-          emailSettings:          mapEmailSettings(emailRes.data),
-          units,
-          documents:              (docRes.data       || []).map(mapDocument),
-          maintenanceTypes:       (maintTypesRes.data || []).map(mapMaintenanceType),
-          maintenanceAttachments: (maintAttRes.data  || []).map(mapMaintenanceAttachment),
-          maintenanceComments:    (maintCommRes.data || []).map(mapMaintenanceComment),
-          emailTemplates:         (emailTplRes.data  || []).map(mapEmailTemplate),
-          emailAutomations:       (emailAutoRes.data || []).map(mapEmailAutomation),
-          emailMessages:          (emailMsgRes.data  || []).map(mapEmailMessage),
-          leaseRenewals:          (renewalRes.data   || []).map(mapLeaseRenewal),
-          contractTenants,
-          parkingSpots:           (parkSpotRes.data   || []).map(mapParkingSpot),
-          parkingRenters:         (parkRenterRes.data || []).map(mapParkingRenter),
-          parkingLeases:          (parkLeaseRes.data  || []).map(mapParkingLease),
-        });
-      } else {
-        // Tenant: fetch own profile + related data
-        const { data: tenRow } = await supabase.from("tenant_profiles").select("*").eq("id", user.id).single();
-        const tenant = tenRow ? mapTenant(tenRow) : null;
-        const { data: ctRows } = await supabase
-          .from("contract_tenants")
-          .select("contract_id")
-          .eq("tenant_id", user.id)
-          .order("created_at", { ascending: false });
-        const contractId = ctRows?.[0]?.contract_id;
-        const [propRes, conRes, payRes, maintRes, maintCommRes] = await Promise.all([
-          tenant?.propertyId ? supabase.from("properties").select("*").eq("id", tenant.propertyId) : Promise.resolve({ data: [] }),
-          contractId ? supabase.from("contracts").select("*, contract_tenants(tenant_id)").eq("id", contractId) : Promise.resolve({ data: [] }),
-          supabase.from("payments").select("*").eq("tenant_id", user.id).order("due_date", { ascending: false }),
-          supabase.from("maintenance_requests").select("*").eq("tenant_id", user.id).order("created_at", { ascending: false }),
-          supabase.from("maintenance_comments").select("*").order("created_at", { ascending: true }),
-        ]);
-        setData({
-          ...EMPTY_DATA,
-          properties:    (propRes.data  || []).map(mapProperty),
-          tenants:       tenant ? [tenant] : [],
-          contracts:     (conRes.data   || []).map(mapContract),
-          payments:      (payRes.data   || []).map(mapPayment),
-          maintenance:   (maintRes.data || []).map(mapMaintenance),
-          maintenanceComments: (maintCommRes.data || []).map(mapMaintenanceComment),
-        });
-      }
-    } catch (err) {
-      console.error("fetchAllData error:", err);
-    }
-    setLoadingData(false);
-  };
-
-  if (authLoading) return null;
-  // The dashboard lives behind a server-side auth guard (app/(app)/dashboard/layout.js).
-  // This is a client-side fallback for the rare case the guard's session check and the
-  // client profile resolution disagree (e.g. valid cookie but missing profile row).
-  if (!user) {
-    if (typeof window !== "undefined") window.location.href = "/login?next=/dashboard";
-    return null;
-  }
-
-  if (loadingData && !data.properties.length && !data.tenants.length) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", color: "#6b7280", fontSize: 16 }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); -webkit-font-smoothing: antialiased;`}</style>
-        Loading your portfolio…
-      </div>
-    );
-  }
-
-  const refresh = fetchAllData;
+  // No auth or loading gates here any more. app/(app)/layout.js resolves the
+  // session and the role on the server before this ever renders, and the
+  // provider holds the cold-store gate — so by the time App mounts there is
+  // always a user with a role.
 
   const renderPage = () => {
     if (user.role === "landlord") {
@@ -5486,17 +5303,17 @@ export default function App() {
         case "dashboard":        return <LandlordDashboard {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} setSelectedTenantId={setSelectedTenantId} />;
         case "properties":       return <PropertiesPage {...props} setPage={setPage} setSelectedPropertyId={setSelectedPropertyId} />;
         case "tenants":          return <TenantsPage {...props} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
-        case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={fetchAllData} user={user} t={t} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
+        case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={refresh} user={user} t={t} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
         case "parking":          return <ParkingPage {...props} />;
         case "contracts":        return <ContractsPage {...props} />;
-        case "payments":         return <PaymentsPage data={data} t={t} refresh={fetchAllData} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
+        case "payments":         return <PaymentsPage data={data} t={t} refresh={refresh} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
         case "maintenance":      return <MaintenancePage {...props} />;
         case "email":            return <EmailPage {...props} />;
         case "email-automation": return <EmailAutomationPage {...props} />;
         case "renewals":         return <RenewalsPage {...props} />;
-        case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={fetchAllData} user={user} />;
-        case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={fetchAllData} user={user} t={t} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
-        case "admin-users":      return <AdminUsersPage t={t} data={data} user={user} refresh={fetchAllData} />;
+        case "documents":        return <DocumentsPageV2 data={data} setData={setData} refresh={refresh} user={user} />;
+        case "property-detail":  return <PropertyDetailPage data={data} setData={setData} refresh={refresh} user={user} t={t} propertyId={selectedPropertyId} onBack={() => setPage('properties')} onNavigateToTenant={(id) => { setSelectedTenantId(id); setPage('tenant-detail'); }} />;
+        case "admin-users":      return <AdminUsersPage t={t} data={data} user={user} refresh={refresh} />;
         default:                 return <LandlordDashboard {...props} />;
       }
     } else {
