@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-12]
+
+### Added
+- **Maintenance requests are editable and deletable.** The To Do detail modal gains Edit Request (description, type, priority, unit) and Delete Request. Status stays on its own control, since `setStatus` owns it together with `closed_at`; tenant and property aren't editable because re-pointing a request at a different home is a different request. Editing clears `description_zh` — it's a cached translation *of* the description, so leaving it would leave the Chinese confidently describing something the English no longer says. Delete is a hard delete: comments and attachment rows cascade in the database, and the attachment **files** are removed from storage separately since those don't cascade. The confirm counts the attachments going with it.
+- **Payment records are editable and deletable.** The Payments page keeps its 3-month completed-only checkbox grid and gains a full record list beneath it — previously a pending payment, an older one, or a wrong amount had no view at all, let alone a way to fix it. Per-record edit covers amount, due date, paid date, status and type. `tenant_id`/`contract_id` aren't editable (re-pointing a payment rewrites two ledgers rather than correcting one) and neither is `ach_status` (Stripe's webhook owns it, so a hand-edit would be silently overwritten).
+- `lib/payments/` (`core.js` + `adapter.js` + `fake.js` + `mappers.js` + `status.js` + `core.test.mjs`) — the seventh per-entity data-access seam. `mapPayment` moved out of `fetchAllData`. The delete routes through the pre-existing `app/api/payments/delete` endpoint the grid's uncheck already used, so there's one server-side delete path; `deletePayment` checks the row count that route reports back, so a delete that silently matched nothing is reported as a failure rather than as success.
+
+### Fixed
+- The gender mark didn't render on the Parking page. `partyForLease` built its occupant name as a plain string, so the mark had nowhere to attach; the party now carries `gender` for the JSX call sites and a pre-suffixed `nameText` for the two string-only ones (the diagram's SVG `<title>`, the delete confirm).
+
 ## [2026-08-11]
 
 ### Changed

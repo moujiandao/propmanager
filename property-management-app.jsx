@@ -25,6 +25,10 @@ import { createUnitAdapter } from '@/lib/units/adapter';
 import { mapUnit } from '@/lib/units/mappers';
 import * as unitOps from '@/lib/units/core';
 import { createParkingAdapter } from '@/lib/parking/adapter';
+import { createPaymentsAdapter } from '@/lib/payments/adapter';
+import { mapPayment } from '@/lib/payments/mappers';
+import { PAYMENT_STATUSES, PAYMENT_TYPES } from '@/lib/payments/status';
+import * as paymentOps from '@/lib/payments/core';
 import { mapParkingSpot, mapParkingRenter, mapParkingLease } from '@/lib/parking/mappers';
 import * as parkingOps from '@/lib/parking/core';
 import { activeLeaseForSpot, SPOT_TYPES } from '@/lib/parking/status';
@@ -71,6 +75,17 @@ const T = {
     tenantPaymentStatus: "Tenant Payment Status", recentMaintenance: "Recent Maintenance", recentPayments: "Recent Payments",
     colTenant: "Tenant", colTenants: "Tenants", colAmount: "Amount", colDueDate: "Due Date", colPaidDate: "Paid Date",
     colType: "Type", colAchStatus: "ACH Status", colStatus: "Status", colContact: "Contact", colPriority: "Priority",
+    payRecords: "Payment Records", payRecordsSub: (n) => `${n} record(s), newest first`,
+    payNoRecords: "No payment records yet.",
+    payEdit: "Edit Payment", payEditTitle: "Edit Payment",
+    payDelete: "Delete Payment", payDeleteTitle: "Delete Payment",
+    payDeleteConfirm: (who, amt, due) => `Delete the ${amt} payment for ${who} due ${due}? This removes the record from the books entirely and cannot be undone.`,
+    payAmount: "Amount ($)", payDueDate: "Due Date", payPaidDate: "Paid Date",
+    payAmountRequired: "An amount of 0 or more is required.", payDueRequired: "A due date is required.",
+    payFailedUpdate: "Failed to update payment.", payFailedDelete: "Failed to delete payment.",
+    payStatus_pending: "Pending", payStatus_completed: "Completed", payStatus_failed: "Failed",
+    payType_recurring: "Recurring", payType_oneTime: "One-time", payTypeNone: "— None —",
+    payShowAll: "Show all", payShowFewer: "Show fewer",
     colProperty: "Property / Unit", colBank: "Bank", colRecurring: "Recurring",
     colTerm: "Term", colDaysRemaining: "Days Remaining",
     propTitle: "Properties", propSubtitle: (n) => `${n} properties in portfolio`,
@@ -386,6 +401,17 @@ const T = {
     tenantPaymentStatus: "租客付款状态", recentMaintenance: "最近维修请求", recentPayments: "最近付款记录",
     colTenant: "租客", colTenants: "租客", colAmount: "金额", colDueDate: "到期日", colPaidDate: "付款日",
     colType: "类型", colAchStatus: "ACH状态", colStatus: "状态", colContact: "联系方式", colPriority: "优先级",
+    payRecords: "付款记录", payRecordsSub: (n) => `共 ${n} 条记录，最新在前`,
+    payNoRecords: "暂无付款记录。",
+    payEdit: "编辑付款", payEditTitle: "编辑付款",
+    payDelete: "删除付款", payDeleteTitle: "删除付款",
+    payDeleteConfirm: (who, amt, due) => `确定删除 ${who} 于 ${due} 到期的 ${amt} 付款记录吗？此记录将从账目中彻底移除，且无法撤销。`,
+    payAmount: "金额（$）", payDueDate: "到期日", payPaidDate: "付款日期",
+    payAmountRequired: "金额必须大于或等于 0。", payDueRequired: "到期日为必填项。",
+    payFailedUpdate: "更新付款失败。", payFailedDelete: "删除付款失败。",
+    payStatus_pending: "待付", payStatus_completed: "已完成", payStatus_failed: "失败",
+    payType_recurring: "周期性", payType_oneTime: "一次性", payTypeNone: "— 无 —",
+    payShowAll: "显示全部", payShowFewer: "收起",
     colProperty: "房产 / 单元", colBank: "银行账户", colRecurring: "自动续费",
     colTerm: "合同期限", colDaysRemaining: "剩余天数",
     propTitle: "房产管理", propSubtitle: (n) => `共 ${n} 处房产`,
@@ -3261,7 +3287,12 @@ const ParkingPage = ({ data, t, refresh, user }) => {
 };
 
 // ─── PAYMENTS PAGE ────────────────────────────────────────────────────────────
-const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
+// How many payment records the list shows before "Show all". The month grid
+// covers the recent completed ones; this list exists for everything else, and a
+// year of monthly rent across a dozen tenants is a long page uncapped.
+const PAYMENT_PAGE_SIZE = 25;
+
+const PaymentsPage = ({ data, t, refresh, setPage, setSelectedTenantId }) => {
   // 3-month window: previous, current, next month
   const months = useMemo(() => {
     const result = [];
@@ -3294,6 +3325,70 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
   const [checked, setChecked] = useState(() => ({ ...saved }));
   const [saving, setSaving] = useState(false);
   const [payError, setPayError] = useState(null);
+
+  const payMx = usePaymentMutations();
+  // The record being edited / queued for deletion. Holds the payment itself so
+  // the form seeds once and the confirm can name the amount and who it is for.
+  const [editPay, setEditPay] = useState(null);
+  const [payForm, setPayForm] = useState({ amount: "", dueDate: "", paidDate: "", status: "completed", type: "" });
+  const setPF = (k, v) => setPayForm(f => ({ ...f, [k]: v }));
+  const [editPayError, setEditPayError] = useState(null);
+  const [savingPay, setSavingPay] = useState(false);
+  const [deletePay, setDeletePay] = useState(null);
+  const [deletePayError, setDeletePayError] = useState(null);
+  const [deletingPay, setDeletingPay] = useState(false);
+  // The month grid only ever shows three months of completed rows. The record
+  // list below it is the only view of everything else, so it starts capped
+  // rather than dumping every payment on the page.
+  const [showAllPayments, setShowAllPayments] = useState(false);
+
+  // Newest due date first. Sorted on a copy — `data.payments` is shared state and
+  // sorting it in place would reorder it for every other page too.
+  const sortedPayments = [...(data.payments || [])].sort((a, b) => String(b.dueDate || "").localeCompare(String(a.dueDate || "")));
+  const visiblePayments = showAllPayments ? sortedPayments : sortedPayments.slice(0, PAYMENT_PAGE_SIZE);
+
+  const openEditPay = (p) => {
+    setEditPay(p);
+    setPayForm({
+      amount: p.amount == null ? "" : String(p.amount),
+      dueDate: p.dueDate || "",
+      paidDate: p.paidDate || "",
+      status: p.status || "completed",
+      type: p.type || "",
+    });
+    setEditPayError(null);
+  };
+
+  const savePayEdit = async () => {
+    // Mirrors what core enforces, so the database's rejections arrive as
+    // translated messages rather than raw errors. Blank is checked separately
+    // from non-numeric because Number("") is 0.
+    if (payForm.amount === "" || !(Number(payForm.amount) >= 0)) { setEditPayError(t.payAmountRequired); return; }
+    if (!payForm.dueDate) { setEditPayError(t.payDueRequired); return; }
+    setSavingPay(true);
+    setEditPayError(null);
+    try {
+      await payMx.updatePayment(editPay.id, payForm);
+      await refresh();
+      setEditPay(null);
+    } catch (e) {
+      setEditPayError(e.message || t.payFailedUpdate);
+    }
+    setSavingPay(false);
+  };
+
+  const confirmDeletePay = async () => {
+    setDeletingPay(true);
+    setDeletePayError(null);
+    try {
+      await payMx.deletePayment(deletePay.id);
+      await refresh();
+      setDeletePay(null);
+    } catch (e) {
+      setDeletePayError(e.message || t.payFailedDelete);
+    }
+    setDeletingPay(false);
+  };
 
   // Detect unsaved changes
   const hasChanges = useMemo(() => {
@@ -3587,6 +3682,95 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
           </tbody>
         </table>
       </div>
+
+      {/* Every payment record, not just the three months of completed rows the
+          grid above manages. This is the only place a pending payment, an older
+          one, or a wrong amount can actually be seen and corrected. */}
+      <div style={{ marginTop: 28 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#111111" }}>{t.payRecords}</div>
+            <div style={{ fontSize: 13, color: "#9ca3af" }}>{t.payRecordsSub(sortedPayments.length)}</div>
+          </div>
+          {sortedPayments.length > PAYMENT_PAGE_SIZE && (
+            <Btn size="sm" variant="ghost" onClick={() => setShowAllPayments(v => !v)}>
+              {showAllPayments ? t.payShowFewer : t.payShowAll}
+            </Btn>
+          )}
+        </div>
+        {sortedPayments.length === 0 ? (
+          <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 14, padding: "30px 0", background: "#fff", border: "1px solid #eaeaea", borderRadius: 12 }}>{t.payNoRecords}</div>
+        ) : (
+          <div style={{ background: "#fff", border: "1px solid #eaeaea", borderRadius: 12, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#fafafa", borderBottom: "1px solid #eaeaea" }}>
+                  {[t.tenant, t.payAmount, t.payDueDate, t.payPaidDate, t.colStatus, t.colType, ""].map((h, i) => (
+                    <th key={i} style={{ padding: "10px 14px", textAlign: i === 6 ? "right" : "left", fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".4px" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visiblePayments.map(p => {
+                  const ten = data.tenants.find(x => x.id === p.tenantId);
+                  return (
+                    <tr key={p.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "11px 14px", fontSize: 14, fontWeight: 500 }}>{ten ? <TenantName tenant={ten} t={t} /> : "—"}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 14, fontWeight: 600 }}>{fmt(p.amount)}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 13, color: "#6b7280" }}>{fmtDate(p.dueDate)}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 13, color: "#6b7280" }}>{p.paidDate ? fmtDate(p.paidDate) : "—"}</td>
+                      <td style={{ padding: "11px 14px" }}><Badge status={p.status} t={t} /></td>
+                      <td style={{ padding: "11px 14px", fontSize: 13, color: "#6b7280" }}>{p.type || "—"}</td>
+                      <td style={{ padding: "11px 14px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        <button onClick={() => openEditPay(p)} style={iconBtn} title={t.payEdit}><Icon name="edit" size={13} /></button>
+                        <button onClick={() => setDeletePay(p)} style={dangerIconBtnStyle} title={t.payDelete}><Icon name="trash" size={13} /></button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {editPay && (
+        <Modal title={t.payEditTitle} onClose={() => setEditPay(null)}>
+          <Inp label={t.payAmount} value={payForm.amount} onChange={v => setPF("amount", v)} type="number" placeholder="0" />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Inp label={t.payDueDate} value={payForm.dueDate} onChange={v => setPF("dueDate", v)} type="date" />
+            <Inp label={t.payPaidDate} value={payForm.paidDate} onChange={v => setPF("paidDate", v)} type="date" />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Sel label={t.colStatus} value={payForm.status} onChange={v => setPF("status", v)}
+              options={PAYMENT_STATUSES.map(x => ({ value: x, label: t[`payStatus_${x}`] }))} />
+            <Sel label={t.colType} value={payForm.type} onChange={v => setPF("type", v)}
+              options={[{ value: "", label: t.payTypeNone }, ...PAYMENT_TYPES.map(x => ({ value: x, label: x === "one-time" ? t.payType_oneTime : t.payType_recurring }))]} />
+          </div>
+          {editPayError && <p style={{ color: "#ef4444", fontSize: 13 }}>{editPayError}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setEditPay(null)}>{t.cancel}</Btn>
+            <Btn onClick={savePayEdit} disabled={savingPay}>{savingPay ? t.saving : t.saveChanges}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {deletePay && (
+        <Modal title={t.payDeleteTitle} onClose={() => setDeletePay(null)}>
+          <p style={{ fontSize: 14, color: "#374151" }}>
+            {t.payDeleteConfirm(
+              (() => { const ten = data.tenants.find(x => x.id === deletePay.tenantId); return ten ? tenantFullName(ten) + genderSuffix(ten) : "—"; })(),
+              fmt(deletePay.amount),
+              fmtDate(deletePay.dueDate),
+            )}
+          </p>
+          {deletePayError && <p style={{ color: "#ef4444", fontSize: 13 }}>{deletePayError}</p>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setDeletePay(null)}>{t.cancel}</Btn>
+            <Btn onClick={confirmDeletePay} disabled={deletingPay}>{deletingPay ? t.deleting : t.payDelete}</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
@@ -3756,6 +3940,15 @@ export function useUnitMutations() {
 // Parking writes behind the lib/parking seam (spot CRUD, lease create/edit/end).
 // Call sites refresh() after, same shape as usePropertyMutations() — no
 // optimistic state coupling here.
+// Payment writes behind the lib/payments seam (edit + delete of a record).
+function usePaymentMutations() {
+  const adapter = createPaymentsAdapter(supabase);
+  return {
+    updatePayment: (id, fields) => paymentOps.updatePayment(adapter, id, fields),
+    deletePayment: (id) => paymentOps.deletePayment(adapter, id),
+  };
+}
+
 function useParkingMutations() {
   const adapter = createParkingAdapter(supabase);
   return {
@@ -5212,7 +5405,7 @@ export default function App() {
   // mapProperty now lives in lib/property/mappers (imported at top).
   // mapTenant now lives in lib/tenant/mappers (imported at top) — the one home for the tenant read-shape.
   const mapContract  = (c) => ({ id: c.id, tenantIds: (c.contract_tenants || []).map(ct => ct.tenant_id), propertyId: c.property_id, unit: c.unit, startDate: c.start_date, endDate: c.end_date, rentAmount: c.rent_amount, dueDay: c.due_day, status: c.status || "active" });
-  const mapPayment   = (p) => ({ id: p.id, tenantId: p.tenant_id, contractId: p.contract_id, amount: p.amount, dueDate: p.due_date, paidDate: p.paid_date, status: p.status, type: p.type, achStatus: p.ach_status });
+  // mapPayment now lives in lib/payments/mappers (imported at top) — one home for the read shape.
   // mapMaintenance / -Type / -Attachment / -Comment now live in lib/maintenance/mappers (imported at top) — one home for the aggregate's shape.
   // mapUnit now lives in lib/units/mappers (imported at top). The `status` it
   // returns is overwritten below with occupancy derived from the unit's tenants.
@@ -5388,7 +5581,7 @@ export default function App() {
         case "tenant-detail":    return <TenantContactPage data={data} setData={setData} refresh={fetchAllData} user={user} t={t} tenantId={selectedTenantId} onBack={() => setPage('tenants')} onNavigateToProperty={(id) => { setSelectedPropertyId(id); setPage('property-detail'); }} />;
         case "parking":          return <ParkingPage {...props} />;
         case "contracts":        return <ContractsPage {...props} />;
-        case "payments":         return <PaymentsPage data={data} t={t} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
+        case "payments":         return <PaymentsPage data={data} t={t} refresh={fetchAllData} setPage={setPage} setSelectedTenantId={setSelectedTenantId} />;
         case "maintenance":      return <MaintenancePage {...props} />;
         case "email":            return <EmailPage {...props} />;
         case "email-automation": return <EmailAutomationPage {...props} />;
