@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-08-11]
+
+### Changed
+- **The vehicle and the rate moved from the parking spot to the parking lease.** `car_make`/`car_model`/`car_year` are now columns on `parking_leases`, so a car arrives with a lease and leaves with it instead of sitting on the spot until someone cleared it by hand. `parking_spots.monthly_rate` was dropped outright rather than moved — `parking_leases.rate` already existed and was `NOT NULL`, so the spot column was a duplicate acting as an asking rate. Consequence taken knowingly: there is no asking-rate concept now, so a vacant spot shows no price and the new-lease form no longer prefills. Two migrations, expand then contract: `scripts/add-parking-lease-vehicle.sql` (add + backfill onto each spot's currently-active lease) and `scripts/drop-parking-spot-vehicle.sql`. Car data on a spot with no active lease, and every `monthly_rate` value, were discarded.
+- The Add/Edit Parking Spot modal is down to property, label, and type. `createSpot`/`updateSpot` no longer accept a rate or a vehicle, and `mapParkingSpot` no longer returns them.
+
+### Added
+- **Edit Parking Lease** modal (rate, end date, vehicle), reachable from the occupied spot card and the lot-diagram detail modal. Backed by a new `updateLease` op in `lib/parking/core.js`. Until now a lease could only be created and ended, so a mistyped rate or a renter's new car had no fix short of ending the lease.
+
+### Fixed
+- **Creating a parking lease could not succeed.** `lib/parking/core.js`'s `createLease` built a snake_case payload (`landlord_id`, `parking_spot_id`, `start_date`, …) which `adapter.js` POSTs verbatim to `/api/parking/leases/create`, but that route destructures camelCase — every field except `rate` and `renter` arrived `undefined` and the route returned `400 landlordId is required`. The tests missed it because `fake.js` mirrored the core's payload rather than the route's contract, so the fake and the real adapter disagreed and only the fake was exercised. Route-backed adapter ops now send camelCase (routes speak camelCase, direct table writes speak snake_case), the fake validates the same required fields the route does, and a regression test pins the payload's key set.
+
 ## [2026-08-05]
 
 ### Added
