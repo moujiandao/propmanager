@@ -2692,7 +2692,17 @@ const ParkingLotDiagram = ({ spots, occBySpotId, onSelect, t }) => {
 
 const ParkingPage = ({ data, t, refresh, user }) => {
   const mx = useParkingMutations();
-  const todayStr = () => new Date().toISOString().split("T")[0];
+  // Local YYYY-MM-DD, deliberately NOT toISOString(), which is UTC. Every date
+  // comparison this page depends on runs through daysBetween in lib/format,
+  // which normalizes to LOCAL midnight -- so a UTC date string makes an evening
+  // in a negative-offset timezone read as tomorrow. Concretely: a lease created
+  // at 8pm Pacific got start_date = tomorrow, isActiveLease said "not started",
+  // and the spot rendered vacant until the next day. Same for End Lease, which
+  // would leave the lease running an extra day.
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
 
   const [showSpotModal, setShowSpotModal] = useState(false);
   // null = the modal is in "add" mode; a spot = "edit" mode. One modal serves both
