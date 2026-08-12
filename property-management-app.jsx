@@ -12,6 +12,7 @@ import { createTenantAdapter } from '@/lib/tenant/adapter';
 import { mapTenant } from '@/lib/tenant/mappers';
 import { statusFor, isCurrentRow, awaitingMoveInAck, awaitingMoveOutAck } from '@/lib/tenant/status';
 import { blockersFromData } from '@/lib/tenant/deletion';
+import { GENDERS, genderMark } from '@/lib/tenant/gender';
 import * as tenantOps from '@/lib/tenant/core';
 import { createPaymentReminderAdapter } from '@/lib/payment-reminders/adapter';
 import { mapEmailSettings } from '@/lib/payment-reminders/mappers';
@@ -324,6 +325,8 @@ const T = {
     inProduction: "In Production", inProductionHint: "Tenants of this property will be hidden from the dashboard, Tenants, Payments, and To Do List pages.", propNotInProduction: "Not in Production",
     failedCreateLease: "Failed to create lease.", failedCreateTenant: "Failed to create tenant.",
     tenantNameMoveInRequired: "First name and move-in date are required.",
+    gender: "Gender", genderNone: "— Not specified —",
+    gender_male: "Male", gender_female: "Female",
     navParking: "Parking",
     parkTitle: "Parking", parkSubtitle: (n) => `${n} parking spots`,
     parkAddSpot: "Add Spot", parkAddSpotTitle: "Add Parking Spot",
@@ -629,6 +632,8 @@ const T = {
     inProduction: "启用中", inProductionHint: "此房产的租客将不再显示在仪表盘、租客、付款和待办事项页面中。", propNotInProduction: "未启用",
     failedCreateLease: "创建租约失败。", failedCreateTenant: "创建租客失败。",
     tenantNameMoveInRequired: "请填写名字和入住日期。",
+    gender: "性别", genderNone: "— 未填写 —",
+    gender_male: "男", gender_female: "女",
     navParking: "停车位",
     parkTitle: "停车位", parkSubtitle: (n) => `共 ${n} 个停车位`,
     parkAddSpot: "添加车位", parkAddSpotTitle: "添加停车位",
@@ -702,6 +707,35 @@ export const Icon = ({ name, size = 18 }) => {
 // fmt / fmtDate now live in lib/format (imported at top) — the one home for the
 // currency/date formatters previously duplicated here, in renewals, and in lib/email.
 const tenantFullName = (ten) => [ten.name, ten.lastName].filter(Boolean).join(" ");
+
+// The ♂/♀ mark that follows a tenant's name. Nothing renders when no gender is
+// recorded, so the symbol always means something rather than standing in for
+// "unknown". aria-label carries the word, because the glyph alone is announced
+// inconsistently by screen readers and colour is no help to anyone who can't
+// see it — the symbol and the label do the work, the colour is decoration.
+export const GenderMark = ({ gender, t }) => {
+  const mark = genderMark(gender);
+  if (!mark) return null;
+  return (
+    <span aria-label={t?.[`gender_${gender}`]} title={t?.[`gender_${gender}`]}
+          style={{ color: mark.color, marginLeft: 5, fontWeight: 700 }}>
+      {mark.symbol}
+    </span>
+  );
+};
+
+// A tenant's name with its mark. Use this anywhere the name renders as JSX; the
+// bare `tenantFullName` stays for the places that can only take a string (an
+// <option>, a title attribute), where `genderSuffix` appends the glyph instead.
+const TenantName = ({ tenant, t }) => (
+  <>{tenantFullName(tenant)}<GenderMark gender={tenant?.gender} t={t} /></>
+);
+
+// Text-only fallback for string contexts, which cannot carry colour.
+export const genderSuffix = (ten) => {
+  const mark = genderMark(ten?.gender);
+  return mark ? ` ${mark.symbol}` : "";
+};
 
 const statusColors = {
   completed: { bg: "#dcfce7", text: "#166534", dot: "#22c55e" },
@@ -1371,7 +1405,7 @@ const LandlordDashboard = ({ data, setData, t, lang, langReady, user, setPage, s
                               onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
                               onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-                            >{tenantFullName(ten)}</div>
+                            ><TenantName tenant={ten} t={t} /></div>
                             <div style={{ fontSize: 13, color: "#9ca3af" }}>{fmtDate(ten.moveOutDate)}</div>
                             {awaitingMoveOutAck(ten) && (
                               <div style={{ fontSize: 12, color: "#b45309", fontWeight: 600, marginTop: 2 }}>{t.dashAckPendingMoveOut}</div>
@@ -1408,7 +1442,7 @@ const LandlordDashboard = ({ data, setData, t, lang, langReady, user, setPage, s
                               onClick={() => { if (setPage && setSelectedTenantId) { setSelectedTenantId(ten.id); setPage("tenant-detail"); } }}
                               onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }}
                               onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-                            >{tenantFullName(ten)}</div>
+                            ><TenantName tenant={ten} t={t} /></div>
                             <div style={{ fontSize: 13, color: "#16a34a" }}>{ten.moveInDate ? fmtDate(ten.moveInDate) : "—"}</div>
                             {(!ten.securityDeposit || +ten.securityDeposit <= 0) ? (
                               <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600, marginTop: 2 }}>{t.securityDepositNotReceived}</div>
@@ -1477,7 +1511,7 @@ const LandlordDashboard = ({ data, setData, t, lang, langReady, user, setPage, s
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#111111,#000000)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700 }}>{(ten.name || "?").charAt(0)}</div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#111111" }}>{tenantFullName(ten)}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#111111" }}><TenantName tenant={ten} t={t} /></div>
                     <div style={{ fontSize: 12, color: "#9ca3af" }}>{ten.unit} · {prop?.address}</div>
                     {ten.notes && (
                       <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600, marginTop: 4 }}>{ten.notes}</div>
@@ -1502,7 +1536,7 @@ const LandlordDashboard = ({ data, setData, t, lang, langReady, user, setPage, s
                 const ten = tenants.find(ten => ten.id === p.tenantId);
                 return (
                   <tr key={p.id} style={{ borderTop: "1px solid #fafafa" }}>
-                    <td style={{ padding: "11px 12px 11px 0", fontSize: 14, fontWeight: 500 }}>{ten ? tenantFullName(ten) : "—"}</td>
+                    <td style={{ padding: "11px 12px 11px 0", fontSize: 14, fontWeight: 500 }}>{ten ? <TenantName tenant={ten} t={t} /> : "—"}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 14 }}>{fmt(p.amount || ten?.monthlyRent || 0)}</td>
                     <td style={{ padding: "11px 12px 11px 0", fontSize: 13, color: "#6b7280" }}>{p.dueDate ? fmtDate(p.dueDate.slice(0,7) + "-05T12:00:00") : "—"}</td>
                   </tr>
@@ -1768,7 +1802,7 @@ export const TenantDeleteModal = ({ tenant, data, t, onClose, onDeleted }) => {
       {blockers.length > 0 ? (
         <>
           <p style={{ margin: "0 0 12px", fontSize: 14, color: "#111111" }}>
-            {t.deleteTenantBlockedBefore}<strong>{tenantFullName(tenant)}</strong>{t.deleteTenantBlockedAfter}
+            {t.deleteTenantBlockedBefore}<strong><TenantName tenant={tenant} t={t} /></strong>{t.deleteTenantBlockedAfter}
           </p>
           <div style={{ margin: "0 0 16px", border: "1px solid #eaeaea", borderRadius: 8, overflow: "hidden" }}>
             {blockers.map((b, i) => (
@@ -1782,7 +1816,7 @@ export const TenantDeleteModal = ({ tenant, data, t, onClose, onDeleted }) => {
       ) : (
         <>
           <p style={{ margin: "0 0 8px", fontSize: 14, color: "#374151" }}>
-            {t.deleteTenantConfirmBefore}<strong>{tenantFullName(tenant)}</strong>{t.deleteTenantConfirmAfter}
+            {t.deleteTenantConfirmBefore}<strong><TenantName tenant={tenant} t={t} /></strong>{t.deleteTenantConfirmAfter}
           </p>
           <p style={{ margin: "0 0 20px", fontSize: 13, color: "#9ca3af" }}>
             {t.deleteWarning}
@@ -1810,7 +1844,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const [saving, setSaving] = useState(false);
   const [addError, setAddError] = useState("");
   // No `status` field: it derives from moveInDate/moveOutDate (lib/tenant/status.js).
-  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
+  const [form, setForm] = useState({ name: "", lastName: "", email: "", phone: "", gender: "", propertyId: "", unit: "", password: "", zelleName: "", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
   const setF = (k,v) => setForm(f => ({...f,[k]:v}));
 
   const [editTenant, setEditTenant] = useState(null);
@@ -1826,7 +1860,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
   const openEdit = (ten) => {
     setEditTenant(ten);
     setEditError("");
-    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "", notes: ten.notes || "", securityDeposit: ten.securityDeposit || "", securityDepositRefunded: ten.securityDepositRefunded || false });
+    setEditForm({ name: ten.name, lastName: ten.lastName || "", email: ten.email || "", phone: ten.phone, gender: ten.gender || "", propertyId: ten.propertyId || "", unit: ten.unit || "", unitId: ten.unitId || "", monthlyRent: ten.monthlyRent || "", password: "", zelleName: ten.zelleName || "", moveInDate: ten.moveInDate || "", moveOutDate: ten.moveOutDate || "", notes: ten.notes || "", securityDeposit: ten.securityDeposit || "", securityDepositRefunded: ten.securityDepositRefunded || false });
   };
 
   const saveEdit = async () => {
@@ -1839,6 +1873,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         tenantId: editTenant.id,
         name: editForm.name,
         lastName: editForm.lastName || null,
+        gender: editForm.gender,
         email: (editForm.email || "").trim() !== (editTenant.email || "").trim() ? (editForm.email || "").trim() : undefined,
         phone: editForm.phone,
         propertyId: editForm.propertyId || null,
@@ -1872,7 +1907,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: form.name, lastName: form.lastName || null, phone: form.phone,
+        name: form.name, lastName: form.lastName || null, phone: form.phone, gender: form.gender,
         email: form.email?.trim() || null,
         password: form.createLogin ? form.password : null,
         propertyId: form.propertyId, unit: form.unit,
@@ -1891,7 +1926,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
     }
     await refresh();
     setShow(false);
-    setForm({ name: "", lastName: "", email: "", phone: "", propertyId: "", unit: "", password: "", zelleName: "", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
+    setForm({ name: "", lastName: "", email: "", phone: "", gender: "", propertyId: "", unit: "", password: "", zelleName: "", moveInDate: "", moveOutDate: "", notes: "", securityDeposit: "", securityDepositRefunded: false, createLogin: false });
     setSaving(false);
   };
 
@@ -1991,7 +2026,7 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
         <td style={{ padding: "14px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#111111,#000000)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{(ten.name || "?").charAt(0)}</div>
-            <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: "#111111", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}>{tenantFullName(ten)}</button>
+            <button onClick={() => { if (setSelectedTenantId && setPage) { setSelectedTenantId(ten.id); setPage('tenant-detail'); } }} style={{ background: "none", border: "none", padding: 0, cursor: setPage ? "pointer" : "default", fontSize: 14, fontWeight: 600, color: "#111111", fontFamily: "inherit", textAlign: "left" }} onMouseEnter={e => { if (setPage) e.currentTarget.style.textDecoration = "underline"; }} onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}><TenantName tenant={ten} t={t} /></button>
           </div>
         </td>
         <td style={{ padding: "14px 20px" }}>
@@ -2142,6 +2177,8 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
             <Inp label={t.lastName} value={form.lastName||""} onChange={v => setF("lastName",v)} placeholder="Smith" />
             <Inp label={t.email} value={form.email} onChange={v => setF("email",v)} type="email" placeholder="tenant@email.com" />
             <Inp label={t.phone} value={form.phone} onChange={v => setF("phone",v)} />
+            <Sel label={t.gender} value={form.gender} onChange={v => setF("gender",v)}
+              options={[{ value: "", label: t.genderNone }, ...GENDERS.map(g => ({ value: g, label: t[`gender_${g}`] }))]} />
             <Sel label={t.navProperties} value={form.propertyId} onChange={v => setF("propertyId",v)} options={[{value:"",label:t.selectProperty},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <Inp label={t.unit} value={form.unit} onChange={v => setF("unit",v)} placeholder="Unit A" />
             <Inp label={t.zelleNameLabel} value={form.zelleName} onChange={v => setF("zelleName",v)} placeholder={t.zelleNamePlaceholder} />
@@ -2181,11 +2218,13 @@ const TenantsPage = ({ data, setData, t, refresh, user, setPage, setSelectedTena
 
       {/* Edit Tenant Modal */}
       {editTenant && (
-        <Modal title={`Edit — ${tenantFullName(editTenant)}`} onClose={() => setEditTenant(null)} wide>
+        <Modal title={`Edit — ${tenantFullName(editTenant)}${genderSuffix(editTenant)}`} onClose={() => setEditTenant(null)} wide>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Inp label={t.firstName} value={editForm.name} onChange={v => setEF("name",v)} />
             <Inp label={t.lastName} value={editForm.lastName||""} onChange={v => setEF("lastName",v)} />
             <Inp label={t.phone} value={editForm.phone} onChange={v => setEF("phone",v)} />
+            <Sel label={t.gender} value={editForm.gender} onChange={v => setEF("gender",v)}
+              options={[{ value: "", label: t.genderNone }, ...GENDERS.map(g => ({ value: g, label: t[`gender_${g}`] }))]} />
             <Sel label={t.navProperties} value={editForm.propertyId} onChange={v => setEF("propertyId",v)} options={[{value:"",label:t.noPropOption},...data.properties.map(p => ({value:p.id,label:p.address}))]} />
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{t.unit}</div>
@@ -2409,7 +2448,7 @@ const ContractsPage = ({ data, t, refresh, user }) => {
                   const ten = data.tenants.find(t => t.id === tid);
                   return (
                     <div key={tid} style={{ fontSize: 13, fontWeight: 500, color: "#9ca3af" }}>
-                      {ten ? tenantFullName(ten) : "Unknown Tenant"}
+                      {ten ? <TenantName tenant={ten} t={t} /> : "Unknown Tenant"}
                     </div>
                   );
                 })}
@@ -2461,7 +2500,7 @@ const ContractsPage = ({ data, t, refresh, user }) => {
                   <label key={ten.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "#111111" }}>
                     <input type="checkbox" checked={editForm.tenantIds.includes(ten.id)}
                       onChange={e => { const ids = e.target.checked ? [...editForm.tenantIds, ten.id] : editForm.tenantIds.filter(id => id !== ten.id); setEF("tenantIds", ids); }} />
-                    {tenantFullName(ten)}
+                    <TenantName tenant={ten} t={t} />
                   </label>
                 ))}
               </div>
@@ -2610,7 +2649,7 @@ const ContractsPage = ({ data, t, refresh, user }) => {
                           setF("tenantIds", ids);
                         }}
                       />
-                      {tenantFullName(ten)}
+                      <TenantName tenant={ten} t={t} />
                     </label>
                   ))}
               </div>
@@ -3062,7 +3101,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
           </div>
           {leaseForm.renterType === "tenant" ? (
             <Sel label={t.selectTenant} value={leaseForm.tenantId} onChange={v => setLF("tenantId", v)}
-              options={[{ value: "", label: t.selectTenant }, ...data.tenants.map(ten => ({ value: ten.id, label: tenantFullName(ten) }))]} />
+              options={[{ value: "", label: t.selectTenant }, ...data.tenants.map(ten => ({ value: ten.id, label: tenantFullName(ten) + genderSuffix(ten) }))]} />
           ) : (
             <>
               <Inp label={t.fullName} value={leaseForm.renterName} onChange={v => setLF("renterName", v)} />
@@ -3470,10 +3509,10 @@ const PaymentsPage = ({ data, t, setPage, setSelectedTenantId }) => {
                           {setPage && setSelectedTenantId ? (
                             <span onClick={() => { setSelectedTenantId(tenant.id); setPage("tenant-detail"); }}
                               style={{ fontSize: 14, fontWeight: 600, color: "#111111", cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}>
-                              {tenantFullName(tenant)}
+                              <TenantName tenant={tenant} t={t} />
                             </span>
                           ) : (
-                            <span style={{ fontSize: 14, fontWeight: 600, color: "#111111" }}>{tenantFullName(tenant)}</span>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#111111" }}><TenantName tenant={tenant} t={t} /></span>
                           )}
                         </div>
                       </td>
@@ -4066,7 +4105,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
                   const commentCount = (data.maintenanceComments || []).filter(c => c.maintenanceRequestId === m.id && !c.deletedAt).length;
                   const sub = `${prop?.address || "—"}${m.unit ? ` · ${m.unit}` : ""} · ${fmtDate(m.date)}`;
                   return (
-                    <TodoCard key={m.id} request={m} tenantName={ten ? tenantFullName(ten) : "—"} sub={sub}
+                    <TodoCard key={m.id} request={m} tenantName={ten ? tenantFullName(ten) + genderSuffix(ten) : "—"} sub={sub}
                       closedText={m.closedDate ? t.maintClosedOn(fmtDate(m.closedDate)) : ""}
                       typeText={m.type} priorityColor={pColors[m.priority]} commentCount={commentCount}
                       attachmentCount={attachmentCount} onOpen={setDetailId} />
@@ -4107,7 +4146,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
             </div>
             {m.descriptionZh && <p style={{ margin: "0 0 10px", fontSize: 14, color: "#000000", background: "#f5f5f5", borderRadius: 7, padding: "8px 11px", whiteSpace: "pre-wrap" }}>{m.descriptionZh}</p>}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 13, color: "#6b7280", margin: "8px 0 14px" }}>
-              <span>{ten ? tenantFullName(ten) : "—"}</span>
+              <span>{ten ? <TenantName tenant={ten} t={t} /> : "—"}</span>
               <span>{prop?.address}{m.unit ? ` · ${m.unit}` : ""}</span>
               <span>{fmtDate(m.date)}</span>
               {/* Null on open tickets and on ones closed before closed_at existed. */}
@@ -4148,7 +4187,7 @@ const MaintenancePage = ({ data, setData, t, refresh, user }) => {
                 style={{ width: "100%", padding: "10px 14px", border: "1px solid #eaeaea", borderRadius: 9, fontSize: 14, color: "#111111", background: "#fff", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}>
                 <option value="">{t.maintSelectTenant}</option>
                 {visibleTenants.filter(ten => ten.status === "current tenant" || ten.status === "future tenant").map(ten => (
-                  <option key={ten.id} value={ten.id}>{tenantFullName(ten)}</option>
+                  <option key={ten.id} value={ten.id}>{tenantFullName(ten) + genderSuffix(ten)}</option>
                 ))}
               </select>
             </div>

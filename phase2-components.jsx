@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
-import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader, useUnitMutations, TenantDeleteModal } from './property-management-app'
+import { Modal, Inp, Sel, Btn, Badge, Icon, PageHeader, useUnitMutations, TenantDeleteModal, GenderMark } from './property-management-app'
 import { UnitHasTenantsError } from '@/lib/units/core'
 import { fmt } from '@/lib/format'
 
@@ -265,7 +265,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, t, propertyId
                           onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
                           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                         >
-                          {ten.lastName ? `${ten.name} ${ten.lastName}` : ten.name}
+                          {ten.lastName ? `${ten.name} ${ten.lastName}` : ten.name}<GenderMark gender={ten.gender} t={t} />
                         </button>
                         <span style={{ fontSize: 12, color: ten.monthlyRent ? "#111111" : "#9ca3af", fontWeight: 600 }}>
                           {ten.monthlyRent ? fmt(ten.monthlyRent) : "—"}
@@ -357,7 +357,7 @@ export const PropertyDetailPage = ({ data, setData, refresh, user, t, propertyId
                     onMouseLeave={e => e.currentTarget.style.background = "#fff"}
                   >
                     <span style={{ fontSize: 14, fontWeight: 600, color: "#111111" }}>
-                      {ten.lastName ? `${ten.name} ${ten.lastName}` : ten.name}
+                      {ten.lastName ? `${ten.name} ${ten.lastName}` : ten.name}<GenderMark gender={ten.gender} t={t} />
                     </span>
                     <Badge status={ten.status} t={t} />
                   </button>
@@ -962,7 +962,7 @@ export const TenantContactPage = ({ data, setData, refresh, user, t, tenantId, o
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#111111", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", letterSpacing: "-0.5px" }}>
-              {tenant.name}{tenant.lastName ? ` ${tenant.lastName}` : ""}
+              {tenant.name}{tenant.lastName ? ` ${tenant.lastName}` : ""}<GenderMark gender={tenant.gender} t={t} />
             </h1>
             <p style={{ margin: "3px 0 0", color: "#6b7280", fontSize: 13 }}>
               {tenant.email}

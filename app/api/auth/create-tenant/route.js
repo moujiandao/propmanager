@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { statusFor, isCurrentRow, CURRENT } from '@/lib/tenant/status'
+import { normalizeGender } from '@/lib/tenant/gender'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -12,7 +13,7 @@ export async function POST(request) {
   )
   // No `status` here on purpose: it derives from the move-in/move-out dates, so the
   // client can't set it. See lib/tenant/status.js.
-  const { name, lastName, email, phone, propertyId, unit, unitId, landlordId, password, zelleName, moveInDate, moveOutDate, notes, securityDeposit, securityDepositRefunded } = await request.json()
+  const { name, lastName, email, phone, gender, propertyId, unit, unitId, landlordId, password, zelleName, moveInDate, moveOutDate, notes, securityDeposit, securityDepositRefunded } = await request.json()
 
   // Use provided email or generate a placeholder so auth user can be created without one
   const authEmail = email?.trim() || `${name.trim().toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@placeholder.local`
@@ -91,6 +92,9 @@ export async function POST(request) {
       last_name: lastName || null,
       email: email?.trim() || authEmail,
       phone,
+      // Validated against the picklist in lib/tenant/gender.js rather than by a
+      // CHECK, so this route is a real write path for it and not just a passthrough.
+      gender: normalizeGender(gender),
       property_id: propertyId,
       unit,
       unit_id: resolvedUnitId,

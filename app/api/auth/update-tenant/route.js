@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { statusFor, statusForRow, isCurrentRow } from '@/lib/tenant/status'
+import { normalizeGender } from '@/lib/tenant/gender'
 
 export async function POST(request) {
   // No `status` here on purpose: it derives from the move-in/move-out dates, so the
   // client can't set it. See lib/tenant/status.js.
-  const { tenantId, name, lastName, email, phone, propertyId, unit, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId, notes, securityDeposit, securityDepositRefunded } = await request.json()
+  const { tenantId, name, lastName, email, phone, gender, propertyId, unit, monthlyRent, password, moveInDate, moveOutDate, hasCosigner, studentStatus, studentYear, zelleName, homeAddress, age, unitId, notes, securityDeposit, securityDepositRefunded } = await request.json()
 
   if (!tenantId) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
@@ -39,6 +40,9 @@ export async function POST(request) {
     name,
     last_name: lastName !== undefined ? (lastName || null) : undefined,
     phone,
+    // undefined leaves the column alone; a supplied value is normalized to the
+    // picklist, so clearing it back to "none" writes null rather than "".
+    gender: gender !== undefined ? normalizeGender(gender) : undefined,
     property_id: propertyId || null,
     unit,
     // Legacy column: written so external SQL isn't looking at nulls, never read back.

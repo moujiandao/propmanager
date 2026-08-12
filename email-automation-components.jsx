@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Modal, Inp, Sel, Btn, Icon, PageHeader } from './property-management-app'
+import { Modal, Inp, Sel, Btn, Icon, PageHeader, genderSuffix } from './property-management-app'
 import { MERGE_TAGS, renderTemplate, sampleContext } from '@/lib/email/merge'
 import { EVENT_TYPES } from '@/lib/email/events'
 import { fmtDate } from '@/lib/email/format'
@@ -15,7 +15,10 @@ const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', color: 
 const footerRow = { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }
 const errText = { color: '#ef4444', fontSize: 13, margin: '8px 0 0' }
 
-const fullName = (x) => [x.name, x.lastName].filter(Boolean).join(' ')
+// Every name in this file lands in a string context (a <select> option, a
+// recipient list), so the gender mark comes through as a bare glyph without
+// its colour -- the same degradation genderSuffix exists for.
+const fullName = (x) => [x.name, x.lastName].filter(Boolean).join(' ') + genderSuffix(x)
 const nl2br = (s) => s ? s.replace(/\n/g, '<br>') : ''
 const isActiveTenant = (x) => x.status === 'current tenant' || x.status === 'future tenant'
 
