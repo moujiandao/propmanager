@@ -1,6 +1,51 @@
 # Changelog
 
+## Outstanding
+
+Known issues carried forward. Not shipped fixes — items still to do, kept here so
+they don't get lost between sessions.
+
+- **Run `scripts/fix-email-settings-defaults.sql`.** Four of the five `email_settings`
+  reminder flags default to `true` in the database (`day_of_reminder`,
+  `three_day_overdue`, `seven_day_overdue` true; `five_day_reminder`,
+  `one_day_overdue` false), verified by inserting a row with one column set and
+  reading back the rest. The app's write path is already safe — `setReminderField`
+  specifies every flag — so this only bites a row created *outside* the app: a seed
+  script, a manual INSERT, or a future route inserting a partial row. Since this
+  feature emails tenants, the failure direction is wrong. The script is safe to run
+  any time: changing a `DEFAULT` doesn't touch existing rows and its `UPDATE` only
+  targets NULLs.
+- **The tenant portal shows hardcoded demo data to real tenants.** "Brian Zhang
+  (Landlord)" and "brian@property.com" on the payment and lease pages, a hardcoded
+  "Next Payment: Mar {dueDay}", and an "Account ending in ••••4521 / Chase Bank ·
+  Checking" panel that is pure fiction — the Connect Bank Account form collects a
+  routing and account number and discards them, flipping a boolean instead. Fix
+  before driving signups.
+- **Tenant rent payment does not work end to end.** The portal POSTs
+  `{ tenant_id, contract_id, amount }` (snake_case) to `app/api/payments/create`,
+  which destructures `{ tenantId, contractId, amount, landlordId }` — so the tenant
+  lookup fails and `landlordId` never arrives at all. Even once fixed, nothing
+  confirms the returned PaymentIntent; there is no Stripe.js element in the
+  codebase. Same camelCase/snake_case class of bug already documented for the
+  parking seam in CLAUDE.md.
+- **`/settings/reminders` is a settings screen with no engine.** The toggles and
+  templates persist to `email_settings`, but no cron, route, or job reads those
+  flags to send anything. The only cron is `/api/cron/email-automations`, which
+  reads the separate `email_automations` table. Either wire it up or fold it into
+  email automations.
+- **`emailTitle` mislabels the Payment Reminders page.** Its header renders "Email
+  Automation" / "邮件自动化" while its own sidebar entry says "Payment Reminders" —
+  two distinct features CLAUDE.md is careful to keep apart. One-line fix in both
+  locales in `lib/i18n/strings.js`.
+- **The pricing page advertises tiers nothing enforces.** `landlord_profiles.plan`
+  and the Stripe subscription columns exist, but billing and plan gating are not
+  built.
+
 ## [2026-08-12]
+
+### Changed
+- **The home page is repositioned around tenant turnover.** It sold PropManager as general property management ("Property management, simplified", "the all-in-one platform for modern landlords"), which competes with Buildium and AppFolio on their own ground and describes the product least accurately where it is most distinctive. The niche is high-turnover rentals — student/near-campus, seasonal, short-term — and the hero now leads with Unit Transitions, the derived-status mechanism that holds every move-in and move-out on the dashboard until a human confirms it. New "How one turnover goes" section; features 4 → 6 cards, turnover-specific first; hero mockup repointed from a lease-renewal queue to the transitions panel. Every claim was checked against the code: no rent-collection card (the tenant ACH path is broken — see Outstanding), no "automated reminders" card (that screen sends nothing; the email card describes the working automations cron), and nothing implying a renewal advances a lease (sending is env-gated off, filing is manual).
+- The marketing header overflowed below ~380px — logo, wordmark and nav shared one row, which pushed the CTA off-screen and made the whole page scroll sideways on an iPhone SE. The wordmark drops out under 640px. The card grids also used `minmax(280px, 1fr)`, which cannot shrink below 280px however narrow the track is; now `minmax(min(280px, 100%), 1fr)`. Note the hero mockup's sidebar takes its `display` from `globals.css` rather than an inline style — an inline `display` outranks the stylesheet, so a media query could not otherwise hide it.
 
 ### Added
 - `app/(app)/error.js` and `app/(app)/not-found.js` — the authed surface had **no error boundary at all**, and the read path swallowed failures into `console.error` while leaving stale data on screen. `not-found` is newly reachable now that app URLs are things a person can type or bookmark. Both render bilingual copy inline rather than through the `T` object: they can render when the provider itself is what failed, so depending on its context would throw again inside the boundary.
