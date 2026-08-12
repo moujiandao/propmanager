@@ -2726,7 +2726,7 @@ const ParkingLotDiagram = ({ spots, occBySpotId, onSelect, t }) => {
             <g key={stall.id} onClick={() => onSelect(stall.id)} style={{ cursor: "pointer" }}
                role="button" tabIndex={0} aria-label={`${t.parkSpotLabel} ${stall.label}`}
                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(stall.id); } }}>
-              <title>{`${stall.label} · ${occ ? occ.name : t.st_vacant}`}</title>
+              <title>{`${stall.label} · ${occ ? occ.nameText : t.st_vacant}`}</title>
               <polygon points={stall.points} fill={BAY_FILL} stroke={BAY_STROKE} strokeWidth="1.5" />
               {car && <polygon points={stall.car} fill={car.bg} stroke={car.dot} strokeWidth="1.5" style={{ pointerEvents: "none" }} />}
               <text x={stall.labelX} y={stall.labelY} textAnchor="middle" dominantBaseline="central"
@@ -2963,13 +2963,24 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   // Who a lease belongs to. Split out of occupantFor so the delete confirm can
   // name the party on a lease it already holds, without routing back through
   // the spot — and so the tenant/renter branch has one home.
+  // `gender` rides along beside the name so the JSX call sites can draw a
+  // coloured mark, while the string-only ones (the diagram's <title>, the delete
+  // confirm) append the bare glyph via genderSuffix. Market renters have no
+  // gender — parking_renters is deliberately not a tenant record — so theirs is
+  // always null and they simply go unmarked.
   const partyForLease = (lease) => {
     if (lease.tenantId) {
       const ten = data.tenants.find(x => x.id === lease.tenantId);
-      return { lease, name: ten ? tenantFullName(ten) : t.parkUnknownTenant, kind: "tenant", person: ten || null };
+      return {
+        lease, kind: "tenant", person: ten || null,
+        name: ten ? tenantFullName(ten) : t.parkUnknownTenant,
+        nameText: ten ? tenantFullName(ten) + genderSuffix(ten) : t.parkUnknownTenant,
+        gender: ten?.gender || null,
+      };
     }
     const renter = renters.find(r => r.id === lease.renterId);
-    return { lease, name: renter ? renter.name : t.parkUnknownRenter, kind: "renter", person: renter || null };
+    const name = renter ? renter.name : t.parkUnknownRenter;
+    return { lease, kind: "renter", person: renter || null, name, nameText: name, gender: null };
   };
 
   const occupantFor = (spot) => {
@@ -3043,7 +3054,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                       </div>
                       {occ ? (
                         <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 10 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#111111" }}>{occ.name}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#111111" }}>{occ.name}<GenderMark gender={occ.gender} t={t} /></div>
                           <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
                             {fmt(occ.lease.rate)}/mo &middot; {t.parkSince} {fmtDate(occ.lease.startDate)}
                           </div>
@@ -3154,7 +3165,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
 
       {deleteLeaseTarget && (
         <Modal title={t.parkDeleteLeaseTitle} onClose={() => setDeleteLeaseTarget(null)}>
-          <p style={{ fontSize: 14, color: "#374151" }}>{t.parkDeleteLeaseConfirm(deleteLeaseTarget.name)}</p>
+          <p style={{ fontSize: 14, color: "#374151" }}>{t.parkDeleteLeaseConfirm(deleteLeaseTarget.nameText)}</p>
           {deleteLeaseError && <p style={{ color: "#ef4444", fontSize: 13 }}>{deleteLeaseError}</p>}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => setDeleteLeaseTarget(null)}>{t.cancel}</Btn>
@@ -3199,7 +3210,7 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                   <div style={detailSectionHeading}>
                     {occ.kind === "tenant" ? t.parkExistingTenant : t.parkMarketRenter}
                   </div>
-                  <DetailRow label={t.fullName} value={occ.name} />
+                  <DetailRow label={t.fullName} value={<>{occ.name}<GenderMark gender={occ.gender} t={t} /></>} />
                   <DetailRow label={t.email} value={occ.person?.email} />
                   <DetailRow label={t.phone} value={occ.person?.phone} />
                   {/* The rate and dates belong to the parking lease, not the person — and
