@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { palette } from '@/lib/theme'
+import { homeFor } from '@/lib/routes'
 import { AuthCard, Field, SubmitButton, Alert } from '../_form'
 
 const supabase = createClient()
@@ -26,22 +27,23 @@ export default function LoginPage() {
     }
 
     // Resolve the account's role before navigating, so a session with no profile
-    // gets a clear error here instead of bouncing off the dashboard guard.
-    // Landlords and tenants log in the same way; the dashboard renders the right
-    // surface based on the resolved role.
+    // gets a clear error here instead of bouncing off the app guard. The role
+    // also decides where to land: the two surfaces have separate namespaces now,
+    // so sending everyone to /dashboard would make a tenant's first action after
+    // login a redirect.
     const { data: membership } = await supabase
       .from('landlord_members')
       .select('landlord_id')
       .eq('auth_user_id', authData.user.id)
       .maybeSingle()
-    if (membership) return go()
+    if (membership) return go('landlord')
 
     const { data: tenant } = await supabase
       .from('tenant_profiles')
       .select('id')
       .eq('id', authData.user.id)
       .maybeSingle()
-    if (tenant) return go()
+    if (tenant) return go('tenant')
 
     await supabase.auth.signOut()
     setError('No profile found for this account.')
@@ -52,9 +54,10 @@ export default function LoginPage() {
   // with the freshly written session cookie. Only same-origin absolute paths are
   // honored: reject protocol-relative (`//host`) and external URLs to avoid an
   // open redirect via the `next` param.
-  const go = () => {
-    const next = new URLSearchParams(window.location.search).get('next') || '/dashboard'
-    const safe = next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'
+  const go = (role) => {
+    const home = homeFor(role)
+    const next = new URLSearchParams(window.location.search).get('next') || home
+    const safe = next.startsWith('/') && !next.startsWith('//') ? next : home
     window.location.href = safe
   }
 

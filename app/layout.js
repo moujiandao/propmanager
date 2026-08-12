@@ -16,7 +16,10 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={inter.variable}>
+    // data-scroll-behavior: globals.css sets `scroll-behavior: smooth` on <html>,
+    // which Next warns about now that there are real route transitions to scroll
+    // between. The attribute tells it the smooth scrolling is intentional.
+    <html lang="en" className={inter.variable} data-scroll-behavior="smooth">
       <body>{children}</body>
     </html>
   )
