@@ -338,6 +338,8 @@ const T = {
     parkUnknownProperty: "Unknown property",
     parkAddLease: "Add Parking Lease", parkAddLeaseTitle: "New Parking Lease",
     parkEndLease: "End Parking Lease", parkSince: "since", parkLeaseHeading: "Parking Lease",
+    parkEditLease: "Edit Lease", parkEditLeaseTitle: "Edit Parking Lease",
+    parkFailedUpdateLease: "Failed to update lease.",
     parkExistingTenant: "Existing Tenant", parkMarketRenter: "Market Renter",
     parkOpenToMarket: "Open to Market", parkMarkTenantPriority: "Mark Tenant-Priority",
     parkDeleteSpot: "Delete Spot", parkDeleteSpotTitle: "Delete Parking Spot",
@@ -635,6 +637,8 @@ const T = {
     parkUnknownProperty: "未知房产",
     parkAddLease: "添加车位租约", parkAddLeaseTitle: "新建车位租约",
     parkEndLease: "结束车位租约", parkSince: "起租于", parkLeaseHeading: "车位租约",
+    parkEditLease: "编辑租约", parkEditLeaseTitle: "编辑车位租约",
+    parkFailedUpdateLease: "更新租约失败。",
     parkExistingTenant: "现有租客", parkMarketRenter: "市场租客",
     parkOpenToMarket: "开放给市场", parkMarkTenantPriority: "标记为租客优先",
     parkDeleteSpot: "删除车位", parkDeleteSpotTitle: "删除停车位",
@@ -2618,13 +2622,15 @@ const ContractsPage = ({ data, t, refresh, user }) => {
 };
 
 // ─── PARKING PAGE ─────────────────────────────────────────────────────────────
-const EMPTY_SPOT_FORM = { propertyId: "", label: "", type: "", monthlyRate: "", carMake: "", carModel: "", carYear: "" };
-const EMPTY_LEASE_FORM = { renterType: "tenant", tenantId: "", renterName: "", renterEmail: "", renterPhone: "", rate: "", startDate: "", endDate: "" };
+const EMPTY_SPOT_FORM = { propertyId: "", label: "", type: "" };
+const EMPTY_LEASE_FORM = { renterType: "tenant", tenantId: "", renterName: "", renterEmail: "", renterPhone: "", rate: "", startDate: "", endDate: "", carMake: "", carModel: "", carYear: "" };
 
 // Label/value row for the spot detail modal. Renders an em-dash for anything empty so
 // the rows stay aligned instead of collapsing when a field is unset.
 const detailRowStyle = { display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", fontSize: 13 };
 const detailSectionHeading = { fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 };
+// Same treatment, used above the VEHICLE block in both lease modals.
+const vehicleSectionHeading = { fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 };
 const DetailRow = ({ label, value }) => (
   <div style={detailRowStyle}>
     <span style={{ color: "#9ca3af" }}>{label}</span>
@@ -2700,6 +2706,15 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   const [leaseError, setLeaseError] = useState(null);
   const [savingLease, setSavingLease] = useState(false);
 
+  // The lease being edited, or null. Holds the lease itself rather than an id:
+  // unlike the spot detail modal, this one is a form seeded once on open, so a
+  // mid-edit refresh must not overwrite what the user is typing.
+  const [editingLease, setEditingLease] = useState(null);
+  const [leaseEditForm, setLeaseEditForm] = useState({ rate: "", endDate: "", carMake: "", carModel: "", carYear: "" });
+  const setLEF = (k, v) => setLeaseEditForm(f => ({ ...f, [k]: v }));
+  const [leaseEditError, setLeaseEditError] = useState(null);
+  const [savingLeaseEdit, setSavingLeaseEdit] = useState(false);
+
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -2722,10 +2737,6 @@ const ParkingPage = ({ data, t, refresh, user }) => {
       propertyId: spot.propertyId,
       label: spot.label,
       type: spot.type || "",
-      monthlyRate: spot.monthlyRate == null ? "" : String(spot.monthlyRate),
-      carMake: spot.carMake || "",
-      carModel: spot.carModel || "",
-      carYear: spot.carYear == null ? "" : String(spot.carYear),
     });
     setSpotError(null);
     setShowSpotModal(true);
@@ -2740,11 +2751,10 @@ const ParkingPage = ({ data, t, refresh, user }) => {
     setSavingSpot(true);
     setSpotError(null);
     try {
-      const car = { carMake: spotForm.carMake, carModel: spotForm.carModel, carYear: spotForm.carYear };
       if (editingSpot) {
-        await mx.updateSpot(editingSpot.id, { label: spotForm.label, type: spotForm.type, monthlyRate: spotForm.monthlyRate, ...car });
+        await mx.updateSpot(editingSpot.id, { label: spotForm.label, type: spotForm.type });
       } else {
-        await mx.createSpot({ landlordId: user.id, propertyId: spotForm.propertyId, label: spotForm.label.trim(), type: spotForm.type, monthlyRate: spotForm.monthlyRate, ...car });
+        await mx.createSpot({ landlordId: user.id, propertyId: spotForm.propertyId, label: spotForm.label.trim(), type: spotForm.type });
       }
       await refresh();
       setShowSpotModal(false);
@@ -2776,7 +2786,9 @@ const ParkingPage = ({ data, t, refresh, user }) => {
 
   const openAddLease = (spot) => {
     setLeaseSpot(spot);
-    setLeaseForm({ ...EMPTY_LEASE_FORM, rate: spot.monthlyRate ? String(spot.monthlyRate) : "", startDate: todayStr() });
+    // No rate prefill: the spot no longer carries an asking rate. The lease's
+    // rate is the only rate there is, and it is entered here.
+    setLeaseForm({ ...EMPTY_LEASE_FORM, startDate: todayStr() });
     setLeaseError(null);
   };
 
@@ -2793,6 +2805,9 @@ const ParkingPage = ({ data, t, refresh, user }) => {
         rate: leaseForm.rate,
         startDate: leaseForm.startDate,
         endDate: leaseForm.endDate || null,
+        carMake: leaseForm.carMake,
+        carModel: leaseForm.carModel,
+        carYear: leaseForm.carYear,
         tenantId: leaseForm.renterType === "tenant" ? leaseForm.tenantId : undefined,
         renter: leaseForm.renterType === "market"
           ? { name: leaseForm.renterName.trim(), email: leaseForm.renterEmail.trim(), phone: leaseForm.renterPhone.trim() }
@@ -2809,6 +2824,32 @@ const ParkingPage = ({ data, t, refresh, user }) => {
   const endLeaseNow = async (lease) => {
     await mx.endLease(lease.id, todayStr());
     await refresh();
+  };
+
+  const openEditLease = (lease) => {
+    setEditingLease(lease);
+    setLeaseEditForm({
+      rate: lease.rate == null ? "" : String(lease.rate),
+      endDate: lease.endDate || "",
+      carMake: lease.carMake || "",
+      carModel: lease.carModel || "",
+      carYear: lease.carYear == null ? "" : String(lease.carYear),
+    });
+    setLeaseEditError(null);
+  };
+
+  const saveLeaseEdit = async () => {
+    if (!leaseEditForm.rate) { setLeaseEditError(t.parkLeaseFieldsRequired); return; }
+    setSavingLeaseEdit(true);
+    setLeaseEditError(null);
+    try {
+      await mx.updateLease(editingLease.id, leaseEditForm);
+      await refresh();
+      setEditingLease(null);
+    } catch (e) {
+      setLeaseEditError(e.message || t.parkFailedUpdateLease);
+    }
+    setSavingLeaseEdit(false);
   };
 
   const spots = data.parkingSpots || [];
@@ -2868,12 +2909,12 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                           <div style={{ fontSize: 15, fontWeight: 700, color: "#111111" }}>{spot.label}</div>
                           {spot.type && <div style={{ fontSize: 12, color: "#6b7280" }}>{spot.type}</div>}
                           {(() => {
-                            // "2019 Honda Civic" from whichever parts are filled in;
-                            // nothing renders if none are.
-                            const car = [spot.carYear, spot.carMake, spot.carModel].filter(Boolean).join(" ");
+                            // "2019 Honda Civic" from whichever parts the active lease
+                            // filled in; nothing renders if none are, and a vacant spot
+                            // shows no vehicle at all.
+                            const car = occ ? [occ.lease.carYear, occ.lease.carMake, occ.lease.carModel].filter(Boolean).join(" ") : "";
                             return car ? <div style={{ fontSize: 12, color: "#111111", fontWeight: 600 }}>{car}</div> : null;
                           })()}
-                          <div style={{ fontSize: 13, color: "#9ca3af" }}>{spot.monthlyRate ? `${fmt(spot.monthlyRate)}/mo` : "—"}</div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                           {/* Editing stays available while leased — renaming a spot or
@@ -2899,7 +2940,10 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                           <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
                             {fmt(occ.lease.rate)}/mo &middot; {t.parkSince} {fmtDate(occ.lease.startDate)}
                           </div>
-                          <Btn size="sm" variant="secondary" onClick={() => endLeaseNow(occ.lease)}>{t.parkEndLease}</Btn>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <Btn size="sm" variant="secondary" onClick={() => openEditLease(occ.lease)}>{t.parkEditLease}</Btn>
+                            <Btn size="sm" variant="secondary" onClick={() => endLeaseNow(occ.lease)}>{t.parkEndLease}</Btn>
+                          </div>
                         </div>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -2932,15 +2976,6 @@ const ParkingPage = ({ data, t, refresh, user }) => {
           <Inp label={t.parkSpotLabel} value={spotForm.label} onChange={v => setSF("label", v)} placeholder="A12" />
           <Sel label={t.parkSpotType} value={spotForm.type} onChange={v => setSF("type", v)}
             options={[{ value: "", label: t.parkSpotTypeNone }, ...SPOT_TYPES.map(x => ({ value: x, label: x }))]} />
-          <Inp label={t.parkMonthlyRate} value={spotForm.monthlyRate} onChange={v => setSF("monthlyRate", v)} type="number" placeholder="0" />
-          <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 14, marginTop: 2 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>{t.parkVehicle}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Inp label={t.parkCarMake} value={spotForm.carMake} onChange={v => setSF("carMake", v)} placeholder="Honda" />
-              <Inp label={t.parkCarModel} value={spotForm.carModel} onChange={v => setSF("carModel", v)} placeholder="Civic" />
-            </div>
-            <Inp label={t.parkCarYear} value={spotForm.carYear} onChange={v => setSF("carYear", v)} type="number" placeholder="2019" />
-          </div>
           {spotError && <p style={{ color: "#ef4444", fontSize: 13 }}>{spotError}</p>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="secondary" onClick={() => { setShowSpotModal(false); setEditingSpot(null); }}>{t.cancel}</Btn>
@@ -2970,8 +3005,36 @@ const ParkingPage = ({ data, t, refresh, user }) => {
           <Inp label={t.parkMonthlyRate} value={leaseForm.rate} onChange={v => setLF("rate", v)} type="number" placeholder="0" />
           <Inp label={t.startDate} value={leaseForm.startDate} onChange={v => setLF("startDate", v)} type="date" />
           <Inp label={t.endDate} value={leaseForm.endDate} onChange={v => setLF("endDate", v)} type="date" />
+          <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 14, marginTop: 2 }}>
+            <div style={vehicleSectionHeading}>{t.parkVehicle}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Inp label={t.parkCarMake} value={leaseForm.carMake} onChange={v => setLF("carMake", v)} placeholder="Honda" />
+              <Inp label={t.parkCarModel} value={leaseForm.carModel} onChange={v => setLF("carModel", v)} placeholder="Civic" />
+            </div>
+            <Inp label={t.parkCarYear} value={leaseForm.carYear} onChange={v => setLF("carYear", v)} type="number" placeholder="2019" />
+          </div>
           {leaseError && <p style={{ color: "#ef4444", fontSize: 13 }}>{leaseError}</p>}
           <Btn onClick={saveLease} disabled={savingLease}>{savingLease ? t.creating : t.parkAddLease}</Btn>
+        </Modal>
+      )}
+
+      {editingLease && (
+        <Modal title={t.parkEditLeaseTitle} onClose={() => setEditingLease(null)}>
+          <Inp label={t.parkMonthlyRate} value={leaseEditForm.rate} onChange={v => setLEF("rate", v)} type="number" placeholder="0" />
+          <Inp label={t.endDate} value={leaseEditForm.endDate} onChange={v => setLEF("endDate", v)} type="date" />
+          <div style={{ borderTop: "1px solid #eaeaea", paddingTop: 14, marginTop: 2 }}>
+            <div style={vehicleSectionHeading}>{t.parkVehicle}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Inp label={t.parkCarMake} value={leaseEditForm.carMake} onChange={v => setLEF("carMake", v)} placeholder="Honda" />
+              <Inp label={t.parkCarModel} value={leaseEditForm.carModel} onChange={v => setLEF("carModel", v)} placeholder="Civic" />
+            </div>
+            <Inp label={t.parkCarYear} value={leaseEditForm.carYear} onChange={v => setLEF("carYear", v)} type="number" placeholder="2019" />
+          </div>
+          {leaseEditError && <p style={{ color: "#ef4444", fontSize: 13 }}>{leaseEditError}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setEditingLease(null)}>{t.cancel}</Btn>
+            <Btn onClick={saveLeaseEdit} disabled={savingLeaseEdit}>{savingLeaseEdit ? t.saving : t.saveChanges}</Btn>
+          </div>
         </Modal>
       )}
 
@@ -2993,7 +3056,6 @@ const ParkingPage = ({ data, t, refresh, user }) => {
         const spot = spots.find(s => s.id === detailSpotId);
         if (!spot) return null;   // spot deleted while the modal was open
         const occ = occBySpotId.get(spot.id);
-        const car = [spot.carYear, spot.carMake, spot.carModel].filter(Boolean).join(" ");
         const prop = data.properties.find(p => p.id === spot.propertyId);
         const close = () => setDetailSpotId(null);
         return (
@@ -3005,8 +3067,6 @@ const ParkingPage = ({ data, t, refresh, user }) => {
 
             <DetailRow label={t.selectProperty} value={prop?.address || t.parkUnknownProperty} />
             <DetailRow label={t.parkSpotType} value={spot.type} />
-            <DetailRow label={t.parkVehicle} value={car} />
-            <DetailRow label={t.parkMonthlyRate} value={spot.monthlyRate ? fmt(spot.monthlyRate) : ""} />
 
             <div style={{ borderTop: "1px solid #eaeaea", marginTop: 14, paddingTop: 14 }}>
               {occ ? (
@@ -3024,8 +3084,10 @@ const ParkingPage = ({ data, t, refresh, user }) => {
                   <DetailRow label={t.parkMonthlyRate} value={fmt(occ.lease.rate)} />
                   <DetailRow label={t.startDate} value={fmtDate(occ.lease.startDate)} />
                   <DetailRow label={t.endDate} value={occ.lease.endDate ? fmtDate(occ.lease.endDate) : t.parkOngoing} />
+                  <DetailRow label={t.parkVehicle} value={[occ.lease.carYear, occ.lease.carMake, occ.lease.carModel].filter(Boolean).join(" ")} />
                   <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                     <Btn size="sm" variant="secondary" onClick={() => { close(); openEditSpot(spot); }}>{t.parkEditSpot}</Btn>
+                    <Btn size="sm" variant="secondary" onClick={() => { close(); openEditLease(occ.lease); }}>{t.parkEditLease}</Btn>
                     <Btn size="sm" variant="secondary" onClick={() => { close(); endLeaseNow(occ.lease); }}>{t.parkEndLease}</Btn>
                   </div>
                 </>
@@ -3529,6 +3591,7 @@ function useParkingMutations() {
     createSpot: (fields) => parkingOps.createSpot(adapter, fields),
     updateSpot: (id, fields) => parkingOps.updateSpot(adapter, id, fields),
     setMarketStatus: (id, marketStatus) => parkingOps.setMarketStatus(adapter, id, marketStatus),
+    updateLease: (id, fields) => parkingOps.updateLease(adapter, id, fields),
     deleteSpot: (id) => parkingOps.deleteSpot(adapter, id),
     createLease: (fields) => parkingOps.createLease(adapter, fields),
     endLease: (id, endDate) => parkingOps.endLease(adapter, id, endDate),
