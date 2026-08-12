@@ -332,7 +332,6 @@ const T = {
     parkVehicle: "Vehicle", parkCarMake: "Car Make", parkCarModel: "Car Model", parkCarYear: "Car Year",
     parkEditSpot: "Edit Spot", parkEditSpotTitle: "Edit Parking Spot", parkFailedUpdateSpot: "Failed to update spot.",
     parkLotDiagram: "Lot Diagram", parkSpotDetailTitle: (label) => `Spot ${label}`,
-    parkEntrance: "entrance",
     parkOngoing: "Ongoing", parkSpotVacantHint: "This spot is not currently leased.",
     parkUnplaced: (labels) => `Not shown above (no type set): ${labels}`,
     parkNoSpots: "No parking spots yet. Add the first one for a property.",
@@ -634,7 +633,6 @@ const T = {
     parkVehicle: "车辆", parkCarMake: "汽车品牌", parkCarModel: "汽车型号", parkCarYear: "汽车年份",
     parkEditSpot: "编辑车位", parkEditSpotTitle: "编辑停车位", parkFailedUpdateSpot: "更新车位失败。",
     parkLotDiagram: "车位平面图", parkSpotDetailTitle: (label) => `车位 ${label}`,
-    parkEntrance: "入口",
     parkOngoing: "长期", parkSpotVacantHint: "此车位当前未出租。",
     parkUnplaced: (labels) => `未显示在上图中（未设置类型）：${labels}`,
     parkNoSpots: "暂无停车位 — 请先为某个房产添加车位。",
@@ -2656,7 +2654,7 @@ const BAY_STROKE = "#cbd5e1";
 const carFill = () => statusColors.occupied;
 
 const ParkingLotDiagram = ({ spots, occBySpotId, onSelect, t }) => {
-  const { width, height, outline, stalls, aisle, entrance, unplaced } = lotLayout(spots);
+  const { width, height, outline, stalls, unplaced } = lotLayout(spots);
   if (!stalls.length) return null;
 
   return (
@@ -2673,14 +2671,6 @@ const ParkingLotDiagram = ({ spots, occBySpotId, onSelect, t }) => {
         style={{ width: "100%", height: "auto", maxWidth: 520, display: "block", margin: "0 auto" }}
       >
         <rect x={outline.x} y={outline.y} width={outline.w} height={outline.h} fill="#fafafa" stroke="#eaeaea" strokeWidth="2" rx="4" />
-
-        {/* Traffic direction up the aisle, from the entrance toward the back wall. */}
-        {aisle && (
-          <g style={{ pointerEvents: "none" }}>
-            <line x1={aisle.x} y1={aisle.fromY} x2={aisle.x} y2={aisle.toY} stroke="#d1d5db" strokeWidth="1.5" strokeDasharray="5 4" />
-            <polygon points={aisle.head} fill="#d1d5db" />
-          </g>
-        )}
 
         {stalls.map(stall => {
           const occ = occBySpotId.get(stall.id);
@@ -2699,12 +2689,6 @@ const ParkingLotDiagram = ({ spots, occBySpotId, onSelect, t }) => {
             </g>
           );
         })}
-
-        {/* Where cars come in — the lot's open side. */}
-        <text x={entrance.x} y={entrance.y} textAnchor="middle" fontSize="12" fontWeight="600" fill="#9ca3af"
-              style={{ pointerEvents: "none", userSelect: "none" }}>
-          {t.parkEntrance}
-        </text>
       </svg>
       {unplaced.length > 0 && (
         <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 10, textAlign: "center" }}>
