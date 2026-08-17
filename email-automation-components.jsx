@@ -3,6 +3,7 @@ import { useState, useRef, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Modal, Inp, Sel, Btn, Icon, PageHeader, genderSuffix } from './property-management-app'
 import { MERGE_TAGS, renderTemplate, sampleContext } from '@/lib/email/merge'
+import { availableGeneratorUnits, buildGeneratorGroups, buildGeneratorRow, isGeneratorTableComplete } from '@/lib/email/generator'
 import { EVENT_TYPES } from '@/lib/email/events'
 import { fmtDate } from '@/lib/email/format'
 
@@ -40,10 +41,10 @@ const eventLabel = (t, value) => ({
 }[value] || value)
 
 // ─── Merge-tag insert bar ─────────────────────────────────────────────────────
-const MergeTagBar = ({ onInsert, t }) => (
+const MergeTagBar = ({ onInsert, t, tags = MERGE_TAGS }) => (
   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0' }}>
     <span style={{ fontSize: 12, color: '#9ca3af', alignSelf: 'center', marginRight: 4 }}>{t.insertField}:</span>
-    {MERGE_TAGS.map(m => (
+    {tags.map(m => (
       <button key={m.tag} type="button" title={m.label} onClick={() => onInsert(`{${m.tag}}`)}
         style={{ padding: '3px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #eaeaea', background: '#fafafa', color: '#6b7280', cursor: 'pointer', fontFamily: 'inherit' }}>
         {`{${m.tag}}`}
@@ -207,6 +208,205 @@ const TemplatesTab = ({ data, user, t, refresh }) => {
             <button onClick={del} style={dangerBtn}>{t.deleteTemplate}</button>
           </div>
         </Modal>
+      )}
+    </div>
+  )
+}
+
+// Local-only generator. It has no send action, API call, Supabase write, or persistence.
+const EmailGeneratorTab = ({ data, t }) => {
+  const [subject, setSubject] = useState(t.generatorDefaultSubject)
+  const [body, setBody] = useState(t.generatorDefaultBody)
+  const [rows, setRows] = useState([{ id: 1, unitId: '', month: '', amount: '' }])
+  const [generated, setGenerated] = useState(false)
+  const [err, setErr] = useState('')
+  const [copied, setCopied] = useState('')
+  const bodyRef = useRef(null)
+  const nextRowId = useRef(2)
+  const units = availableGeneratorUnits(data.units || [], data.properties || [])
+  const tenants = data.tenants || []
+  const properties = data.properties || []
+  const unitById = new Map(units.map(unit => [unit.id, unit]))
+  const generatorTags = [
+    { tag: 'name', label: t.generatorFieldName },
+    { tag: 'unit_number', label: t.generatorFieldUnit },
+    { tag: 'month_year', label: t.generatorFieldMonth },
+    { tag: 'amount', label: t.generatorFieldAmount },
+    { tag: 'bill_lines', label: t.generatorFieldBillLines },
+  ]
+
+  const unitOptions = units.map(unit => {
+    const property = properties.find(x => x.id === unit.propertyId)
+    const prefix = property?.address ? `${property.address} · ` : ''
+    return { value: unit.id, label: `${prefix}${t.generatorUnit} ${unit.unitNumber}` }
+  })
+
+  const rowOutputs = rows.map(row => {
+    const unit = unitById.get(row.unitId)
+    const details = buildGeneratorRow({ tenants, unit, month: row.month, amount: row.amount })
+    return { row, details }
+  })
+  const outputs = buildGeneratorGroups({ rows, units, tenants }).map(details => ({
+    details,
+    rendered: renderTemplate({ subject, bodyText: body }, details.mergeValues),
+  }))
+  const tableComplete = isGeneratorTableComplete(rows)
+
+  const updateRow = (id, field, value) => {
+    setRows(current => current.map(row => row.id === id ? { ...row, [field]: value } : row))
+    setGenerated(false)
+    setErr('')
+  }
+
+  const addRow = () => {
+    setRows(current => [...current, { id: nextRowId.current++, unitId: '', month: '', amount: '' }])
+    setGenerated(false)
+  }
+
+  const removeRow = (id) => {
+    setRows(current => current.filter(row => row.id !== id))
+    setGenerated(false)
+  }
+
+  const insertTag = (tag) => {
+    const el = bodyRef.current
+    if (!el) { setBody(value => value + tag); return }
+    const start = el.selectionStart ?? body.length
+    const end = el.selectionEnd ?? body.length
+    setBody(body.slice(0, start) + tag + body.slice(end))
+    requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = start + tag.length })
+  }
+
+  const generate = () => {
+    if (!tableComplete) {
+      setErr(t.generatorCompleteRows)
+      setGenerated(false)
+      return
+    }
+    setErr('')
+    setGenerated(true)
+  }
+
+  const copy = async (value, key) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(key)
+      setTimeout(() => setCopied(current => current === key ? '' : current), 1600)
+    } catch {
+      setErr(t.generatorCopyFailed)
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 18 }}>
+      <div style={{ ...card, background: '#fafafa' }}>
+        <div style={{ fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{t.generatorIntro}</div>
+        <div style={{ fontSize: 13, color: '#16a34a', fontWeight: 600, marginTop: 6 }}>{t.generatorNeverSends}</div>
+      </div>
+
+      <div style={card}>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>{t.generatorSubject}</label>
+        <input value={subject} onChange={event => setSubject(event.target.value)}
+          style={{ width: '100%', padding: '10px 12px', border: '1px solid #eaeaea', borderRadius: 9, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }} />
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', margin: '14px 0 6px' }}>{t.generatorBody}</label>
+        <MergeTagBar onInsert={insertTag} t={t} tags={generatorTags} />
+        <textarea ref={bodyRef} value={body} onChange={event => setBody(event.target.value)}
+          style={{ width: '100%', minHeight: 250, padding: '12px 14px', border: '1px solid #eaeaea', borderRadius: 9, fontSize: 13, color: '#374151', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', outline: 'none', lineHeight: 1.6 }} />
+      </div>
+
+      <div style={{ ...card, overflowX: 'auto' }}>
+        <table style={{ width: '100%', minWidth: 780, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {[t.generatorUnit, t.generatorNames, t.generatorMonth, t.generatorAmount, ''].map((label, index) => (
+                <th key={`${label}-${index}`} style={{ padding: '0 8px 10px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#6b7280' }}>{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rowOutputs.map(({ row, details }) => (
+              <tr key={row.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '10px 8px' }}>
+                  <select value={row.unitId} onChange={event => updateRow(row.id, 'unitId', event.target.value)}
+                    aria-label={t.generatorUnit}
+                    style={{ width: '100%', minWidth: 210, padding: '9px 10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', fontFamily: 'inherit' }}>
+                    <option value="">{t.generatorSelectUnit}</option>
+                    {unitOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </td>
+                <td style={{ padding: '10px 8px', minWidth: 180, fontSize: 13, color: details.mergeValues.name ? '#374151' : '#9ca3af' }}>
+                  {details.mergeValues.name || (row.unitId && row.month ? t.generatorNoTenants : t.generatorEnterUnitMonth)}
+                </td>
+                <td style={{ padding: '10px 8px' }}>
+                  <input type="month" value={row.month} onChange={event => updateRow(row.id, 'month', event.target.value)}
+                    aria-label={t.generatorMonth}
+                    style={{ padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontFamily: 'inherit' }} />
+                </td>
+                <td style={{ padding: '10px 8px' }}>
+                  <input type="number" min="0" step="0.01" value={row.amount} onChange={event => updateRow(row.id, 'amount', event.target.value)}
+                    aria-label={t.generatorAmount}
+                    style={{ width: 110, padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontFamily: 'inherit' }} />
+                </td>
+                <td style={{ padding: '10px 8px', width: 40 }}>
+                  {rows.length > 1 && (
+                    <button type="button" onClick={() => removeRow(row.id)} title={t.generatorRemoveRow} style={iconBtn}>
+                      <Icon name="trash" size={16} />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 14 }}>
+          <Btn size="sm" variant="secondary" icon="plus" onClick={addRow}>{t.generatorAddRow}</Btn>
+          <Btn icon="sparkles" onClick={generate}>{t.generatorGenerate}</Btn>
+        </div>
+        {err && <p style={errText}>{err}</p>}
+      </div>
+
+      {generated && tableComplete && (
+        <div style={{ display: 'grid', gap: 14 }}>
+          <h3 style={{ margin: '4px 0 0', fontSize: 17, color: '#111111' }}>{t.generatorResults}</h3>
+          {outputs.map(({ details, rendered }, index) => {
+            const resultKey = `${details.unitId}-${index}`
+            const subjectKey = `subject-${resultKey}`
+            const bodyKey = `body-${resultKey}`
+            const emailsKey = `emails-${resultKey}`
+            return (
+              <div key={resultKey} style={{ ...card, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 280px', gap: 20 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111111', marginBottom: 8 }}>{rendered.subject || t.previewNoSubject}</div>
+                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{rendered.text}</div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                    <Btn size="sm" variant="secondary" onClick={() => copy(rendered.subject, subjectKey)}>
+                      {copied === subjectKey ? t.generatorCopied : t.generatorCopySubject}
+                    </Btn>
+                    <Btn size="sm" variant="secondary" onClick={() => copy(rendered.text, bodyKey)}>
+                      {copied === bodyKey ? t.generatorCopied : t.generatorCopyBody}
+                    </Btn>
+                  </div>
+                </div>
+                <aside style={{ borderLeft: '1px solid #eaeaea', paddingLeft: 18 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 7 }}>{t.generatorEmailAddresses}</div>
+                  <div style={{ fontSize: 13, color: details.emailAddresses ? '#374151' : '#9ca3af', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+                    {details.emailAddresses || t.generatorNoEmailAddresses}
+                  </div>
+                  <div style={{ marginTop: 10 }}>
+                    <Btn size="sm" variant="secondary" disabled={!details.emailAddresses} onClick={() => copy(details.emailAddresses, emailsKey)}>
+                      {copied === emailsKey ? t.generatorCopied : t.generatorCopyEmails}
+                    </Btn>
+                  </div>
+                  {details.missingEmailNames.length > 0 && (
+                    <p style={{ color: '#b45309', fontSize: 12, margin: '10px 0 0', lineHeight: 1.4 }}>
+                      {t.generatorMissingEmails(details.missingEmailNames.join(', '))}
+                    </p>
+                  )}
+                </aside>
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
@@ -651,6 +851,7 @@ export const EmailAutomationPage = ({ data, user, t, refresh }) => {
   const [tab, setTab] = useState('templates')
   const tabs = [
     { id: 'templates', label: t.tabTemplates },
+    { id: 'generator', label: t.tabEmailGenerator },
     { id: 'automations', label: t.tabAutomations },
     { id: 'inbox', label: t.tabInbox },
   ]
@@ -666,6 +867,7 @@ export const EmailAutomationPage = ({ data, user, t, refresh }) => {
         ))}
       </div>
       {tab === 'templates' && <TemplatesTab data={data} user={user} t={t} refresh={refresh} />}
+      {tab === 'generator' && <EmailGeneratorTab data={data} t={t} />}
       {tab === 'automations' && <AutomationsTab data={data} user={user} t={t} refresh={refresh} />}
       {tab === 'inbox' && <InboxTab data={data} t={t} />}
     </div>
