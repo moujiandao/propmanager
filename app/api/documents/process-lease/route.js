@@ -33,14 +33,14 @@ function primaryProfileUpdate(profile, { propertyId, unitId }) {
   return update
 }
 
-async function findOrCreateTenant(supabase, { name, landlordId, propertyId, unitId, primaryProfile, isPrimary }) {
+async function findOrCreateTenant(supabase, { name, landlordId }) {
   const { data: existing, error: existingError } = await supabase
     .from('tenant_profiles')
     .select('id')
     .eq('landlord_id', landlordId)
     .ilike('name', name)
-    .limit(1)
   if (existingError) throw new Error(`Failed to look up tenant: ${existingError.message}`)
+  if (existing?.length > 1) throw new Error(`More than one tenant matches "${name}". Review and resolve the duplicate profiles first.`)
 
   let tenantId
   let created = false
@@ -62,8 +62,6 @@ async function findOrCreateTenant(supabase, { name, landlordId, propertyId, unit
       name,
       email: placeholderEmail,
       landlord_id: landlordId,
-      property_id: propertyId || null,
-      unit_id: unitId || null,
       // Legacy write-only field. It remains for compatibility, but occupancy
       // is derived from the approved dates elsewhere in the application.
       status: 'active',
@@ -76,6 +74,10 @@ async function findOrCreateTenant(supabase, { name, landlordId, propertyId, unit
     created = true
   }
 
+  return { tenantId, created }
+}
+
+async function updateImportedTenant(supabase, { tenantId, propertyId, unitId, primaryProfile, isPrimary }) {
   const update = isPrimary
     ? primaryProfileUpdate(primaryProfile, { propertyId, unitId })
     : primaryProfileUpdate({}, { propertyId, unitId })
@@ -83,7 +85,13 @@ async function findOrCreateTenant(supabase, { name, landlordId, propertyId, unit
     const { error: updateError } = await supabase.from('tenant_profiles').update(update).eq('id', tenantId)
     if (updateError) throw new Error(`Failed to update tenant: ${updateError.message}`)
   }
-  return { tenantId, created }
+}
+
+async function cleanupCreatedTenants(supabase, tenantIds) {
+  if (!tenantIds.length) return
+  const { error: profileError } = await supabase.from('tenant_profiles').delete().in('id', tenantIds)
+  if (profileError) return
+  await Promise.all(tenantIds.map((tenantId) => supabase.auth.admin.deleteUser(tenantId)))
 }
 
 export async function POST(request) {
@@ -108,31 +116,55 @@ export async function POST(request) {
     return NextResponse.json({ error: error.message || 'Document extraction is malformed.' }, { status: 400 })
   }
 
+  // Validate the assignment before tenant creation. The contract RPC repeats
+  // the property check, but it runs after this route has otherwise created
+  // auth/profile records, so it cannot be the first line of defense here.
+  if (propertyId) {
+    const { data: property, error: propertyError } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('id', propertyId)
+      .eq('landlord_id', auth.landlordId)
+      .maybeSingle()
+    if (propertyError || !property) return NextResponse.json({ error: 'Selected property was not found for this team.' }, { status: 400 })
+  }
+
   let unitNumber = null
   if (unitId) {
-    const { data: unitRow, error: unitError } = await supabase.from('units').select('unit_number').eq('id', unitId).single()
-    if (unitError || !unitRow) return NextResponse.json({ error: 'Selected unit was not found.' }, { status: 400 })
+    if (!propertyId) return NextResponse.json({ error: 'Select the property before assigning a unit.' }, { status: 400 })
+    const { data: unitRow, error: unitError } = await supabase.from('units').select('unit_number, property_id').eq('id', unitId).single()
+    if (unitError || !unitRow || unitRow.property_id !== propertyId) {
+      return NextResponse.json({ error: 'Selected unit does not belong to the selected property.' }, { status: 400 })
+    }
     unitNumber = unitRow.unit_number
   }
 
   const created = []
   const updated = []
   const tenantIds = []
+  const createdTenantIds = []
   try {
     for (const name of reviewed.people) {
-      const isPrimary = name.toLocaleLowerCase() === reviewed.primaryName.toLocaleLowerCase()
       const tenant = await findOrCreateTenant(supabase, {
         name,
         landlordId: auth.landlordId,
+      })
+      tenantIds.push(tenant.tenantId)
+      if (tenant.created) createdTenantIds.push(tenant.tenantId)
+      ;(tenant.created ? created : updated).push(name)
+    }
+
+    for (let index = 0; index < reviewed.people.length; index += 1) {
+      await updateImportedTenant(supabase, {
+        tenantId: tenantIds[index],
         propertyId,
         unitId,
         primaryProfile: reviewed.primaryProfile,
-        isPrimary,
+        isPrimary: reviewed.people[index].toLocaleLowerCase() === reviewed.primaryName.toLocaleLowerCase(),
       })
-      tenantIds.push(tenant.tenantId)
-      ;(tenant.created ? created : updated).push(name)
     }
   } catch (error) {
+    await cleanupCreatedTenants(supabase, createdTenantIds)
     return NextResponse.json({ error: error.message || 'Failed to apply approved tenant information.' }, { status: 500 })
   }
 
@@ -147,7 +179,10 @@ export async function POST(request) {
       .select('id, property_id, unit, contract_tenants(tenant_id)')
       .eq('landlord_id', auth.landlordId)
       .eq('start_date', reviewed.contract.startDate)
-    if (candidatesError) return NextResponse.json({ error: candidatesError.message }, { status: 500 })
+    if (candidatesError) {
+      await cleanupCreatedTenants(supabase, createdTenantIds)
+      return NextResponse.json({ error: candidatesError.message }, { status: 500 })
+    }
 
     const duplicate = (candidates || []).some((contract) =>
       contract.property_id === (propertyId || null)
@@ -170,6 +205,7 @@ export async function POST(request) {
         })
         contractsCreated = 1
       } catch (error) {
+        await cleanupCreatedTenants(supabase, createdTenantIds)
         return NextResponse.json({ error: error.message || 'Failed to create lease.' }, { status: 500 })
       }
     }
