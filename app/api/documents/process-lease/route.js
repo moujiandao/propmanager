@@ -37,7 +37,7 @@ function primaryProfileUpdate(profile, { propertyId, unitId }) {
 async function findOrCreateTenant(supabase, { name, landlordId }) {
   const { data: existing, error: existingError } = await supabase
     .from('tenant_profiles')
-    .select('id')
+    .select('id, property_id, unit_id, move_in_date, move_out_date, email, phone, home_address, age, student_status, student_year, zelle_name, has_cosigner')
     .eq('landlord_id', landlordId)
     .ilike('name', name)
   if (existingError) throw new Error(`Failed to look up tenant: ${existingError.message}`)
@@ -68,14 +68,20 @@ async function findOrCreateTenant(supabase, { name, landlordId }) {
       status: 'active',
     })
     if (insertError) {
-      await supabase.auth.admin.deleteUser(authData.user.id)
-      throw new Error(`Failed to create tenant: ${insertError.message}`)
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(authData.user.id)
+      const failure = new Error(deleteError
+        ? `Failed to create tenant: ${insertError.message}. Auth cleanup also failed: ${deleteError.message}`
+        : `Failed to create tenant: ${insertError.message}`)
+      // The caller retries cleanup because a returned Auth error is not an
+      // exception and this account was not otherwise added to its created list.
+      if (deleteError) failure.createdTenantId = authData.user.id
+      throw failure
     }
     tenantId = authData.user.id
     created = true
   }
 
-  return { tenantId, created }
+  return { tenantId, created, before: created ? null : matchedTenant }
 }
 
 async function updateImportedTenant(supabase, { tenantId, propertyId, unitId, primaryProfile, isPrimary }) {
@@ -101,13 +107,53 @@ async function cleanupCreatedTenants(supabase, tenantIds) {
   }, tenantIds)
 }
 
-async function importFailure(supabase, tenantIds, error, message) {
-  try {
-    await cleanupCreatedTenants(supabase, tenantIds)
-  } catch (cleanupError) {
-    return NextResponse.json({ error: `${message}: ${error.message || error}. Cleanup also failed: ${cleanupError.message}` }, { status: 500 })
+function profileSnapshot(row) {
+  return {
+    property_id: row.property_id,
+    unit_id: row.unit_id,
+    move_in_date: row.move_in_date,
+    move_out_date: row.move_out_date,
+    email: row.email,
+    phone: row.phone,
+    home_address: row.home_address,
+    age: row.age,
+    student_status: row.student_status,
+    student_year: row.student_year,
+    zelle_name: row.zelle_name,
+    has_cosigner: row.has_cosigner,
   }
-  return NextResponse.json({ error: error.message || message }, { status: 500 })
+}
+
+async function restoreExistingProfiles(supabase, snapshots) {
+  const failures = []
+  for (const { tenantId, before } of [...snapshots].reverse()) {
+    const { error } = await supabase.from('tenant_profiles').update(profileSnapshot(before)).eq('id', tenantId)
+    if (error) failures.push(error.message)
+  }
+  if (failures.length) throw new Error(`Could not restore every existing tenant profile: ${failures.join('; ')}`)
+}
+
+async function deleteCreatedContract(supabase, contractId) {
+  if (!contractId) return
+  const { error } = await supabase.from('contracts').delete().eq('id', contractId)
+  if (error) throw new Error(`Could not remove the newly created lease: ${error.message}`)
+}
+
+async function importFailure(supabase, { tenantIds, existingSnapshots, contractId }, error, message) {
+  const cleanupFailures = []
+  for (const cleanup of [
+    () => deleteCreatedContract(supabase, contractId),
+    () => restoreExistingProfiles(supabase, existingSnapshots),
+    () => cleanupCreatedTenants(supabase, tenantIds),
+  ]) {
+    try {
+      await cleanup()
+    } catch (cleanupError) {
+      cleanupFailures.push(cleanupError.message || String(cleanupError))
+    }
+  }
+  const suffix = cleanupFailures.length ? `. Cleanup also failed: ${cleanupFailures.join('; ')}` : ''
+  return NextResponse.json({ error: `${error.message || message}${suffix}` }, { status: 500 })
 }
 
 export async function POST(request) {
@@ -157,6 +203,7 @@ export async function POST(request) {
   const updated = []
   const tenantIds = []
   const createdTenantIds = []
+  const existingSnapshots = []
   try {
     for (const name of reviewed.people) {
       const tenant = await findOrCreateTenant(supabase, {
@@ -165,6 +212,7 @@ export async function POST(request) {
       })
       tenantIds.push(tenant.tenantId)
       if (tenant.created) createdTenantIds.push(tenant.tenantId)
+      else existingSnapshots.push({ tenantId: tenant.tenantId, before: tenant.before })
       ;(tenant.created ? created : updated).push(name)
     }
 
@@ -178,7 +226,8 @@ export async function POST(request) {
       })
     }
   } catch (error) {
-    return importFailure(supabase, createdTenantIds, error, 'Failed to apply approved tenant information')
+    if (error.createdTenantId) createdTenantIds.push(error.createdTenantId)
+    return importFailure(supabase, { tenantIds: createdTenantIds, existingSnapshots, contractId: null }, error, 'Failed to apply approved tenant information')
   }
 
   let contractsCreated = 0
@@ -193,7 +242,7 @@ export async function POST(request) {
       .eq('landlord_id', auth.landlordId)
       .eq('start_date', reviewed.contract.startDate)
     if (candidatesError) {
-      return importFailure(supabase, createdTenantIds, candidatesError, 'Failed to look up existing leases')
+      return importFailure(supabase, { tenantIds: createdTenantIds, existingSnapshots, contractId: null }, candidatesError, 'Failed to look up existing leases')
     }
 
     const duplicate = (candidates || []).some((contract) =>
@@ -217,7 +266,7 @@ export async function POST(request) {
         })
         contractsCreated = 1
       } catch (error) {
-        return importFailure(supabase, createdTenantIds, error, 'Failed to create lease')
+        return importFailure(supabase, { tenantIds: createdTenantIds, existingSnapshots, contractId: null }, error, 'Failed to create lease')
       }
     }
   }
