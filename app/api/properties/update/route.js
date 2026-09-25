@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireLandlord, requireTeamRecord } from '@/lib/auth/authorize'
 
 export async function POST(request) {
   const { propertyId, address, city, state, zip, units, type, status, driveLink, inProduction } = await request.json()
@@ -7,11 +8,17 @@ export async function POST(request) {
     return Response.json({ error: 'propertyId is required.' }, { status: 400 })
   }
 
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
+
+  const access = await requireTeamRecord(supabase, { table: 'properties', id: propertyId, landlordId: auth.landlordId })
+  if (access.response) return access.response
 
   const { error } = await supabase
     .from('properties')

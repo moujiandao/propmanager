@@ -2,10 +2,13 @@ import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { statusFor, isCurrentRow, CURRENT } from '@/lib/tenant/status'
 import { normalizeGender } from '@/lib/tenant/gender'
+import { requireLandlord, rejectMismatchedLandlord, requireTeamRecords } from '@/lib/auth/authorize'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request) {
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -14,6 +17,11 @@ export async function POST(request) {
   // No `status` here on purpose: it derives from the move-in/move-out dates, so the
   // client can't set it. See lib/tenant/status.js.
   const { name, lastName, email, phone, gender, propertyId, unit, unitId, landlordId, password, zelleName, moveInDate, moveOutDate, notes, securityDeposit, securityDepositRefunded } = await request.json()
+
+  const teamMismatch = rejectMismatchedLandlord(landlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const propertyAccess = await requireTeamRecords(supabaseAdmin, { table: 'properties', ids: [propertyId], landlordId: auth.landlordId })
+  if (propertyAccess.response) return propertyAccess.response
 
   // Use provided email or generate a placeholder so auth user can be created without one
   const authEmail = email?.trim() || `${name.trim().toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@placeholder.local`
@@ -87,7 +95,7 @@ export async function POST(request) {
     .from('tenant_profiles')
     .insert({
       id: authUserId,
-      landlord_id: landlordId,
+      landlord_id: auth.landlordId,
       name,
       last_name: lastName || null,
       email: email?.trim() || authEmail,

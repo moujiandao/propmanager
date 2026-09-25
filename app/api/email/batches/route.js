@@ -3,6 +3,7 @@ import { renderTemplate, buildContext } from '@/lib/email/merge'
 import { eventDateFor } from '@/lib/email/events'
 import { loadLandlordDataset, contractForTenant } from '@/lib/email/context'
 import { candidates, matchesScope } from '@/lib/email/audience'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 // Run now: launch a human-review batch from an automation. Computes EVERYONE
 // matching the automation's event_type + scope (ignoring offset_days), renders
@@ -14,9 +15,13 @@ import { candidates, matchesScope } from '@/lib/email/audience'
 // reload mid-flow resumes rather than spawning duplicate drafts.
 export async function POST(request) {
   const body = await request.json()
-  const { landlordId, automationId } = body || {}
+  const { landlordId: requestedLandlordId, automationId } = body || {}
 
-  if (!landlordId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(requestedLandlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const landlordId = auth.landlordId
   if (!automationId) return Response.json({ error: 'An automationId is required' }, { status: 400 })
 
   const supabase = createClient(

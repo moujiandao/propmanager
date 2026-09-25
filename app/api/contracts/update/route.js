@@ -1,15 +1,26 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireLandlord, requireTeamRecord, requireTeamRecords } from '@/lib/auth/authorize'
 
 export async function POST(request) {
   const { contractId, propertyId, unit, startDate, endDate, rentAmount, dueDay, tenantIds } = await request.json()
   if (!contractId) return Response.json({ error: 'contractId is required.' }, { status: 400 })
   const tenantList = Array.isArray(tenantIds) ? tenantIds : []
 
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
+
+  const access = await requireTeamRecord(supabase, { table: 'contracts', id: contractId, landlordId: auth.landlordId })
+  if (access.response) return access.response
+  const propertyAccess = await requireTeamRecords(supabase, { table: 'properties', ids: [propertyId], landlordId: auth.landlordId })
+  if (propertyAccess.response) return propertyAccess.response
+  const tenantAccess = await requireTeamRecords(supabase, { table: 'tenant_profiles', ids: tenantList, landlordId: auth.landlordId })
+  if (tenantAccess.response) return tenantAccess.response
 
   // Capture existing tenants so we know which are newly assigned
   const { data: existingLinks } = await supabase

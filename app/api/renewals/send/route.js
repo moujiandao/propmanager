@@ -1,5 +1,6 @@
 import { createClient } from '../../../../lib/supabase/server'
 import { releaseSubmitter } from '../../../../lib/docuseal/client'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 // POST /api/renewals/send
 // Body: { landlordId, renewalId }
@@ -28,9 +29,10 @@ export async function POST(request) {
 
   const { landlordId, renewalId } = body || {}
 
-  if (!landlordId) {
-    return Response.json({ error: 'landlordId is required.' }, { status: 400 })
-  }
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(landlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
   if (!renewalId) {
     return Response.json({ error: 'renewalId is required.' }, { status: 400 })
   }
@@ -42,7 +44,7 @@ export async function POST(request) {
     .from('lease_renewals')
     .select('id, landlord_id, status, docuseal_submission_id, signers')
     .eq('id', renewalId)
-    .eq('landlord_id', landlordId)
+    .eq('landlord_id', auth.landlordId)
     .single()
 
   if (loadError || !renewal) {
@@ -88,7 +90,7 @@ export async function POST(request) {
     .from('lease_renewals')
     .update({ status: 'sent' })
     .eq('id', renewalId)
-    .eq('landlord_id', landlordId)
+    .eq('landlord_id', auth.landlordId)
 
   if (updateError) {
     return Response.json({ error: updateError.message }, { status: 400 })

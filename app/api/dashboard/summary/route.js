@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { statusForRow } from '@/lib/tenant/status'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 const client = new Anthropic()
 
@@ -147,9 +148,10 @@ function buildFacts({ tenants: rawTenants, contracts, payments, maintenance, pro
 
 export async function POST(request) {
   const { landlordId, lang } = await request.json()
-  if (!landlordId) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(landlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
   const targetLang = lang === 'zh' ? 'zh' : 'en'
 
   const supabase = createClient(
@@ -160,11 +162,11 @@ export async function POST(request) {
 
   try {
     const [tenantsRes, contractsRes, paymentsRes, maintRes, propsRes] = await Promise.all([
-      supabase.from('tenant_profiles').select('*').eq('landlord_id', landlordId),
-      supabase.from('contracts').select('*').eq('landlord_id', landlordId),
-      supabase.from('payments').select('*').eq('landlord_id', landlordId),
-      supabase.from('maintenance_requests').select('*').eq('landlord_id', landlordId),
-      supabase.from('properties').select('*').eq('landlord_id', landlordId),
+      supabase.from('tenant_profiles').select('*').eq('landlord_id', auth.landlordId),
+      supabase.from('contracts').select('*').eq('landlord_id', auth.landlordId),
+      supabase.from('payments').select('*').eq('landlord_id', auth.landlordId),
+      supabase.from('maintenance_requests').select('*').eq('landlord_id', auth.landlordId),
+      supabase.from('properties').select('*').eq('landlord_id', auth.landlordId),
     ])
 
     const firstError = [tenantsRes, contractsRes, paymentsRes, maintRes, propsRes].find(r => r.error)

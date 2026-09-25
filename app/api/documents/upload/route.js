@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { requireLandlord, rejectMismatchedLandlord, requireTeamRecords } from '@/lib/auth/authorize'
 
 export async function POST(request) {
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -10,16 +13,26 @@ export async function POST(request) {
   const formData = await request.formData()
 
   const file = formData.get('file')
-  const landlordId = formData.get('landlordId')
+  const requestedLandlordId = formData.get('landlordId')
   const tenantId = formData.get('tenantId') || null
   const propertyId = formData.get('propertyId') || null
   const unitId = formData.get('unitId') || null
   const contractId = formData.get('contractId') || null
   const documentType = formData.get('documentType') || 'other'
 
-  if (!file || !landlordId) {
+  if (!file) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
+  const teamMismatch = rejectMismatchedLandlord(requestedLandlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const landlordId = auth.landlordId
+  const relatedRecords = await Promise.all([
+    requireTeamRecords(supabase, { table: 'tenant_profiles', ids: [tenantId], landlordId }),
+    requireTeamRecords(supabase, { table: 'properties', ids: [propertyId], landlordId }),
+    requireTeamRecords(supabase, { table: 'contracts', ids: [contractId], landlordId }),
+  ])
+  const denied = relatedRecords.find(result => result.response)
+  if (denied) return denied.response
 
   const timestamp = Date.now()
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')

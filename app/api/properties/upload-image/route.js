@@ -1,9 +1,12 @@
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ALLOWED_EXT = new Set(['jpg', 'jpeg', 'png', 'webp'])
 
 export async function POST(request) {
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
   // Initialize inside handler so env vars are definitely resolved
   const adminClient = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -16,13 +19,15 @@ export async function POST(request) {
   const propertyId = formData.get('propertyId')
   const landlordId = formData.get('landlordId')
 
-  if (!file || !propertyId || !landlordId) {
-    return Response.json({ error: 'file, propertyId, and landlordId are required' }, { status: 400 })
+  if (!file || !propertyId) {
+    return Response.json({ error: 'file and propertyId are required' }, { status: 400 })
   }
 
-  if (!UUID_RE.test(propertyId) || !UUID_RE.test(landlordId)) {
+  if (!UUID_RE.test(propertyId)) {
     return Response.json({ error: 'Invalid id' }, { status: 400 })
   }
+  const teamMismatch = rejectMismatchedLandlord(landlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
 
   const ext = file.name.split('.').pop().toLowerCase()
   if (!ALLOWED_EXT.has(ext)) {
@@ -34,7 +39,7 @@ export async function POST(request) {
     .from('properties')
     .select('id')
     .eq('id', propertyId)
-    .eq('landlord_id', landlordId)
+    .eq('landlord_id', auth.landlordId)
     .maybeSingle()
 
   if (!property) {

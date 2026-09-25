@@ -1,9 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { isCurrentRow } from '@/lib/tenant/status'
+import { requireLandlord, requireTeamRecord } from '@/lib/auth/authorize'
 
 export async function POST(request) {
   const { userId, role } = await request.json()
   if (!userId) return Response.json({ error: 'userId is required.' }, { status: 400 })
+
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -11,10 +15,11 @@ export async function POST(request) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  if (role === 'landlord') {
-    const { error: profileError } = await supabase.from('landlord_profiles').delete().eq('id', userId)
-    if (profileError) return Response.json({ error: profileError.message }, { status: 400 })
+  if (role === 'landlord' || role === 'admin') {
+    return Response.json({ error: 'Deleting a landlord team is not supported by this endpoint.' }, { status: 403 })
   } else {
+    const access = await requireTeamRecord(supabase, { table: 'tenant_profiles', id: userId, landlordId: auth.landlordId })
+    if (access.response) return access.response
     const { data: tenant } = await supabase.from('tenant_profiles').select('unit_id, property_id').eq('id', userId).single()
     const { error: profileError } = await supabase.from('tenant_profiles').delete().eq('id', userId)
     if (profileError) return Response.json({ error: profileError.message }, { status: 400 })

@@ -1,12 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { requireSignedIn } from '@/lib/auth/authorize'
 
 const client = new Anthropic()
 
 export async function POST(request) {
-  const { text, landlordId } = await request.json()
-  if (!landlordId) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { text } = await request.json()
+  const auth = await requireSignedIn()
+  if (auth.response) return auth.response
   if (!text?.trim()) {
     return Response.json({ error: 'text is required' }, { status: 400 })
   }

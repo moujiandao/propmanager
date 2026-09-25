@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireLandlord, requireTeamRecord } from '@/lib/auth/authorize'
 
 // Minimal endpoint for the inline "Security Deposit Refunded" checkbox on the
 // Tenants tab. Updates ONLY that boolean — the full update-tenant route expects
@@ -10,11 +11,17 @@ export async function POST(request) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
   }
 
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
+
+  const access = await requireTeamRecord(supabase, { table: 'tenant_profiles', id: tenantId, landlordId: auth.landlordId })
+  if (access.response) return access.response
 
   const { error } = await supabase
     .from('tenant_profiles')

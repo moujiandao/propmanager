@@ -1,9 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireLandlord, rejectMismatchedLandlord, requireTeamRecords } from '@/lib/auth/authorize'
 
 export async function POST(request) {
   const { landlordId, propertyId, unit, startDate, endDate, rentAmount, dueDay, tenantIds } = await request.json()
 
-  if (!landlordId) return Response.json({ error: 'landlordId is required.' }, { status: 400 })
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(landlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
   if (!rentAmount) return Response.json({ error: 'rentAmount is required.' }, { status: 400 })
   const tenantList = Array.isArray(tenantIds) ? tenantIds.filter(Boolean) : []
   if (tenantList.length === 0) return Response.json({ error: 'At least one tenant is required.' }, { status: 400 })
@@ -14,10 +18,15 @@ export async function POST(request) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
+  const propertyAccess = await requireTeamRecords(supabase, { table: 'properties', ids: [propertyId], landlordId: auth.landlordId })
+  if (propertyAccess.response) return propertyAccess.response
+  const tenantAccess = await requireTeamRecords(supabase, { table: 'tenant_profiles', ids: tenantList, landlordId: auth.landlordId })
+  if (tenantAccess.response) return tenantAccess.response
+
   const { data: newContract, error: insertError } = await supabase
     .from('contracts')
     .insert({
-      landlord_id: landlordId,
+      landlord_id: auth.landlordId,
       property_id: propertyId || null,
       unit: unit || null,
       start_date: startDate || null,

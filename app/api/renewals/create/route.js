@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createRenewalSubmission } from '../../../../lib/docuseal/client.js'
 import { deriveRenewalTerm, pickOriginalLeaseDate } from '../../../../lib/docuseal/renewal.js'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 const PLACEHOLDER_SUFFIX = '@placeholder.local'
 
@@ -18,7 +19,10 @@ export async function POST(request) {
   }
 
   const { landlordId, contractId } = body || {}
-  if (!landlordId) return Response.json({ error: 'landlordId is required' }, { status: 400 })
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(landlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
   if (!contractId) return Response.json({ error: 'contractId is required' }, { status: 400 })
 
   const templateId = process.env.DOCUSEAL_RENEWAL_TEMPLATE_ID
@@ -37,7 +41,7 @@ export async function POST(request) {
     .from('contracts')
     .select('id, landlord_id, property_id, start_date, end_date, rent_amount')
     .eq('id', contractId)
-    .eq('landlord_id', landlordId)
+    .eq('landlord_id', auth.landlordId)
     .maybeSingle()
   if (contractError) return Response.json({ error: contractError.message }, { status: 400 })
   if (!contract) return Response.json({ error: 'Contract not found' }, { status: 404 })
@@ -81,7 +85,7 @@ export async function POST(request) {
   const { data: landlord, error: landlordError } = await supabase
     .from('landlord_profiles')
     .select('id, email')
-    .eq('id', landlordId)
+    .eq('id', auth.landlordId)
     .maybeSingle()
   if (landlordError) return Response.json({ error: landlordError.message }, { status: 400 })
   if (!landlord || isUnsendableEmail(landlord.email)) {
@@ -199,7 +203,7 @@ export async function POST(request) {
   const { data: inserted, error: insertError } = await supabase
     .from('lease_renewals')
     .insert({
-      landlord_id: landlordId,
+      landlord_id: auth.landlordId,
       contract_id: contractId,
       property_id: contract.property_id || null,
       original_lease_date: originalLeaseDate || null,

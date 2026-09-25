@@ -1,5 +1,6 @@
 import { createClient } from '../../../../lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireLandlord, requireTeamRecord, requireTeamRecords } from '@/lib/auth/authorize'
 
 export async function POST(request) {
   const supabase = await createClient()
@@ -9,16 +10,15 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Missing documentId' }, { status: 400 })
   }
 
-  // 1. Fetch document record
-  const { data: doc, error: docError } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('id', documentId)
-    .single()
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
 
-  if (docError || !doc) {
-    return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-  }
+  // 1. Fetch document record
+  const access = await requireTeamRecord(supabase, { table: 'documents', id: documentId, landlordId: auth.landlordId, select: '*' })
+  if (access.response) return access.response
+  const doc = access.row
+  const propertyAccess = await requireTeamRecords(supabase, { table: 'properties', ids: [propertyId], landlordId: auth.landlordId })
+  if (propertyAccess.response) return propertyAccess.response
 
   const ai = doc.ai_extracted
   if (!ai || !ai.tenant_name) {

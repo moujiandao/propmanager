@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { statusFor, statusForRow, isCurrentRow } from '@/lib/tenant/status'
 import { normalizeGender } from '@/lib/tenant/gender'
+import { requireLandlord, requireTeamRecord, requireTeamRecords } from '@/lib/auth/authorize'
 
 export async function POST(request) {
   // No `status` here on purpose: it derives from the move-in/move-out dates, so the
@@ -11,11 +12,19 @@ export async function POST(request) {
     return Response.json({ error: 'tenantId is required.' }, { status: 400 })
   }
 
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
+
+  const access = await requireTeamRecord(supabase, { table: 'tenant_profiles', id: tenantId, landlordId: auth.landlordId })
+  if (access.response) return access.response
+  const propertyAccess = await requireTeamRecords(supabase, { table: 'properties', ids: [propertyId], landlordId: auth.landlordId })
+  if (propertyAccess.response) return propertyAccess.response
 
   // Capture the tenant's previous unit and dates so we can recompute occupancy when either
   // the assigned unit or the DERIVED status changes.

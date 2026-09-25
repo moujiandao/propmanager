@@ -3,14 +3,19 @@ import { renderTemplate, buildContext } from '@/lib/email/merge'
 import { eventDateFor } from '@/lib/email/events'
 import { loadTenantContext, mapLandlordRow } from '@/lib/email/context'
 import { sendEmail, replyToAddress } from '@/lib/email/send'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 // Manual send: render a template for a real tenant and send immediately. Logs a
 // real outbound row (is_test=false, automation_id=null) so it shows in the inbox
 // and can receive a tracked reply.
 export async function POST(request) {
-  const { landlordId, templateId, tenantId, eventType } = (await request.json()) || {}
+  const { landlordId: requestedLandlordId, templateId, tenantId, eventType } = (await request.json()) || {}
 
-  if (!landlordId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(requestedLandlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const landlordId = auth.landlordId
   if (!templateId || !tenantId) return Response.json({ error: 'templateId and tenantId are required' }, { status: 400 })
 
   const supabase = createClient(

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email/send'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 // Fire a reviewed batch. No env kill-switch by design — the Step 3 confirmation
 // dialog + per-recipient review is the safety gate. For each draft row we CLAIM
@@ -12,9 +13,13 @@ import { sendEmail } from '@/lib/email/send'
 export async function POST(request, { params }) {
   const { id } = await params
   const body = await request.json()
-  const { landlordId } = body || {}
+  const { landlordId: requestedLandlordId } = body || {}
 
-  if (!landlordId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(requestedLandlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const landlordId = auth.landlordId
   if (!id) return Response.json({ error: 'A batch id is required' }, { status: 400 })
 
   const supabase = createClient(

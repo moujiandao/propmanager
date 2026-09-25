@@ -1,6 +1,7 @@
 import { GoogleAuth } from 'google-auth-library'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -9,17 +10,23 @@ const supabase = createClient(
 )
 
 export async function POST(request) {
-  const { propertyId, landlordId } = await request.json()
+  const { propertyId, landlordId: requestedLandlordId } = await request.json()
 
-  if (!propertyId || !landlordId) {
-    return Response.json({ error: 'propertyId and landlordId are required.' }, { status: 400 })
+  if (!propertyId) {
+    return Response.json({ error: 'propertyId is required.' }, { status: 400 })
   }
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(requestedLandlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const landlordId = auth.landlordId
 
   // Get property drive_link
   const { data: property } = await supabase
     .from('properties')
     .select('drive_link, address')
     .eq('id', propertyId)
+    .eq('landlord_id', landlordId)
     .single()
 
   if (!property?.drive_link) {

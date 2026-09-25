@@ -1,9 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireLandlord, rejectMismatchedLandlord, requireTeamRecord, requireTeamRecords } from '@/lib/auth/authorize'
 
 export async function POST(request) {
   const { landlordId, parkingSpotId, rate, startDate, endDate, tenantId, renterId, renter, carMake, carModel, carYear } = await request.json()
 
-  if (!landlordId) return Response.json({ error: 'landlordId is required.' }, { status: 400 })
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(landlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
   if (!parkingSpotId) return Response.json({ error: 'parkingSpotId is required.' }, { status: 400 })
   if (!rate) return Response.json({ error: 'rate is required.' }, { status: 400 })
   if (!startDate) return Response.json({ error: 'startDate is required.' }, { status: 400 })
@@ -32,6 +36,13 @@ export async function POST(request) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
+  const spot = await requireTeamRecord(supabase, { table: 'parking_spots', id: parkingSpotId, landlordId: auth.landlordId })
+  if (spot.response) return spot.response
+  const tenantAccess = await requireTeamRecords(supabase, { table: 'tenant_profiles', ids: [tenantId], landlordId: auth.landlordId })
+  if (tenantAccess.response) return tenantAccess.response
+  const renterAccess = await requireTeamRecords(supabase, { table: 'parking_renters', ids: [renterId], landlordId: auth.landlordId })
+  if (renterAccess.response) return renterAccess.response
+
   // A brand-new market renter has no tenant_profiles row and never will --
   // this insert is the only place a parking_renters row gets created, and it
   // never touches auth.users, so a market renter can never get portal access.
@@ -41,7 +52,7 @@ export async function POST(request) {
     const { data: newRenter, error: renterError } = await supabase
       .from('parking_renters')
       .insert({
-        landlord_id: landlordId,
+        landlord_id: auth.landlordId,
         name: renter.name.trim(),
         email: renter.email?.trim() || null,
         phone: renter.phone?.trim() || null,
@@ -57,7 +68,7 @@ export async function POST(request) {
   const { data: newLease, error: leaseError } = await supabase
     .from('parking_leases')
     .insert({
-      landlord_id: landlordId,
+      landlord_id: auth.landlordId,
       parking_spot_id: parkingSpotId,
       tenant_id: tenantId || null,
       renter_id: resolvedRenterId,

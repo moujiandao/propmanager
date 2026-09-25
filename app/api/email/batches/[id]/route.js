@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { renderTemplate, buildContext } from '@/lib/email/merge'
 import { eventDateFor } from '@/lib/email/events'
 import { loadTenantContext, mapLandlordRow } from '@/lib/email/context'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 // Persist per-recipient edits to a draft batch:
 //   - upserts with an id   → update that draft row's to_email/subject/body
@@ -12,9 +13,13 @@ import { loadTenantContext, mapLandlordRow } from '@/lib/email/context'
 export async function PATCH(request, { params }) {
   const { id } = await params
   const body = await request.json()
-  const { landlordId, upserts = [], deleteIds = [] } = body || {}
+  const { landlordId: requestedLandlordId, upserts = [], deleteIds = [] } = body || {}
 
-  if (!landlordId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(requestedLandlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const landlordId = auth.landlordId
   if (!id) return Response.json({ error: 'A batch id is required' }, { status: 400 })
 
   const supabase = createClient(

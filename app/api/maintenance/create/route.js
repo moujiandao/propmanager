@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { normalizeWriteStatus } from '@/lib/maintenance/status'
+import { requireLandlord, rejectMismatchedLandlord, requireTeamRecord } from '@/lib/auth/authorize'
 
 export async function POST(request) {
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -17,12 +20,17 @@ export async function POST(request) {
   const type = formData.get('type') || null
   const description = formData.get('description')
   const descriptionZh = formData.get('descriptionZh') || null
-  const landlordId = formData.get('landlordId')
+  const requestedLandlordId = formData.get('landlordId')
   const files = formData.getAll('files').filter(f => f && f.size > 0)
 
-  if (!tenantId || !description || !landlordId) {
-    return NextResponse.json({ error: 'tenantId, description, and landlordId are required' }, { status: 400 })
+  if (!tenantId || !description) {
+    return NextResponse.json({ error: 'tenantId and description are required' }, { status: 400 })
   }
+  const teamMismatch = rejectMismatchedLandlord(requestedLandlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const landlordId = auth.landlordId
+  const tenantAccess = await requireTeamRecord(supabase, { table: 'tenant_profiles', id: tenantId, landlordId })
+  if (tenantAccess.response) return tenantAccess.response
 
   // Create the maintenance request
   const { data: req, error: reqError } = await supabase

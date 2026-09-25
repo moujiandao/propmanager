@@ -2,6 +2,7 @@ import { createClient } from '../../../../lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import mammoth from 'mammoth'
 import { NextResponse } from 'next/server'
+import { requireLandlord, requireTeamRecord } from '@/lib/auth/authorize'
 
 const anthropic = new Anthropic() // reads ANTHROPIC_API_KEY from env
 
@@ -37,15 +38,12 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Missing documentId' }, { status: 400 })
   }
 
-  const { data: doc, error: fetchError } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('id', documentId)
-    .single()
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
 
-  if (fetchError || !doc) {
-    return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-  }
+  const access = await requireTeamRecord(supabase, { table: 'documents', id: documentId, landlordId: auth.landlordId, select: '*' })
+  if (access.response) return access.response
+  const doc = access.row
 
   const { data: fileData, error: downloadError } = await supabase.storage
     .from('documents')

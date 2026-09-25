@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { requireLandlord, requireTeamRecord } from '@/lib/auth/authorize'
 
 export async function POST(request) {
   const supabase = createClient(
@@ -13,15 +14,12 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Missing documentId' }, { status: 400 })
   }
 
-  const { data: doc, error: fetchError } = await supabase
-    .from('documents')
-    .select('file_path')
-    .eq('id', documentId)
-    .single()
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
 
-  if (fetchError || !doc) {
-    return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-  }
+  const access = await requireTeamRecord(supabase, { table: 'documents', id: documentId, landlordId: auth.landlordId, select: 'id, landlord_id, file_path' })
+  if (access.response) return access.response
+  const doc = access.row
 
   // Only delete from storage if there's an actual uploaded file
   if (doc.file_path) {

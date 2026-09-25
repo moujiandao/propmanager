@@ -3,15 +3,20 @@ import { renderTemplate, buildContext, sampleContext } from '@/lib/email/merge'
 import { eventDateFor } from '@/lib/email/events'
 import { loadTenantContext, mapLandlordRow } from '@/lib/email/context'
 import { sendEmail } from '@/lib/email/send'
+import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 // Test send: renders a template with sample data (or a real tenant's data) and
 // sends it to a dummy address so the landlord can preview look + deliverability.
 // Logged with is_test=true so it never counts toward automation dedup or stats.
 export async function POST(request) {
   const body = await request.json()
-  const { landlordId, toEmail, templateId, template: inlineTemplate, tenantId, eventType } = body || {}
+  const { landlordId: requestedLandlordId, toEmail, templateId, template: inlineTemplate, tenantId, eventType } = body || {}
 
-  if (!landlordId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireLandlord()
+  if (auth.response) return auth.response
+  const teamMismatch = rejectMismatchedLandlord(requestedLandlordId, auth.landlordId)
+  if (teamMismatch) return teamMismatch
+  const landlordId = auth.landlordId
   if (!toEmail) return Response.json({ error: 'A test recipient email is required' }, { status: 400 })
 
   const supabase = createClient(
