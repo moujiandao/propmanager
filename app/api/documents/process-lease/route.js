@@ -37,7 +37,7 @@ function primaryProfileUpdate(profile, { propertyId, unitId }) {
 async function findOrCreateTenant(supabase, { name, landlordId }) {
   const { data: existing, error: existingError } = await supabase
     .from('tenant_profiles')
-    .select('id, property_id, unit_id, move_in_date, move_out_date, email, phone, home_address, age, student_status, student_year, zelle_name, has_cosigner')
+    .select('id, property_id, unit_id, move_in_date, move_out_date, email, phone, home_address, age, student_status, student_year, zelle_name, has_cosigner, updated_at')
     .eq('landlord_id', landlordId)
     .ilike('name', name)
   if (existingError) throw new Error(`Failed to look up tenant: ${existingError.message}`)
@@ -89,9 +89,16 @@ async function updateImportedTenant(supabase, { tenantId, propertyId, unitId, pr
     ? primaryProfileUpdate(primaryProfile, { propertyId, unitId })
     : primaryProfileUpdate({}, { propertyId, unitId })
   if (Object.keys(update).length) {
-    const { error: updateError } = await supabase.from('tenant_profiles').update(update).eq('id', tenantId)
-    if (updateError) throw new Error(`Failed to update tenant: ${updateError.message}`)
+    const { data, error: updateError } = await supabase
+      .from('tenant_profiles')
+      .update(update)
+      .eq('id', tenantId)
+      .select('updated_at')
+      .single()
+    if (updateError || !data) throw new Error(`Failed to update tenant: ${updateError?.message || 'no row returned'}`)
+    return data.updated_at
   }
+  return null
 }
 
 async function cleanupCreatedTenants(supabase, tenantIds) {
@@ -126,9 +133,16 @@ function profileSnapshot(row) {
 
 async function restoreExistingProfiles(supabase, snapshots) {
   const failures = []
-  for (const { tenantId, before } of [...snapshots].reverse()) {
-    const { error } = await supabase.from('tenant_profiles').update(profileSnapshot(before)).eq('id', tenantId)
+  for (const { tenantId, before, writtenAt } of [...snapshots].reverse()) {
+    if (!writtenAt) continue
+    const { data, error } = await supabase
+      .from('tenant_profiles')
+      .update(profileSnapshot(before))
+      .eq('id', tenantId)
+      .eq('updated_at', writtenAt)
+      .select('id')
     if (error) failures.push(error.message)
+    else if (!data?.length) failures.push(`Tenant ${tenantId} changed after this import and was not overwritten`)
   }
   if (failures.length) throw new Error(`Could not restore every existing tenant profile: ${failures.join('; ')}`)
 }
@@ -212,18 +226,20 @@ export async function POST(request) {
       })
       tenantIds.push(tenant.tenantId)
       if (tenant.created) createdTenantIds.push(tenant.tenantId)
-      else existingSnapshots.push({ tenantId: tenant.tenantId, before: tenant.before })
+      else existingSnapshots.push({ tenantId: tenant.tenantId, before: tenant.before, writtenAt: null })
       ;(tenant.created ? created : updated).push(name)
     }
 
     for (let index = 0; index < reviewed.people.length; index += 1) {
-      await updateImportedTenant(supabase, {
+      const writtenAt = await updateImportedTenant(supabase, {
         tenantId: tenantIds[index],
         propertyId,
         unitId,
         primaryProfile: reviewed.primaryProfile,
         isPrimary: reviewed.people[index].toLocaleLowerCase() === reviewed.primaryName.toLocaleLowerCase(),
       })
+      const snapshot = existingSnapshots.find((candidate) => candidate.tenantId === tenantIds[index])
+      if (snapshot) snapshot.writtenAt = writtenAt
     }
   } catch (error) {
     if (error.createdTenantId) createdTenantIds.push(error.createdTenantId)
