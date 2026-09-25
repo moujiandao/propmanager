@@ -11,6 +11,12 @@ import { createSupabaseAdapter } from '@/lib/maintenance/adapter';
 import { mapMaintenance, mapMaintenanceType, mapMaintenanceAttachment, mapMaintenanceComment } from '@/lib/maintenance/mappers';
 import * as maint from '@/lib/maintenance/core';
 import * as maintStatus from '@/lib/maintenance/status';
+import {
+  applyOptimisticRecordRemoval,
+  applyOptimisticRecordUpdate,
+  rollbackOptimisticRecordRemoval,
+  rollbackOptimisticRecordUpdate,
+} from '@/lib/maintenance/optimistic';
 import { createTenantAdapter } from '@/lib/tenant/adapter';
 import { mapTenant } from '@/lib/tenant/mappers';
 import { statusFor, isCurrentRow, awaitingMoveInAck, awaitingMoveOutAck } from '@/lib/tenant/status';
@@ -3054,7 +3060,7 @@ const AttachmentChip = ({ att }) => {
 // React-coupled wrapper over the maintenance core (lib/maintenance). It owns the
 // optimistic local-state updates + rollback that the core deliberately knows
 // nothing about: the core persists and returns/throws; this hook applies the
-// change to `data`, and on failure restores the exact prior snapshot and reports
+// change to `data`, and on failure restores only the row it changed and reports
 // the error. The single home for the rollback that 9 scattered writes lacked.
 function useMaintenanceMutations(setData, { onError } = {}) {
   // Plain values: eslint-plugin-react-hooks v7 rejects manual useMemo/useCallback
@@ -3065,14 +3071,41 @@ function useMaintenanceMutations(setData, { onError } = {}) {
   const adapter = createSupabaseAdapter(supabase);
   const report = (e) => { console.error("[maintenance]", e); onError?.(e); };
 
-  // Apply optimistically, persist, roll back on failure. Rollback restores ONLY
-  // the touched slice (via a functional updater), so a concurrent change to a
-  // different slice in flight isn't clobbered.
-  const optimistic = async (slice, applyFn, persistFn) => {
-    let prevSlice;
-    setData(d => { prevSlice = d[slice]; return applyFn(d); });
+  // Apply optimistically, persist, then roll back only the affected record.
+  // Object identity protects a newer local edit or a refresh from an older
+  // failed request's rollback.
+  const optimisticUpdate = async (slice, id, update, persistFn) => {
+    let previous;
+    let optimistic;
+    setData(d => {
+      const result = applyOptimisticRecordUpdate(d, slice, id, update);
+      previous = result.previous;
+      optimistic = result.optimistic;
+      return result.data;
+    });
     try { return await persistFn(); }
-    catch (e) { setData(d => ({ ...d, [slice]: prevSlice })); report(e); throw e; }
+    catch (e) {
+      setData(d => rollbackOptimisticRecordUpdate(d, slice, id, previous, optimistic));
+      report(e);
+      throw e;
+    }
+  };
+
+  const optimisticRemoval = async (slice, id, persistFn) => {
+    let previous;
+    let index;
+    setData(d => {
+      const result = applyOptimisticRecordRemoval(d, slice, id);
+      previous = result.previous;
+      index = result.index;
+      return result.data;
+    });
+    try { return await persistFn(); }
+    catch (e) {
+      setData(d => rollbackOptimisticRecordRemoval(d, slice, id, previous, index));
+      report(e);
+      throw e;
+    }
   };
 
   return {
@@ -3084,20 +3117,16 @@ function useMaintenanceMutations(setData, { onError } = {}) {
     setStatus: (id, status, existingClosedAt = null) => {
       const now = new Date().toISOString();
       const closedAt = maintStatus.nextClosedAt(status, existingClosedAt, now);
-      return optimistic("maintenance",
-        d => ({ ...d, maintenance: d.maintenance.map(m => m.id === id
-          ? { ...m, status, closedAt, closedDate: closedAt ? closedAt.split("T")[0] : null }
-          : m) }),
+      return optimisticUpdate("maintenance", id,
+        m => ({ ...m, status, closedAt, closedDate: closedAt ? closedAt.split("T")[0] : null }),
         () => maint.setStatus(adapter, id, status, { existingClosedAt, now }),
       );
     },
-    updateRequest: (id, fields) => optimistic("maintenance",
-      d => ({ ...d, maintenance: d.maintenance.map(m => m.id === id
-        // descriptionZh is cleared alongside, matching what the core writes —
-        // otherwise the card would keep showing Chinese for the old text until
-        // the next refetch.
-        ? { ...m, ...fields, description: (fields.description || "").trim(), descriptionZh: "" }
-        : m) }),
+    updateRequest: (id, fields) => optimisticUpdate("maintenance", id,
+      // descriptionZh is cleared alongside, matching what the core writes —
+      // otherwise the card would keep showing Chinese for the old text until
+      // the next refetch.
+      m => ({ ...m, ...fields, description: (fields.description || "").trim(), descriptionZh: "" }),
       () => maint.updateRequest(adapter, id, fields),
     ),
     // Only the `maintenance` slice is touched, even though the database cascades
@@ -3106,18 +3135,19 @@ function useMaintenanceMutations(setData, { onError } = {}) {
     // failed and the rollback ran. Their rows are unreferenced the moment the
     // request is gone — nothing renders a thread for a request that isn't there
     // — and the caller's refresh clears them for real.
-    deleteRequest: (id, attachmentPaths = []) => optimistic("maintenance",
-      d => ({ ...d, maintenance: d.maintenance.filter(m => m.id !== id) }),
+    deleteRequest: (id, attachmentPaths = []) => optimisticRemoval("maintenance", id,
       () => maint.deleteRequest(adapter, id, attachmentPaths),
     ),
     deleteComment: (comment, hasReplies) => {
       const now = new Date().toISOString();
-      return optimistic("maintenanceComments",
-        d => ({ ...d, maintenanceComments: hasReplies
-          ? d.maintenanceComments.map(x => x.id === comment.id ? { ...x, deletedAt: now, body: "", bodyZh: "" } : x)
-          : d.maintenanceComments.filter(x => x.id !== comment.id) }),
-        () => maint.deleteComment(adapter, comment, hasReplies, now),
-      );
+      return hasReplies
+        ? optimisticUpdate("maintenanceComments", comment.id,
+          x => ({ ...x, deletedAt: now, body: "", bodyZh: "" }),
+          () => maint.deleteComment(adapter, comment, true, now),
+        )
+        : optimisticRemoval("maintenanceComments", comment.id,
+          () => maint.deleteComment(adapter, comment, false, now),
+        );
     },
     // Pessimistic (persist first, then reflect the real result), error surfaced.
     addComment: async (input) => {
