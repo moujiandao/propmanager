@@ -4,6 +4,7 @@ import { requireLandlord, requireTeamRecord, requireTeamRecords } from '@/lib/au
 import { createContract } from '../../../../lib/contracts/core.js'
 import { createContractsAdapter } from '../../../../lib/contracts/adapter.js'
 import { reviewedLeaseImport } from '../../../../lib/documents/lease-extraction.js'
+import { cleanupCreatedTenantAccounts, oneTenantMatch, validateLeaseAssignment } from '../../../../lib/documents/import-safety.js'
 
 function samePeople(left, right) {
   if (left.length !== right.length) return false
@@ -40,12 +41,12 @@ async function findOrCreateTenant(supabase, { name, landlordId }) {
     .eq('landlord_id', landlordId)
     .ilike('name', name)
   if (existingError) throw new Error(`Failed to look up tenant: ${existingError.message}`)
-  if (existing?.length > 1) throw new Error(`More than one tenant matches "${name}". Review and resolve the duplicate profiles first.`)
+  const matchedTenant = oneTenantMatch(existing, name)
 
   let tenantId
   let created = false
-  if (existing?.length) {
-    tenantId = existing[0].id
+  if (matchedTenant) {
+    tenantId = matchedTenant.id
   } else {
     // Document review has already validated the name. A placeholder user is
     // still needed because tenant_profiles.id references auth.users.id.
@@ -88,10 +89,25 @@ async function updateImportedTenant(supabase, { tenantId, propertyId, unitId, pr
 }
 
 async function cleanupCreatedTenants(supabase, tenantIds) {
-  if (!tenantIds.length) return
-  const { error: profileError } = await supabase.from('tenant_profiles').delete().in('id', tenantIds)
-  if (profileError) return
-  await Promise.all(tenantIds.map((tenantId) => supabase.auth.admin.deleteUser(tenantId)))
+  return cleanupCreatedTenantAccounts({
+    async deleteTenantProfiles(ids) {
+      const { error } = await supabase.from('tenant_profiles').delete().in('id', ids)
+      if (error) throw new Error(`Failed to remove created tenant profiles: ${error.message}`)
+    },
+    async deleteAuthUser(tenantId) {
+      const { error } = await supabase.auth.admin.deleteUser(tenantId)
+      if (error) throw new Error(`Failed to remove created tenant auth user: ${error.message}`)
+    },
+  }, tenantIds)
+}
+
+async function importFailure(supabase, tenantIds, error, message) {
+  try {
+    await cleanupCreatedTenants(supabase, tenantIds)
+  } catch (cleanupError) {
+    return NextResponse.json({ error: `${message}: ${error.message || error}. Cleanup also failed: ${cleanupError.message}` }, { status: 500 })
+  }
+  return NextResponse.json({ error: error.message || message }, { status: 500 })
 }
 
 export async function POST(request) {
@@ -116,27 +132,25 @@ export async function POST(request) {
     return NextResponse.json({ error: error.message || 'Document extraction is malformed.' }, { status: 400 })
   }
 
-  // Validate the assignment before tenant creation. The contract RPC repeats
-  // the property check, but it runs after this route has otherwise created
-  // auth/profile records, so it cannot be the first line of defense here.
-  if (propertyId) {
-    const { data: property, error: propertyError } = await supabase
-      .from('properties')
-      .select('id')
-      .eq('id', propertyId)
-      .eq('landlord_id', auth.landlordId)
-      .maybeSingle()
-    if (propertyError || !property) return NextResponse.json({ error: 'Selected property was not found for this team.' }, { status: 400 })
-  }
-
   let unitNumber = null
-  if (unitId) {
-    if (!propertyId) return NextResponse.json({ error: 'Select the property before assigning a unit.' }, { status: 400 })
-    const { data: unitRow, error: unitError } = await supabase.from('units').select('unit_number, property_id').eq('id', unitId).single()
-    if (unitError || !unitRow || unitRow.property_id !== propertyId) {
-      return NextResponse.json({ error: 'Selected unit does not belong to the selected property.' }, { status: 400 })
-    }
-    unitNumber = unitRow.unit_number
+  try {
+    // Validate before tenant creation. The contract RPC repeats the property
+    // check, but it runs after this route has otherwise created auth/profile
+    // records, so it cannot be the first line of defense here.
+    unitNumber = await validateLeaseAssignment({
+      async findPropertyForLandlord(id, landlordId) {
+        const { data, error } = await supabase.from('properties').select('id').eq('id', id).eq('landlord_id', landlordId).maybeSingle()
+        if (error) throw new Error(error.message)
+        return data
+      },
+      async findUnit(id) {
+        const { data, error } = await supabase.from('units').select('unit_number, property_id').eq('id', id).maybeSingle()
+        if (error) throw new Error(error.message)
+        return data
+      },
+    }, { landlordId: auth.landlordId, propertyId, unitId })
+  } catch (error) {
+    return NextResponse.json({ error: error.message || 'Invalid property or unit assignment.' }, { status: 400 })
   }
 
   const created = []
@@ -164,8 +178,7 @@ export async function POST(request) {
       })
     }
   } catch (error) {
-    await cleanupCreatedTenants(supabase, createdTenantIds)
-    return NextResponse.json({ error: error.message || 'Failed to apply approved tenant information.' }, { status: 500 })
+    return importFailure(supabase, createdTenantIds, error, 'Failed to apply approved tenant information')
   }
 
   let contractsCreated = 0
@@ -180,8 +193,7 @@ export async function POST(request) {
       .eq('landlord_id', auth.landlordId)
       .eq('start_date', reviewed.contract.startDate)
     if (candidatesError) {
-      await cleanupCreatedTenants(supabase, createdTenantIds)
-      return NextResponse.json({ error: candidatesError.message }, { status: 500 })
+      return importFailure(supabase, createdTenantIds, candidatesError, 'Failed to look up existing leases')
     }
 
     const duplicate = (candidates || []).some((contract) =>
@@ -205,8 +217,7 @@ export async function POST(request) {
         })
         contractsCreated = 1
       } catch (error) {
-        await cleanupCreatedTenants(supabase, createdTenantIds)
-        return NextResponse.json({ error: error.message || 'Failed to create lease.' }, { status: 500 })
+        return importFailure(supabase, createdTenantIds, error, 'Failed to create lease')
       }
     }
   }
