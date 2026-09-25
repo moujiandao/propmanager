@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { requireLandlord, requireTeamRecord, requireTeamRecords } from '@/lib/auth/authorize'
+import { updateContract } from '../../../../lib/contracts/core.js'
+import { createContractsAdapter } from '../../../../lib/contracts/adapter.js'
 
 export async function POST(request) {
   const { contractId, propertyId, unit, startDate, endDate, rentAmount, dueDay, tenantIds } = await request.json()
   if (!contractId) return Response.json({ error: 'contractId is required.' }, { status: 400 })
-  const tenantList = Array.isArray(tenantIds) ? tenantIds : []
 
   const auth = await requireLandlord()
   if (auth.response) return auth.response
@@ -19,45 +20,36 @@ export async function POST(request) {
   if (access.response) return access.response
   const propertyAccess = await requireTeamRecords(supabase, { table: 'properties', ids: [propertyId], landlordId: auth.landlordId })
   if (propertyAccess.response) return propertyAccess.response
-  const tenantAccess = await requireTeamRecords(supabase, { table: 'tenant_profiles', ids: tenantList, landlordId: auth.landlordId })
+  const tenantAccess = await requireTeamRecords(supabase, { table: 'tenant_profiles', ids: Array.isArray(tenantIds) ? tenantIds : [], landlordId: auth.landlordId })
   if (tenantAccess.response) return tenantAccess.response
 
-  // Capture existing tenants so we know which are newly assigned
-  const { data: existingLinks } = await supabase
+  // Capture the current parties. The RPC re-verifies the owner before it
+  // replaces a single row, so links cannot be lost when an insert fails.
+  const { data: existingLinks, error: linksError } = await supabase
     .from('contract_tenants')
     .select('tenant_id')
     .eq('contract_id', contractId)
+  if (linksError) return Response.json({ error: linksError.message }, { status: 400 })
   const existingTenantIds = new Set((existingLinks || []).map(r => r.tenant_id))
 
-  const { error: updateError } = await supabase
-    .from('contracts')
-    .update({
-      property_id: propertyId || null,
-      unit: unit || null,
-      start_date: startDate || null,
-      end_date: endDate || null,
-      rent_amount: rentAmount ? +rentAmount : null,
-      due_day: dueDay ? +dueDay : null,
+  try {
+    await updateContract(createContractsAdapter(supabase), {
+      contractId,
+      landlordId: auth.landlordId,
+      propertyId,
+      unit,
+      startDate,
+      endDate,
+      rentAmount,
+      dueDay,
+      tenantIds,
     })
-    .eq('id', contractId)
-  if (updateError) return Response.json({ error: updateError.message }, { status: 400 })
-
-  // Replace contract_tenants links
-  const { error: delError } = await supabase
-    .from('contract_tenants')
-    .delete()
-    .eq('contract_id', contractId)
-  if (delError) return Response.json({ error: delError.message }, { status: 400 })
-
-  if (tenantList.length > 0) {
-    const { error: insError } = await supabase
-      .from('contract_tenants')
-      .insert(tenantList.map(tid => ({ contract_id: contractId, tenant_id: tid })))
-    if (insError) return Response.json({ error: insError.message }, { status: 400 })
+  } catch (error) {
+    return Response.json({ error: error.message || 'Failed to update lease.' }, { status: 400 })
   }
 
   // Update move_in_date for newly added tenants when a startDate is provided
-  const newTenantIds = tenantList.filter(tid => !existingTenantIds.has(tid))
+  const newTenantIds = (Array.isArray(tenantIds) ? tenantIds : []).filter(tid => !existingTenantIds.has(tid))
   if (startDate && newTenantIds.length) {
     await supabase
       .from('tenant_profiles')
