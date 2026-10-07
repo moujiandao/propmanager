@@ -48,7 +48,7 @@ export async function POST(request) {
     return Response.json({ error: 'GOOGLE_SERVICE_ACCOUNT_JSON env var is missing or invalid.' }, { status: 500 })
   }
 
-  const auth = new GoogleAuth({
+  const googleAuth = new GoogleAuth({
     credentials: {
       client_email: serviceAccountCredentials.client_email,
       private_key: serviceAccountCredentials.private_key,
@@ -58,7 +58,7 @@ export async function POST(request) {
 
   let token
   try {
-    const client = await auth.getClient()
+    const client = await googleAuth.getClient()
     const tokenRes = await client.getAccessToken()
     token = tokenRes.token
   } catch (err) {
