@@ -41,6 +41,15 @@ they don't get lost between sessions.
   and the Stripe subscription columns exist, but billing and plan gating are not
   built.
 
+## [2026-10-06]
+
+### Changed
+- **An unreachable Auth server no longer takes the whole site down with it.** `middleware.js` awaited `supabase.auth.getUser()` on every request with no bound; with Supabase unreachable and an expired session cookie, the client retries a token refresh for up to 30s, past the platform's 25s middleware limit, so every page (including the marketing site) returned `504 MIDDLEWARE_INVOCATION_TIMEOUT`. Public pages (`/`, `/pricing`, `/login`, `/signup`, `/reset-password`) now skip Supabase entirely, and everywhere else the lookup is bounded at 5s: app paths answer a fast 503, API routes and the auth callback pass through to their own checks. An outage is never treated as "signed out", so it cannot bounce a signed-in user to the login page.
+- Move `APP_PREFIXES` from `middleware.js` to `lib/auth/session-gate.js`. **Adding a new top-level app segment now means adding it there.**
+
+### Added
+- Add `lib/auth/session-gate.js` (`isAppPath`, `isPublicPath`, `resolveUser`, `gateDecision`): the middleware's path rules and outage handling, free of Next and Supabase and unit-tested via `npm test`.
+
 ## [2026-08-12]
 
 ### Changed

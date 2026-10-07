@@ -50,7 +50,7 @@ Run tests and lint after code changes. Run the production build when a change af
 - Resolve route params with the `find*` helpers in `lib/routes.js`, not inline `.find()` calls.
 - Landlord routes live in the `(landlord)` route group, which does not add a URL segment. Tenant routes live below `/portal`.
 - `app/(app)/layout.js` owns the authenticated guard and mounts `AppProvider`. `middleware.js` refreshes the Supabase session cookie and recognizes authenticated URL prefixes, but it is not the authorization gate.
-- When adding a top-level authenticated route, add it to `APP_PREFIXES` in `middleware.js`.
+- When adding a top-level authenticated route, add it to `APP_PREFIXES` in `lib/auth/session-gate.js`.
 - Keep the app store in the shared layout so it survives route navigation. Keep the cold-store loading gate inside `AppProvider`; moving the conditional outside remounts the provider and discards optimistic state.
 
 ### Supabase and authorization
@@ -120,7 +120,7 @@ The seamed entities are `maintenance`, `tenant`, `property`, `payment-reminders`
 3. Use `useLandlordPageProps()` for landlord pages where applicable.
 4. Add its route builder to `lib/routes.js`.
 5. Add navigation in `components/sidebar.jsx` with both translations in `lib/i18n/strings.js`.
-6. Add a new top-level segment to `APP_PREFIXES` in `middleware.js`.
+6. Add a new top-level segment to `APP_PREFIXES` in `lib/auth/session-gate.js`.
 
 ### Add or change a seamed write
 

@@ -1,8 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { isPublicPath, resolveUser, gateDecision } from './lib/auth/session-gate.js'
 
 export async function middleware(request) {
   let supabaseResponse = NextResponse.next({ request })
+
+  const { pathname, search } = request.nextUrl
+  if (isPublicPath(pathname)) return supabaseResponse
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -25,7 +29,15 @@ export async function middleware(request) {
 
   // Refreshes the session and writes updated cookies to the response.
   // Do not add any logic between createServerClient and this call.
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await resolveUser(() => supabase.auth.getUser())
+  const decision = gateDecision(pathname, session)
+
+  if (decision === 'unavailable') {
+    return new NextResponse('The sign-in service is not responding. Please try again in a minute.', {
+      status: 503,
+      headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '30', 'cache-control': 'no-store' },
+    })
+  }
 
   // Bounce unauthenticated requests for app paths, carrying the ACTUAL requested
   // path in `next`. This lives here rather than in the (app) layout because a
@@ -34,10 +46,8 @@ export async function middleware(request) {
   // real bug the moment it had twenty: every deep link sent you to the dashboard
   // after login instead of where you asked for. The layout's own check stays as
   // the authoritative one; this is the optimistic redirect that keeps `next`
-  // honest. getUser() is already called above, so this costs nothing extra.
-  const { pathname, search } = request.nextUrl
-  const isAppPath = APP_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'))
-  if (!user && isAppPath) {
+  // honest. The user is already resolved above, so this costs nothing extra.
+  if (decision === 'login') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.search = ''
@@ -47,15 +57,6 @@ export async function middleware(request) {
 
   return supabaseResponse
 }
-
-// Top-level segments owned by the authenticated surface. Route groups don't
-// appear in URLs, so this cannot be derived from the directory layout — adding
-// an app route means adding its first segment here.
-const APP_PREFIXES = [
-  '/dashboard', '/properties', '/tenants', '/payments', '/maintenance',
-  '/parking', '/leases', '/renewals', '/documents', '/email', '/settings',
-  '/portal',
-]
 
 export const config = {
   matcher: [
