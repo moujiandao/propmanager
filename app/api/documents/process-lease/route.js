@@ -1,4 +1,4 @@
-import { createClient } from '../../../../lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { requireLandlord, requireTeamRecord, requireTeamRecords } from '@/lib/auth/authorize'
 import { createContract } from '../../../../lib/contracts/core.js'
@@ -171,13 +171,22 @@ async function importFailure(supabase, { tenantIds, existingSnapshots, contractI
 }
 
 export async function POST(request) {
-  const supabase = await createClient()
   const { documentId, propertyId, unitId, approvedTenants, approvedFields } = await request.json()
 
   if (!documentId) return NextResponse.json({ error: 'Missing documentId' }, { status: 400 })
 
   const auth = await requireLandlord()
   if (auth.response) return auth.response
+
+  // A plain service-role client, not the cookie-bound one in lib/supabase/server:
+  // that one sends the caller's JWT whenever a session cookie is present, so its
+  // queries run as `authenticated`, and the contract RPCs are granted to
+  // `service_role` only. Team scoping is the explicit checks below.
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 
   const access = await requireTeamRecord(supabase, { table: 'documents', id: documentId, landlordId: auth.landlordId, select: 'id, landlord_id, ai_extracted' })
   if (access.response) return access.response
