@@ -36,7 +36,7 @@ import * as unitOps from '@/lib/units/core';
 import { createParkingAdapter } from '@/lib/parking/adapter';
 import { createPaymentsAdapter } from '@/lib/payments/adapter';
 import { mapPayment } from '@/lib/payments/mappers';
-import { PAYMENT_STATUSES, PAYMENT_TYPES, isRentPayment, isParkingPayment } from '@/lib/payments/status';
+import { PAYMENT_STATUSES, PAYMENT_TYPES } from '@/lib/payments/status';
 import * as paymentOps from '@/lib/payments/core';
 import { mapParkingSpot, mapParkingRenter, mapParkingLease } from '@/lib/parking/mappers';
 import * as parkingOps from '@/lib/parking/core';
@@ -464,9 +464,7 @@ export const LandlordDashboard = ({ data, setData, t, lang, user }) => {
   const todayStr = now.toISOString().split("T")[0];
   const paidTenantIds = new Set(
     payments
-      // Parking payments are tracked separately on the Payments page and must
-      // not mark the rent as paid (lib/payments/status.js).
-      .filter(p => isRentPayment(p) && p.status === "completed" && p.dueDate && p.dueDate.startsWith(currentMonthKey))
+      .filter(p => p.status === "completed" && p.dueDate && p.dueDate.startsWith(currentMonthKey))
       .map(p => p.tenantId)
   );
   // Only flag rent as unpaid once we're at the 5th of the month or later — gives tenants a grace window through the 4th.
@@ -2558,31 +2556,6 @@ export const ParkingPage = ({ data, t, refresh, user }) => {
 // year of monthly rent across a dozen tenants is a long page uncapped.
 const PAYMENT_PAGE_SIZE = 25;
 
-// Keys for the month grid's checkbox map. A tenant has a rent box per month and,
-// only while they hold an active parking lease, a parking box too. The kind is a
-// prefix rather than a second map so one dirty/discard/save path covers both.
-const gridKey = (kind, tenantId, monthKey) => `${kind}:${tenantId}-${monthKey}`;
-const parseGridKey = (mapKey) => {
-  const [kind, rest] = mapKey.split(":");
-  // tenantId is a 36-char UUID; the month key follows the separating dash.
-  return { kind, tenantId: rest.slice(0, 36), monthKey: rest.slice(37) };
-};
-
-// One checkbox cell of the month grid, shaded while it differs from what is saved.
-const GridCheckCell = ({ mapKey, checked, saved, toggle, size = 17, style }) => {
-  const isDirty = !!checked[mapKey] !== !!saved[mapKey];
-  return (
-    <td style={{ padding: "13px 10px", textAlign: "center", ...style, background: isDirty ? "#f5f5f5" : "transparent" }}>
-      <input
-        type="checkbox"
-        checked={!!checked[mapKey]}
-        onChange={() => toggle(mapKey)}
-        style={{ width: size, height: size, cursor: "pointer", accentColor: "#111111" }}
-      />
-    </td>
-  );
-};
-
 export const PaymentsPage = ({ data, t, refresh }) => {
   // 3-month window: previous, current, next month
   const months = useMemo(() => {
@@ -2601,15 +2574,12 @@ export const PaymentsPage = ({ data, t, refresh }) => {
     return result;
   }, []);
 
-  // "<kind>:tenantId-YYYY-MM" → payment record id (from DB), where kind is
-  // "rent" or "parking". One map for both checkbox rows so the dirty-tracking,
-  // discard and save paths below stay single-pathed; the kind decides the row's
-  // `type` and amount on insert, and which checkbox a saved row ticks on load.
+  // "tenantId-YYYY-MM" → payment record id (from DB)
   const [saved, setSaved] = useState(() => {
     const map = {};
     for (const p of data.payments) {
       if (p.status === "completed" && p.dueDate) {
-        map[gridKey(isParkingPayment(p) ? "parking" : "rent", p.tenantId, p.dueDate.slice(0, 7))] = p.id;
+        map[`${p.tenantId}-${p.dueDate.slice(0, 7)}`] = p.id;
       }
     }
     return map;
@@ -2755,31 +2725,23 @@ export const PaymentsPage = ({ data, t, refresh }) => {
 
   const getContract = (tenant) => data.contracts.find(c => c.tenantIds.includes(tenant.id));
 
-  // A tenant's parking, derived from their *active* parking leases (lib/parking/status.js),
-  // never stored. A tenant with no active lease gets no entry, and no parking row in the
-  // grid: there is nothing to tick off for them. A tenant on two spots gets one row that
-  // sums both rates and names both spots.
+  // A tenant's monthly parking, summed over their *active* parking leases
+  // (lib/parking/status.js) at each lease's agreed rate. Derived, never stored.
+  // Parking is paid together with rent, so it has no checkbox of its own: it is
+  // shown for reference and folded into the Total the month checkbox records.
   const parkingByTenant = (() => {
     const map = {};
     for (const lease of data.parkingLeases || []) {
-      if (!lease.tenantId || !isActiveLease(lease)) continue;
-      const spot = (data.parkingSpots || []).find(sp => sp.id === lease.parkingSpotId);
-      const entry = map[lease.tenantId] || (map[lease.tenantId] = { amount: 0, spots: [] });
-      entry.amount += Number(lease.rate) || 0;
-      if (spot?.label) entry.spots.push(spot.label);
+      if (lease.tenantId && isActiveLease(lease)) {
+        map[lease.tenantId] = (map[lease.tenantId] || 0) + (Number(lease.rate) || 0);
+      }
     }
-    for (const entry of Object.values(map)) entry.spots.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     return map;
   })();
+  const monthlyTotal = (tenant) => (tenant.monthlyRent || 0) + (parkingByTenant[tenant.id] || 0);
 
-  // Every checkbox in a month column: one rent box per tenant, plus a parking
-  // box for each tenant with active parking. The select-all header reads this.
-  const columnKeys = (monthKey) => allTenants.flatMap(ten => [
-    gridKey("rent", ten.id, monthKey),
-    ...(parkingByTenant[ten.id] ? [gridKey("parking", ten.id, monthKey)] : []),
-  ]);
-
-  const toggle = (mapKey) => {
+  const toggle = (tenantId, monthKey) => {
+    const mapKey = `${tenantId}-${monthKey}`;
     setChecked(prev => {
       const next = { ...prev };
       if (next[mapKey]) { delete next[mapKey]; } else { next[mapKey] = true; }
@@ -2788,11 +2750,11 @@ export const PaymentsPage = ({ data, t, refresh }) => {
   };
 
   const toggleColumn = (monthKey) => {
-    const keys = columnKeys(monthKey);
-    const allChecked = keys.every(k => !!checked[k]);
+    const allChecked = allTenants.every(t => !!checked[`${t.id}-${monthKey}`]);
     setChecked(prev => {
       const next = { ...prev };
-      for (const mapKey of keys) {
+      for (const tenant of allTenants) {
+        const mapKey = `${tenant.id}-${monthKey}`;
         if (allChecked) { delete next[mapKey]; } else { next[mapKey] = true; }
       }
       return next;
@@ -2812,20 +2774,18 @@ export const PaymentsPage = ({ data, t, refresh }) => {
       const isChecked = !!checked[mapKey];
       if (isChecked && !wasSaved) {
         // New check - need to insert
-        const { kind, tenantId, monthKey } = parseGridKey(mapKey);
+        const [tenantId, monthKey] = [mapKey.slice(0, 36), mapKey.slice(37)];
         const tenant = data.tenants.find(t => t.id === tenantId);
-        const parking = kind === "parking";
-        const contract = tenant && !parking ? getContract(tenant) : null;
+        const contract = tenant ? getContract(tenant) : null;
         const row = {
           landlord_id: user.id,
           tenant_id: tenantId,
-          // A parking payment is for the lease's agreed rate (the only rate in
-          // the system, see lib/parking), not the tenant's rent.
-          amount: parking ? (parkingByTenant[tenantId]?.amount || 0) : (tenant?.monthlyRent || 0),
+          // One payment per month covers rent and any parking together.
+          amount: tenant ? monthlyTotal(tenant) : 0,
           due_date: `${monthKey}-01`,
           paid_date: new Date().toISOString().split("T")[0],
           status: "completed",
-          type: parking ? "parking" : "recurring",
+          type: "recurring",
         };
         if (contract?.id) row.contract_id = contract.id;
         toInsert.push({ mapKey, row });
@@ -2870,9 +2830,9 @@ export const PaymentsPage = ({ data, t, refresh }) => {
         setSaving(false);
         return;
       }
-      // Map returned rows back to mapKeys by matching kind + tenant_id + due_date
+      // Map returned rows back to mapKeys by matching tenant_id + due_date
       for (const rec of inserted) {
-        const mk = gridKey(isParkingPayment(rec) ? "parking" : "rent", rec.tenant_id, rec.due_date.slice(0, 7));
+        const mk = `${rec.tenant_id}-${rec.due_date.slice(0, 7)}`;
         newSaved[mk] = rec.id;
       }
     }
@@ -2909,7 +2869,7 @@ export const PaymentsPage = ({ data, t, refresh }) => {
               <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.colTenant}</th>
               <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.payZelleName}</th>
               <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.rent}</th>
-              <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.payParking}</th>
+              <th style={{ padding: "14px 18px", textAlign: "left", whiteSpace: "nowrap" }}>{t.payTotalCol}</th>
               {months.map(m => (
                 <th key={m.key} style={{ padding: "14px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{m.label}</th>
               ))}
@@ -2919,9 +2879,8 @@ export const PaymentsPage = ({ data, t, refresh }) => {
                 {t.paySelectAll}
               </td>
               {months.map(m => {
-                const keys = columnKeys(m.key);
-                const allChecked = keys.length > 0 && keys.every(k => !!checked[k]);
-                const someChecked = !allChecked && keys.some(k => !!checked[k]);
+                const allChecked = allTenants.length > 0 && allTenants.every(t => !!checked[`${t.id}-${m.key}`]);
+                const someChecked = !allChecked && allTenants.some(t => !!checked[`${t.id}-${m.key}`]);
                 return (
                   <td key={m.key} style={{ padding: "5px 10px", textAlign: "center" }}>
                     <input
@@ -2947,10 +2906,10 @@ export const PaymentsPage = ({ data, t, refresh }) => {
                 </tr>
                 {tenants.map(tenant => {
                   const rentAmount = tenant.monthlyRent || null;
-                  const parking = parkingByTenant[tenant.id] || null;
+                  const parkingAmount = parkingByTenant[tenant.id] || 0;
+                  const totalAmount = monthlyTotal(tenant);
                   return (
-                    <Fragment key={tenant.id}>
-                    <tr style={{ borderTop: "1px solid #f5f5f5", background: "transparent" }}>
+                    <tr key={tenant.id} style={{ borderTop: "1px solid #f5f5f5", background: "transparent" }}>
                       <td style={{ padding: "13px 18px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                           <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#111111,#000000)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700 }}>{(tenant.name || "?").charAt(0)}</div>
@@ -2967,39 +2926,37 @@ export const PaymentsPage = ({ data, t, refresh }) => {
                         {rentAmount ? fmt(rentAmount) : <span style={{ color: "#d1d5db" }}>-</span>}
                       </td>
                       <td style={{ padding: "13px 18px", fontSize: 14, fontWeight: 600, color: "#111111" }}>
-                        {parking ? fmt(parking.amount) : <span style={{ color: "#d1d5db" }}>-</span>}
+                        {totalAmount ? fmt(totalAmount) : <span style={{ color: "#d1d5db" }}>-</span>}
+                        {parkingAmount > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 500, color: "#6b7280", marginTop: 2 }}>{t.payInclParking(fmt(parkingAmount))}</div>
+                        )}
                       </td>
-                      {months.map(month => (
-                        <GridCheckCell key={month.key} mapKey={gridKey("rent", tenant.id, month.key)} checked={checked} saved={saved} toggle={toggle} />
-                      ))}
+                      {months.map(month => {
+                        const mapKey = `${tenant.id}-${month.key}`;
+                        const isChecked = !!checked[mapKey];
+                        const isDirty = !!checked[mapKey] !== !!saved[mapKey];
+                        return (
+                          <td key={month.key} style={{ padding: "13px 10px", textAlign: "center", background: isDirty ? "#f5f5f5" : "transparent" }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggle(tenant.id, month.key)}
+                              style={{ width: 17, height: 17, cursor: "pointer", accentColor: "#111111" }}
+                            />
+                          </td>
+                        );
+                      })}
                     </tr>
-                    {/* The parking row exists only while the tenant holds an active parking
-                        lease. It ticks off that month's parking payment, separate from rent. */}
-                    {parking && (
-                      <tr style={{ background: "transparent" }}>
-                        <td colSpan={4} style={{ padding: "0 18px 11px 57px", fontSize: 12, color: "#6b7280" }}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            <Icon name="car" size={13} />
-                            {t.payParkingRow(parking.spots.join(", "))}
-                            <span style={{ fontWeight: 600, color: "#111111" }}>{fmt(parking.amount)}</span>
-                          </span>
-                        </td>
-                        {months.map(month => (
-                          <GridCheckCell key={month.key} mapKey={gridKey("parking", tenant.id, month.key)} checked={checked} saved={saved} toggle={toggle} size={15} style={{ padding: "0 10px 11px" }} />
-                        ))}
-                      </tr>
-                    )}
-                    </Fragment>
                   );
                 })}
                 {(() => {
-                  const unitTotal = tenants.reduce((s, t) => s + (t.monthlyRent || 0), 0);
-                  const parkingTotal = tenants.reduce((s, t) => s + (parkingByTenant[t.id]?.amount || 0), 0);
-                  return unitTotal > 0 || parkingTotal > 0 ? (
+                  const unitRent = tenants.reduce((s, ten) => s + (ten.monthlyRent || 0), 0);
+                  const unitTotal = tenants.reduce((s, ten) => s + monthlyTotal(ten), 0);
+                  return unitTotal > 0 ? (
                     <tr style={{ borderTop: "1px solid #eaeaea", background: "#fafafa" }}>
                       <td colSpan={2} style={{ padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#6b7280" }}>{t.payTotal}</td>
-                      <td style={{ padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#111111" }}>{unitTotal > 0 ? fmt(unitTotal) : <span style={{ color: "#d1d5db" }}>-</span>}</td>
-                      <td style={{ padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#111111" }}>{parkingTotal > 0 ? fmt(parkingTotal) : <span style={{ color: "#d1d5db" }}>-</span>}</td>
+                      <td style={{ padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#111111" }}>{fmt(unitRent)}</td>
+                      <td style={{ padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#111111" }}>{fmt(unitTotal)}</td>
                       <td colSpan={months.length} />
                     </tr>
                   ) : null;
@@ -3077,7 +3034,7 @@ export const PaymentsPage = ({ data, t, refresh }) => {
             <Sel label={t.colStatus} value={payForm.status} onChange={v => setPF("status", v)}
               options={PAYMENT_STATUSES.map(x => ({ value: x, label: t[`payStatus_${x}`] }))} />
             <Sel label={t.colType} value={payForm.type} onChange={v => setPF("type", v)}
-              options={[{ value: "", label: t.payTypeNone }, ...PAYMENT_TYPES.map(x => ({ value: x, label: { "one-time": t.payType_oneTime, parking: t.payType_parking }[x] || t.payType_recurring }))]} />
+              options={[{ value: "", label: t.payTypeNone }, ...PAYMENT_TYPES.map(x => ({ value: x, label: x === "one-time" ? t.payType_oneTime : t.payType_recurring }))]} />
           </div>
           {editPayError && <p style={{ color: "#ef4444", fontSize: 13 }}>{editPayError}</p>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
