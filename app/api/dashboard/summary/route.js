@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { statusForRow } from '@/lib/tenant/status'
+import { isRentPayment } from '@/lib/payments/status'
 import { requireLandlord, rejectMismatchedLandlord } from '@/lib/auth/authorize'
 
 const client = new Anthropic()
@@ -76,7 +77,8 @@ function buildFacts({ tenants: rawTenants, contracts, payments, maintenance, pro
 
   const paidPrevMonthTenantIds = new Set(
     payments
-      .filter(p => p.status === 'completed' && p.due_date && p.due_date.startsWith(prevMonthKey))
+      // A parking-only payment doesn't settle the rent (lib/payments/status.js).
+      .filter(p => isRentPayment(p) && p.status === 'completed' && p.due_date && p.due_date.startsWith(prevMonthKey))
       .map(p => p.tenant_id)
   )
   const wasActiveLastMonth = (t) => {
